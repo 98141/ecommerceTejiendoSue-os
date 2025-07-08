@@ -1,3 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import url("../src/blocks/styles.css");
+@import url("../src/blocks/produtCard.css");
+@import url("../src/blocks/cardItem.css");
+@import url("../src/blocks/producDetailBlock.css");
+@import url("../src/blocks/adminProductRow.css");
+@import url("../src/blocks/adminOrderRow.css");
+@import url("../src/blocks/productForm.css");
+@import url("../src/blocks/confirmModal.css");
+@import url("../src/blocks/toast.css");

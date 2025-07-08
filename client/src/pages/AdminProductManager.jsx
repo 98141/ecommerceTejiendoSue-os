@@ -1,95 +1,78 @@
-import { useContext, useEffect, useState } from "react";
-import { AuthContext } from "../contexts/AuthContext";
+import { useEffect, useState, useContext } from "react";
 import axios from "axios";
+import { AuthContext } from "../contexts/AuthContext";
+import AdminProductRow from "../blocks/AdminProductRow";
 import { useNavigate } from "react-router-dom";
 
-const AdminProductManager = () => {
-  const { user, token } = useContext(AuthContext);
-  const navigate = useNavigate();
+const AdminProductPage = () => {
   const [products, setProducts] = useState([]);
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    price: 0,
-    stock: 0,
-    imageUrl: ""
-  });
+  const { token } = useContext(AuthContext);
+  const navigate = useNavigate();
 
-  const [editingId, setEditingId] = useState(null);
-
-  useEffect(() => {
-    if (!user || user.role !== "admin") return navigate("/");
-
-    fetchProducts();
-  }, [token]);
-
-  const fetchProducts = () => {
-    axios.get("http://localhost:5000/api/products")
-      .then(res => setProducts(res.data));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const method = editingId ? "put" : "post";
-    const url = editingId
-      ? `http://localhost:5000/api/products/${editingId}`
-      : "http://localhost:5000/api/products";
-
-    axios[method](url, form, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(() => {
-      fetchProducts();
-      setForm({ name: "", description: "", price: 0, stock: 0, imageUrl: "" });
-      setEditingId(null);
-    });
-  };
-
-  const handleEdit = (product) => {
-    setForm(product);
-    setEditingId(product._id);
-  };
-
-  const handleDelete = (id) => {
-    if (confirm("¿Eliminar este producto?")) {
-      axios.delete(`http://localhost:5000/api/products/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      }).then(() => fetchProducts());
+  const fetchProducts = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/products");
+      setProducts(res.data);
+    } catch {
+      alert("Error al cargar productos");
     }
   };
 
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("¿Eliminar este producto?")) return;
+
+    try {
+      await axios.delete(`http://localhost:5000/api/products/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchProducts();
+    } catch {
+      alert("Error al eliminar");
+    }
+  };
+
+  const handleEdit = (product) => {
+    navigate(`/admin/products/edit/${product._id}`);
+  };
+
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Gestión de Productos</h2>
-      <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
-        <input placeholder="Nombre" value={form.name}
-          onChange={e => setForm({ ...form, name: e.target.value })} /><br />
-        <input placeholder="Descripción" value={form.description}
-          onChange={e => setForm({ ...form, description: e.target.value })} /><br />
-        <input type="number" placeholder="Precio" value={form.price}
-          onChange={e => setForm({ ...form, price: Number(e.target.value) })} /><br />
-        <input type="number" placeholder="Stock" value={form.stock}
-          onChange={e => setForm({ ...form, stock: Number(e.target.value) })} /><br />
-        <input placeholder="URL de imagen" value={form.imageUrl}
-          onChange={e => setForm({ ...form, imageUrl: e.target.value })} /><br />
-        <button type="submit">{editingId ? "Actualizar" : "Crear"} producto</button>
-      </form>
+    <div style={{ padding: "20px" }}>
+      <h2>Administrar Productos</h2>
 
-      <hr />
+      <button
+        onClick={() => navigate("/admin/products/new")}
+        className="btn-save"
+        style={{ marginBottom: "20px" }}
+      >
+        + Agregar nuevo producto
+      </button>
 
-      <h3>Lista de productos</h3>
-      {products.map(p => (
-        <div key={p._id} style={{ border: "1px solid gray", marginBottom: 10, padding: 10 }}>
-          <p><strong>{p.name}</strong> - ${p.price} - Stock: {p.stock}</p>
-          <img src={p.imageUrl} alt={p.name} width="150" />
-          <p>{p.description}</p>
-          <button onClick={() => handleEdit(p)}>Editar</button>
-          <button onClick={() => handleDelete(p._id)} style={{ marginLeft: 10, color: "red" }}>
-            Eliminar
-          </button>
-        </div>
-      ))}
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Precio</th>
+            <th>Stock</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((p) => (
+            <AdminProductRow
+              key={p._id}
+              product={p}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };
 
-export default AdminProductManager;
+export default AdminProductPage;
