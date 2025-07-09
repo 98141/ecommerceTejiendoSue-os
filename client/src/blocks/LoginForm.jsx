@@ -2,28 +2,37 @@ import { useState, useContext } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useToast } from "../contexts/ToastContext"; // ✅ importación
 
 const LoginForm = () => {
   const { login } = useContext(AuthContext);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { showToast } = useToast(); // ✅ uso del toast
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://localhost:5000/api/users/login", { email, password });
+      const res = await axios.post("http://localhost:5000/api/users/login", {
+        email,
+        password
+      });
+
       login(res.data.token, res.data.user);
+      showToast("Inicio de sesión exitoso", "success"); // ✅ toast de éxito
       res.data.user.role === "admin" ? navigate("/admin") : navigate("/");
     } catch (err) {
-      alert("Credenciales inválidas" + err.response?.data?.error);
+      const msg = err.response?.data?.error || "Error al iniciar sesión";
+      showToast(msg, "error"); // ✅ toast de error
     }
   };
 
   return (
     <div className="login-container">
       <h2>Iniciar sesión</h2>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleLogin}>
         <input
           type="email"
           placeholder="Correo electrónico"

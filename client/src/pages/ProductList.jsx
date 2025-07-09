@@ -1,15 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import ProductCard from "../blocks/ProductCard";
+import { AuthContext } from "../contexts/AuthContext";
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
+  const { user } = useContext(AuthContext);
 
   useEffect(() => {
-    axios.get("http://localhost:5000/api/products")
-      .then(res => setProducts(res.data))
-      .catch(() => alert("Error al cargar productos"));
-  }, []);
+    if (user?.role !== "admin") {
+      axios.get("http://localhost:5000/api/products")
+        .then(res => setProducts(res.data))
+        .catch(() => alert("Error al cargar productos"));
+    }
+  }, [user]);
+
+  if (user?.role === "admin") {
+    return (
+      <div style={{ padding: "20px", textAlign: "center" }}>
+        <h2>Acceso restringido</h2>
+        <p>Los administradores no pueden visualizar el catálogo de productos.</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: "20px" }}>

@@ -1,22 +1,27 @@
-import { createContext, useState, useEffect } from "react";
+import { createContext, useState } from "react";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token") || null);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
 
-  const login = (token, userData) => {
-    setToken(token);
-    setUser(userData);
-    localStorage.setItem("token", token);
+  const login = (newToken, newUser) => {
+    setToken(newToken);
+    setUser(newUser);
+    localStorage.setItem("token", newToken);
+    localStorage.setItem("user", JSON.stringify(newUser));
   };
 
   const logout = () => {
-    alert("Has cerrado sesión");
     setToken(null);
     setUser(null);
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
   };
 
   return (

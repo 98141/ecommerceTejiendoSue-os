@@ -1,15 +1,28 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 
 const ProductDetailBlock = ({ product, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
+  const { user } = useContext(AuthContext);
+  const { showToast } = useToast();
+  const navigate = useNavigate();
 
   const handleAdd = () => {
-    if (quantity > product.stock) {
-      alert("No hay suficiente stock disponible.");
+    if (!user || user.role === "admin") {
+      showToast("Debes iniciar sesión como usuario para comprar", "warning");
+      navigate("/login");
       return;
     }
+
+    if (quantity > product.stock) {
+      showToast("No hay suficiente stock disponible", "error");
+      return;
+    }
+
     onAddToCart(product, quantity);
-    alert("Producto agregado al carrito.");
+    showToast("Producto agregado al carrito", "success");
   };
 
   return (
@@ -45,3 +58,4 @@ const ProductDetailBlock = ({ product, onAddToCart }) => {
 };
 
 export default ProductDetailBlock;
+

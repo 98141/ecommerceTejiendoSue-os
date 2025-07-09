@@ -3,10 +3,16 @@ import axios from "axios";
 import { AuthContext } from "../contexts/AuthContext";
 import AdminProductRow from "../blocks/AdminProductRow";
 import { useNavigate } from "react-router-dom";
+import ConfirmModal from "../blocks/ConfirmModal"; // ✅ Modal visual
+import { useToast } from "../contexts/ToastContext"; // ✅ Toast visual
 
 const AdminProductPage = () => {
   const [products, setProducts] = useState([]);
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const { token } = useContext(AuthContext);
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const fetchProducts = async () => {
@@ -14,7 +20,7 @@ const AdminProductPage = () => {
       const res = await axios.get("http://localhost:5000/api/products");
       setProducts(res.data);
     } catch {
-      alert("Error al cargar productos");
+      showToast("Error al cargar productos", "error");
     }
   };
 
@@ -22,16 +28,24 @@ const AdminProductPage = () => {
     fetchProducts();
   }, []);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("¿Eliminar este producto?")) return;
+  const requestDelete = (product) => {
+    setProductToDelete(product);
+    setShowConfirm(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!productToDelete) return;
     try {
-      await axios.delete(`http://localhost:5000/api/products/${id}`, {
+      await axios.delete(`http://localhost:5000/api/products/${productToDelete._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      showToast("Producto eliminado correctamente", "success");
       fetchProducts();
     } catch {
-      alert("Error al eliminar");
+      showToast("Error al eliminar el producto", "error");
+    } finally {
+      setShowConfirm(false);
+      setProductToDelete(null);
     }
   };
 
@@ -66,11 +80,23 @@ const AdminProductPage = () => {
               key={p._id}
               product={p}
               onEdit={handleEdit}
-              onDelete={handleDelete}
+              onDelete={() => requestDelete(p)} 
             />
           ))}
         </tbody>
       </table>
+
+      {showConfirm && (
+        <ConfirmModal
+          title="Eliminar producto"
+          message={`¿Estás seguro de eliminar "${productToDelete?.name}"? Esta acción no se puede deshacer.`}
+          onConfirm={confirmDelete}
+          onCancel={() => {
+            setShowConfirm(false);
+            setProductToDelete(null);
+          }}
+        />
+      )}
     </div>
   );
 };
