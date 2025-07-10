@@ -1,6 +1,7 @@
 const Message = require("../models/Message");
 const User = require("../models/User");
 
+
 // Obtener historial entre dos usuarios
 exports.getMessageHistory = async (req, res) => {
   const { withUserId } = req.params;
@@ -10,12 +11,12 @@ exports.getMessageHistory = async (req, res) => {
     const messages = await Message.find({
       $or: [
         { from: userId, to: withUserId },
-        { from: withUserId, to: userId }
-      ]
+        { from: withUserId, to: userId },
+      ],
     })
-    .sort({ createdAt: 1 })
-    .populate("from", "name")
-    .populate("to", "name");
+      .sort({ createdAt: 1 })
+      .populate("from", "name")
+      .populate("to", "name");
 
     res.json(messages);
   } catch (err) {
@@ -31,7 +32,7 @@ exports.sendMessage = async (req, res) => {
     const message = await Message.create({
       from: req.user.id,
       to,
-      content
+      content,
     });
 
     res.status(201).json(message);
@@ -45,7 +46,7 @@ exports.getUnreadMessagesCount = async (req, res) => {
   try {
     const count = await Message.countDocuments({
       to: req.user.id,
-      isRead: false
+      isRead: false,
     });
     res.json({ count });
   } catch (err) {
@@ -83,10 +84,67 @@ exports.getInboxUsers = async (req, res) => {
       if (msg.to.toString() !== adminId) userIds.add(msg.to.toString());
     });
 
-    const users = await User.find({ _id: { $in: [...userIds] } }).select("name email");
+    const users = await User.find({ _id: { $in: [...userIds] } }).select(
+      "name email"
+    );
 
     res.json(users);
   } catch (err) {
     res.status(500).json({ error: "Error al obtener la bandeja de entrada" });
+  }
+};
+
+// Obtener lista de usuarios con los que el admin ha hablado
+exports.getConversations = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const messages = await Message.find({
+      $or: [{ from: userId }, { to: userId }],
+    })
+      .populate("from", "name role")
+      .populate("to", "name role");
+
+    // Extraer IDs únicos de usuarios con los que se ha hablado
+    const usersMap = {};
+
+    messages.forEach((msg) => {
+      const otherUser = msg.from._id.equals(userId) ? msg.to : msg.from;
+      if (!usersMap[otherUser._id]) {
+        usersMap[otherUser._id] = {
+          id: otherUser._id,
+          name: otherUser.name,
+          role: otherUser.role,
+        };
+      }
+    });
+
+    // Obtener usuarios únicos con los que el admin ha hablado
+    exports.getInboxUsers = async (req, res) => {
+      try {
+        const adminId = req.user.id;
+        const messages = await Message.find({
+          $or: [{ from: adminId }, { to: adminId }],
+        }).populate("from to", "name");
+
+        // Extraer usuarios únicos con los que el admin ha hablado
+        const userMap = {};
+
+        messages.forEach((msg) => {
+          const user = msg.from._id.toString() === adminId ? msg.to : msg.from;
+
+          userMap[user._id] = user;
+        });
+
+        const users = Object.values(userMap);
+        res.json(users);
+      } catch (err) {
+        res.status(500).json({ error: "Error al cargar inbox" });
+      }
+    };
+
+    res.json(Object.values(usersMap));
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener conversaciones" });
   }
 };

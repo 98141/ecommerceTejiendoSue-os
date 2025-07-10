@@ -13,55 +13,45 @@ import NewProductPage from "./pages/RegisterProductPage";
 import EditProductPage from "./pages/EditProductPage";
 import PrivateRoute from "./routes/PrivateRoutes";
 import NotFoundPage from "./pages/NotFoundPage";
+import AdminInboxPage from "./pages/AdminInboxPage";
 import SupportChatPage from "./pages/SupportChatPage";
-import { AuthProvider } from "./contexts/AuthContext";
-import { ToastProvider } from "./contexts/ToastContext";
 
 function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <Router>
-          <Navbar />
-          <Routes>
-            {/* Públicas */}
-            <Route path="/" element={<ProductList />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-
-            {/* Privadas para usuarios */}
-            <Route element={<PrivateRoute allowedRoles={["user"]} />}>
-              <Route path="/cart" element={<CartPage />} />
-              <Route path="/my-orders" element={<MyOrders />} />
-              <Route path="/product/:id" element={<ProductDetail />} />
-            </Route>
-
-            {/* Privadas para administrador */}
-            <Route element={<PrivateRoute allowedRoles={["admin"]} />}>
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/orders" element={<AdminOrderPage />} />
-              <Route path="/admin/products" element={<AdminProductManager />} />
-              <Route path="/admin/products/new" element={<NewProductPage />} />
-              <Route
-                path="/admin/products/edit/:id"
-                element={<EditProductPage />}
-              />
-              
-              {/* Ruta compartida para soporte (usuarios y administradores) */}
-              <Route
-                element={<PrivateRoute allowedRoles={["user", "admin"]} />}
-              >
-                <Route path="/support" element={<SupportChatPage />} />
-              </Route>
-
-              {/* tus otras rutas... */}
-              <Route path="*" element={<NotFoundPage />} />{" "}
-              {/* 👈 ruta comodín */}
-            </Route>
-          </Routes>
-        </Router>
-      </AuthProvider>
-    </ToastProvider>
+    <Router>
+      <Navbar />
+      <Routes>
+        {/* Públicas */}
+        <Route path="/" element={<ProductList />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        {/* Privadas para usuarios */}
+        <Route element={<PrivateRoute allowedRoles={["user"]} />}>
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/my-orders" element={<MyOrders />} />
+          <Route path="/product/:id" element={<ProductDetail />} />
+        </Route>
+        {/* Privadas para administrador */}
+        <Route element={<PrivateRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/orders" element={<AdminOrderPage />} />
+          <Route path="/admin/products" element={<AdminProductManager />} />
+          <Route path="/admin/products/new" element={<NewProductPage />} />
+          <Route
+            path="/admin/products/edit/:id"
+            element={<EditProductPage />}
+          />
+          <Route path="/support/:withUserId" element={<SupportChatPage />} />
+          <Route path="/admin/inbox" element={<AdminInboxPage />} />
+        </Route>
+        {/* Ruta compartida para soporte (usuarios y administradores) */}
+        <Route element={<PrivateRoute allowedRoles={["user", "admin"]} />}>
+          <Route path="/support" element={<SupportChatPage />} />
+        </Route>
+        {/* tus otras rutas... */}
+        <Route path="*" element={<NotFoundPage />} /> {/* 👈 ruta comodín */}
+      </Routes>
+    </Router>
   );
 }
 

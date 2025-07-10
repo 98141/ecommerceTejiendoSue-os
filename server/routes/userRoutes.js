@@ -17,4 +17,14 @@ router.get("/admin-dashboard", verifyToken, isAdmin, (req, res) => {
   res.json({ message: "Bienvenido al panel de administrador" });
 });
 
+router.get('/admin/id', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const admin = await User.findOne({ role: "admin" });
+    if (!admin) return res.status(404).json({ error: "Admin no encontrado" });
+    res.json({ adminId: admin._id });
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener admin ID" });
+  }
+});
+
 module.exports = router;

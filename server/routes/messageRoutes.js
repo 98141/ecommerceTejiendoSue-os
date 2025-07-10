@@ -6,22 +6,21 @@ const {
   sendMessage,
   getUnreadMessagesCount,
   markMessagesAsRead,
-  getInboxUsers
+  getInboxUsers,
+  getConversations,
 } = require("../controllers/messageControler");
 
-// Obtener historial de conversación
-router.get("/:withUserId", verifyToken, getMessageHistory);
+// Rutas específicas primero ✅
+router.get("/unread/count", verifyToken, getUnreadMessagesCount);
+router.post("/read", verifyToken, markMessagesAsRead);
+router.get("/inbox/users", verifyToken, isAdmin, getInboxUsers);
+router.get("/inbox/admin", verifyToken, isAdmin, getInboxUsers);
+router.get("/conversations/list", verifyToken, getConversations);
 
 // Enviar nuevo mensaje
 router.post("/", verifyToken, sendMessage);
 
-// Contar mensajes no leídos
-router.get("/unread/count", verifyToken, getUnreadMessagesCount);
-
-// Marcar mensajes como leídos
-router.post("/read", verifyToken, markMessagesAsRead);
-
-// Nueva ruta: obtener lista de usuarios con los que se ha chateado
-router.get("/inbox/users", verifyToken, isAdmin, getInboxUsers);
+// Al final: historial entre dos usuarios
+router.get("/:withUserId", verifyToken, getMessageHistory);
 
 module.exports = router;

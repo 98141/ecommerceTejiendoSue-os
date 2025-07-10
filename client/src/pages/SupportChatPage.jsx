@@ -1,5 +1,5 @@
 import { useEffect, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { SupportContext } from "../contexts/SupportContext";
 import { AuthContext } from "../contexts/AuthContext";
 import SupportChatBlock from "../blocks/SupportChatBlock";
@@ -8,30 +8,34 @@ const SupportChatPage = () => {
   const { user } = useContext(AuthContext);
   const { messages, fetchMessages, sendMessage } = useContext(SupportContext);
   const navigate = useNavigate();
-
-  const ADMIN_ID = "admin"; // Placeholder – será reemplazado al cargar desde backend
+  const { withUserId } = useParams(); // ← permite que el admin chatee con un cliente
 
   useEffect(() => {
     if (!user) return;
-    // Si es usuario, escribe al admin; si es admin, espera que el withUserId llegue como query param o similar
-    const withUserId = user.role === "user" ? "admin" : null;
 
-    if (!withUserId) {
-      navigate("/admin"); // o alguna otra página si no hay destinatario
-      return;
+    let targetId = "";
+
+    if (user.role === "user") {
+      targetId = "686c4d1c64583fa5d6a198dd"; // ← este ID debe coincidir con el que asignaste al administrador en la base de datos
+    } else if (user.role === "admin") {
+      if (!withUserId) {
+        navigate("/admin/inbox"); // ← redirige si no tiene un destinatario
+        return;
+      }
+      targetId = withUserId;
     }
 
-    fetchMessages(withUserId);
-  }, [user]);
+    fetchMessages(targetId);
+  }, [user, withUserId]);
 
-  const handleSend = (text) => {
-    const to = user.role === "user" ? "admin" : null; // Aquí luego se podría seleccionar
-    if (!to) return;
-    sendMessage(to, text);
-  };
+const handleSend = (text) => {
+  const to = user.role === "user" ? "686c4d1c64583fa5d6a198dd" : withUserId;
+  if (!to) return;
+  sendMessage(to, text);
+};
 
   return (
-    <div style={{ padding: "20px" }}>
+    <div>
       <SupportChatBlock
         messages={messages}
         onSendMessage={handleSend}

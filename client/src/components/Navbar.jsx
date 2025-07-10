@@ -34,9 +34,6 @@ const Navbar = () => {
               <Link to="/admin" className="mr-4">Pedidos</Link>
               <Link to="/admin/orders" className="mr-4">Historial</Link>
               <Link to="/admin/products" className="mr-4">Productos</Link>
-              <Link to="/support" className="mr-4">
-                Soporte {unreadCount > 0 && <span className="text-yellow-300 font-semibold">({unreadCount})</span>}
-              </Link>
             </>
           )}
 
@@ -44,10 +41,21 @@ const Navbar = () => {
             <>
               <Link to="/cart" className="mr-4">Carrito ({totalItems})</Link>
               <Link to="/my-orders" className="mr-4">Mis pedidos</Link>
-              <Link to="/support" className="mr-4">
-                Soporte {unreadCount > 0 && <span className="text-yellow-300 font-semibold">({unreadCount})</span>}
-              </Link>
             </>
+          )}
+
+          {user && (
+            <Link
+              to={user.role === "admin" ? "/admin/inbox" : "/support"}
+              className="mr-4"
+            >
+              Soporte{" "}
+              {unreadCount > 0 && (
+                <span className="text-yellow-300 font-semibold">
+                  ({unreadCount})
+                </span>
+              )}
+            </Link>
           )}
         </div>
 
