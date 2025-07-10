@@ -13,6 +13,7 @@ import NewProductPage from "./pages/RegisterProductPage";
 import EditProductPage from "./pages/EditProductPage";
 import PrivateRoute from "./routes/PrivateRoutes";
 import NotFoundPage from "./pages/NotFoundPage";
+import SupportChatPage from "./pages/SupportChatPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ToastProvider } from "./contexts/ToastContext";
 
@@ -45,6 +46,14 @@ function App() {
                 path="/admin/products/edit/:id"
                 element={<EditProductPage />}
               />
+              
+              {/* Ruta compartida para soporte (usuarios y administradores) */}
+              <Route
+                element={<PrivateRoute allowedRoles={["user", "admin"]} />}
+              >
+                <Route path="/support" element={<SupportChatPage />} />
+              </Route>
+
               {/* tus otras rutas... */}
               <Route path="*" element={<NotFoundPage />} />{" "}
               {/* 👈 ruta comodín */}
