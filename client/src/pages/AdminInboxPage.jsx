@@ -2,6 +2,7 @@ import { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import { AuthContext } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { socket } from "../socket";
 
 const AdminInboxPage = () => {
   const { token } = useContext(AuthContext);
@@ -9,32 +10,34 @@ const AdminInboxPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  const fetchInbox = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(
+        "http://localhost:5000/api/messages/inbox/admin",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setUsers(res.data);
+    } catch (err) {
+      console.error("Error al cargar el inbox", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchInbox = async () => {
-      setLoading(true);
-      try {
-        const res = await axios.get(
-          "http://localhost:5000/api/messages/inbox/admin",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setUsers(res.data);
-      } catch (err) {
-        console.error("Error al cargar el inbox", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (token) {
-      fetchInbox(); // primera carga
+      fetchInbox();
 
-      // 🔁 recarga automática cada 1 segundo
-      const interval = setInterval(fetchInbox, 1000);
+      socket.on("adminInboxUpdate", () => {
+        fetchInbox();
+      });
 
-      // limpieza al desmontar
-      return () => clearInterval(interval);
+      return () => {
+        socket.off("adminInboxUpdate");
+      };
     }
   }, [token]);
 

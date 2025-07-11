@@ -1,4 +1,4 @@
-import { useEffect, useContext, useRef } from "react";
+import { useEffect, useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SupportContext } from "../contexts/SupportContext";
 import { AuthContext } from "../contexts/AuthContext";
@@ -16,7 +16,6 @@ const SupportChatPage = () => {
 
   const { withUserId } = useParams();
   const navigate = useNavigate();
-  const intervalRef = useRef();
 
   const getTargetId = () => {
     if (!user) return null;
@@ -28,44 +27,22 @@ const SupportChatPage = () => {
   useEffect(() => {
     if (!user) return;
 
-    let targetId = "";
-
-    if (user.role === "user") {
-      targetId = "686c4d1c64583fa5d6a198dd";
-    } else if (user.role === "admin") {
-      if (!withUserId) {
-        navigate("/admin/inbox");
-        return;
-      }
-      targetId = withUserId;
+    const targetId = getTargetId();
+    if (!targetId) {
+      if (user.role === "admin") navigate("/admin/inbox");
+      return;
     }
 
-    const loadInitial = async () => {
+    const loadMessages = async () => {
       await fetchMessages(targetId);
       await markMessagesAsRead(targetId);
       await fetchUnreadMessagesCount();
     };
 
-    loadInitial();
-
-    // Evita que se cree más de un polling
-    let intervalId = null;
-
-    if (document.visibilityState === "visible") {
-      intervalId = setInterval(() => fetchMessages(targetId), 5000);
-    }
-
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        fetchMessages(targetId);
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibility);
+    loadMessages(); // solo al montar
 
     return () => {
-      clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", handleVisibility);
+      // limpieza automática
     };
   }, [user, withUserId]);
 

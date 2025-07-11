@@ -1,8 +1,9 @@
+// SupportContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
 import { AuthContext } from "./AuthContext";
 import { useToast } from "./ToastContext";
-import { socket } from "../socket";
+import { socket } from "../socket"; // nuevo
 
 export const SupportContext = createContext();
 
@@ -13,11 +14,33 @@ export const SupportProvider = ({ children }) => {
   const [messages, setMessages] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [lastUnreadToastShown, setLastUnreadToastShown] = useState(null);
 
   const authHeaders = {
     headers: { Authorization: `Bearer ${token}` },
   };
+
+  // 🔌 Conectar al socket una vez autenticado
+  useEffect(() => {
+    if (token && user) {
+      socket.auth = { token };
+      socket.connect();
+
+      socket.on("connect", () => {
+        console.log("🔌 Conectado al socket:", socket.id);
+      });
+
+      socket.on("newMessage", (msg) => {
+        setMessages((prev) => [...prev, msg]);
+        showToast("Nuevo mensaje recibido", "info");
+        fetchUnreadMessagesCount(); // actualiza contador
+      });
+
+      return () => {
+        socket.off("newMessage");
+        socket.disconnect();
+      };
+    }
+  }, [token, user]);
 
   const fetchMessages = async (withUserId) => {
     if (!token || !withUserId) return;
@@ -38,16 +61,15 @@ export const SupportProvider = ({ children }) => {
   const sendMessage = async (to, content) => {
     if (!token || !to || !content.trim()) return;
     try {
-      await axios.post(
+      const res = await axios.post(
         `http://localhost:5000/api/messages`,
         { to, content: content.trim() },
         authHeaders
       );
+      socket.emit("sendMessage", res.data); // envía mensaje por socket
       await fetchMessages(to);
-      showToast("Mensaje enviado", "success");
     } catch (err) {
       console.error("Error al enviar mensaje", err);
-      showToast("No se pudo enviar el mensaje", "error");
     }
   };
 
@@ -59,15 +81,6 @@ export const SupportProvider = ({ children }) => {
         authHeaders
       );
       setUnreadCount(res.data.count);
-
-      const now = Date.now();
-      if (
-        res.data.count > 0 &&
-        (!lastUnreadToastShown || now - lastUnreadToastShown > 30000)
-      ) {
-        showToast("Tienes nuevos mensajes sin leer", "info");
-        setLastUnreadToastShown(now);
-      }
     } catch (err) {
       console.error("Error al obtener conteo de mensajes no leídos", err);
     }
@@ -81,22 +94,11 @@ export const SupportProvider = ({ children }) => {
         { from: fromUserId },
         authHeaders
       );
-      await fetchUnreadMessagesCount(); // sincroniza el contador
+      await fetchUnreadMessagesCount(); // actualiza global
     } catch (err) {
       console.error("Error al marcar mensajes como leídos", err);
     }
   };
-
-  useEffect(() => {
-    if (token) {
-      const interval = setInterval(fetchUnreadMessagesCount, 20000);
-      return () => clearInterval(interval);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    return () => setMessages([]);
-  }, []);
 
   return (
     <SupportContext.Provider
