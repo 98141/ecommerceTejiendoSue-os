@@ -6,7 +6,6 @@ import { Link } from "react-router-dom";
 const MyOrders = () => {
   const { token } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
-  const withUserId = "686c4d1c64583fa5d6a198dd";
 
   useEffect(() => {
     if (!token) return;
@@ -55,7 +54,6 @@ const MyOrders = () => {
           </div>
         ))
       )}
-      <Link to={`/support/${withUserId}`}>Contactar soporte</Link>
     </div>
 
   );

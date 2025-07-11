@@ -1,0 +1,72 @@
+.admin-inbox-container {
+  padding: 30px;
+  max-width: 800px;
+  margin: 0 auto;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.admin-inbox-container h2 {
+  font-size: 24px;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.empty-inbox {
+  color: #999;
+  text-align: center;
+  font-style: italic;
+}
+
+.inbox-list {
+  list-style: none;
+  padding: 0;
+}
+
+.inbox-item {
+  margin-bottom: 10px;
+}
+
+.inbox-button {
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #f9f9f9;
+  transition: background-color 0.3s ease;
+}
+
+.inbox-button:hover {
+  background-color: #eaeaea;
+}
+
+.highlight-unread {
+  border-left: 5px solid crimson;
+  background-color: #fff7f7;
+}
+
+.inbox-button:focus {
+  outline: 2px solid #005fcc;
+}
+
+.user-name {
+  font-weight: bold;
+  display: block;
+}
+
+.user-email {
+  font-size: 0.9em;
+  color: gray;
+}
+
+.last-message {
+  margin-top: 5px;
+  font-size: 0.9em;
+  color: #444;
+}
+
+.unread-dot {
+  color: crimson;
+  margin-left: 8px;
+  font-weight: bold;
+}

@@ -1,7 +1,6 @@
 const Message = require("../models/Message");
 const User = require("../models/User");
 
-
 // Obtener historial entre dos usuarios
 exports.getMessageHistory = async (req, res) => {
   const { withUserId } = req.params;
@@ -26,18 +25,22 @@ exports.getMessageHistory = async (req, res) => {
 
 // Enviar mensaje
 exports.sendMessage = async (req, res) => {
-  const { to, content } = req.body;
-
   try {
-    const message = await Message.create({
-      from: req.user.id,
-      to,
-      content,
-    });
+    const { to, content } = req.body;
+    const from = req.user.id;
 
-    res.status(201).json(message);
+    const message = await Message.create({ from, to, content });
+
+    const populatedMessage = await message.populate("from to", "name email");
+
+    // Enviar mensaje en tiempo real usando Socket.IO
+    const io = req.app.get("io");
+    io.emit("newMessage", populatedMessage); // Puedes filtrar esto por usuario más adelante
+
+    res.status(201).json(populatedMessage);
   } catch (err) {
-    res.status(500).json({ error: "Error al enviar el mensaje" });
+    console.error("Error al enviar mensaje", err);
+    res.status(500).json({ error: "Error al enviar mensaje" });
   }
 };
 
@@ -73,24 +76,43 @@ exports.getInboxUsers = async (req, res) => {
   try {
     const adminId = req.user.id;
 
+    // Obtener todos los mensajes que involucren al admin (enviados o recibidos)
     const messages = await Message.find({
       $or: [{ from: adminId }, { to: adminId }],
-    });
+    })
+      .sort({ createdAt: -1 })
+      .populate("from to", "name email");
 
-    const userIds = new Set();
+    const userMap = {};
 
-    messages.forEach((msg) => {
-      if (msg.from.toString() !== adminId) userIds.add(msg.from.toString());
-      if (msg.to.toString() !== adminId) userIds.add(msg.to.toString());
-    });
+    for (let msg of messages) {
+      // Identificar con quién fue la conversación (usuario, no admin)
+      const other = msg.from._id.toString() === adminId ? msg.to : msg.from;
+      const otherId = other._id.toString();
 
-    const users = await User.find({ _id: { $in: [...userIds] } }).select(
-      "name email"
-    );
+      // Si el usuario no está en el mapa, lo agregamos
+      if (!userMap[otherId]) {
+        // Buscar si hay al menos un mensaje sin leer de este usuario al admin
+        const hasUnread = await Message.exists({
+          from: otherId,
+          to: adminId,
+          isRead: false,
+        });
 
-    res.json(users);
+        userMap[otherId] = {
+          _id: other._id,
+          name: other.name,
+          email: other.email,
+          lastMessage: msg.content,
+          unread: !!hasUnread,
+        };
+      }
+    }
+
+    res.json(Object.values(userMap));
   } catch (err) {
-    res.status(500).json({ error: "Error al obtener la bandeja de entrada" });
+    console.error("Error en getInboxUsers:", err);
+    res.status(500).json({ error: "Error al obtener inbox de admin" });
   }
 };
 

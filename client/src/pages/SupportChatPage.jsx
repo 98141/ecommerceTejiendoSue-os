@@ -1,4 +1,4 @@
-import { useEffect, useContext } from "react";
+import { useEffect, useContext, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SupportContext } from "../contexts/SupportContext";
 import { AuthContext } from "../contexts/AuthContext";
@@ -6,9 +6,24 @@ import SupportChatBlock from "../blocks/SupportChatBlock";
 
 const SupportChatPage = () => {
   const { user } = useContext(AuthContext);
-  const { messages, fetchMessages, sendMessage } = useContext(SupportContext);
+  const {
+    messages,
+    fetchMessages,
+    sendMessage,
+    markMessagesAsRead,
+    fetchUnreadMessagesCount,
+  } = useContext(SupportContext);
+
+  const { withUserId } = useParams();
   const navigate = useNavigate();
-  const { withUserId } = useParams(); // ← permite que el admin chatee con un cliente
+  const intervalRef = useRef();
+
+  const getTargetId = () => {
+    if (!user) return null;
+    if (user.role === "user") return "686c4d1c64583fa5d6a198dd"; // ID del admin
+    if (user.role === "admin") return withUserId || null;
+    return null;
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -16,23 +31,48 @@ const SupportChatPage = () => {
     let targetId = "";
 
     if (user.role === "user") {
-      targetId = "686c4d1c64583fa5d6a198dd"; // ← este ID debe coincidir con el que asignaste al administrador en la base de datos
+      targetId = "686c4d1c64583fa5d6a198dd";
     } else if (user.role === "admin") {
       if (!withUserId) {
-        navigate("/admin/inbox"); // ← redirige si no tiene un destinatario
+        navigate("/admin/inbox");
         return;
       }
       targetId = withUserId;
     }
 
-    fetchMessages(targetId);
+    const loadInitial = async () => {
+      await fetchMessages(targetId);
+      await markMessagesAsRead(targetId);
+      await fetchUnreadMessagesCount();
+    };
+
+    loadInitial();
+
+    // Evita que se cree más de un polling
+    let intervalId = null;
+
+    if (document.visibilityState === "visible") {
+      intervalId = setInterval(() => fetchMessages(targetId), 5000);
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchMessages(targetId);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [user, withUserId]);
 
-const handleSend = (text) => {
-  const to = user.role === "user" ? "686c4d1c64583fa5d6a198dd" : withUserId;
-  if (!to) return;
-  sendMessage(to, text);
-};
+  const handleSend = (text) => {
+    const to = getTargetId();
+    if (to) sendMessage(to, text);
+  };
 
   return (
     <div>

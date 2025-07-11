@@ -77,3 +77,15 @@
 .chat-input button:hover {
   background-color: #374151;
 }
+
+.chat-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  margin-bottom: 2px;
+  color: #ccc;
+}
+
+.chat-time {
+  font-style: italic;
+}
