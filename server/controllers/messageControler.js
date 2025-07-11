@@ -111,10 +111,16 @@ exports.getInboxUsers = async (req, res) => {
           name: other.name,
           email: other.email,
           lastMessage: msg.content,
+          lastMessageTime: msg.createdAt, // 🕓 nuevo campo
           unread: !!hasUnread,
         };
       }
     }
+
+    //nuevo componente para mostrar usuarios
+    const inboxList = Object.values(userMap).sort(
+      (a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime)
+    );
 
     res.json(Object.values(userMap));
   } catch (err) {

@@ -49,11 +49,15 @@
   outline: 2px solid #005fcc;
 }
 
-.user-name {
-  font-weight: bold;
-  display: block;
+.user-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
+.user-name {
+  font-weight: bold;
+}
 .user-email {
   font-size: 0.9em;
   color: gray;
@@ -69,4 +73,32 @@
   color: crimson;
   margin-left: 8px;
   font-weight: bold;
+}
+
+.timestamp {
+  font-size: 0.75rem;
+  color: #bbb;
+  margin-left: 12px;
+  white-space: nowrap;
+}
+
+.inbox-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.search-input {
+  flex: 2;
+  padding: 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.filter-select {
+  flex: 1;
+  padding: 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }

@@ -3,8 +3,8 @@ import axios from "axios";
 import { AuthContext } from "../contexts/AuthContext";
 import AdminProductRow from "../blocks/AdminProductRow";
 import { useNavigate } from "react-router-dom";
-import ConfirmModal from "../blocks/ConfirmModal"; // ✅ Modal visual
-import { useToast } from "../contexts/ToastContext"; // ✅ Toast visual
+import ConfirmModal from "../blocks/ConfirmModal"; 
+import { useToast } from "../contexts/ToastContext"; 
 
 const AdminProductPage = () => {
   const [products, setProducts] = useState([]);
