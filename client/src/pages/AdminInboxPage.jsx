@@ -11,8 +11,8 @@ const AdminInboxPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-
   const navigate = useNavigate();
+
   const ITEMS_PER_PAGE = 5;
 
   const fetchInbox = async () => {
@@ -32,35 +32,38 @@ const AdminInboxPage = () => {
     }
   };
 
+  const updateStatus = async (userId, status) => {
+    try {
+      await axios.post(
+        "http://localhost:5000/api/messages/status",
+        { userId, status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      fetchInbox();
+    } catch (err) {
+      console.error("Error al actualizar estado", err);
+    }
+  };
+
   useEffect(() => {
     if (token) {
       fetchInbox();
-
-      socket.on("adminInboxUpdate", () => {
-        fetchInbox();
-      });
-
-      return () => {
-        socket.off("adminInboxUpdate");
-      };
+      socket.on("adminInboxUpdate", fetchInbox);
+      return () => socket.off("adminInboxUpdate");
     }
   }, [token]);
 
-  // 🔍 Filtro
   const filteredUsers = users.filter((u) => {
     const searchMatch =
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase());
-
     const filterMatch =
       filter === "all" ||
       (filter === "unread" && u.unread) ||
       (filter === "read" && !u.unread);
-
     return searchMatch && filterMatch;
   });
 
-  // 📄 Paginación
   const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
   const paginatedUsers = filteredUsers.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -76,14 +79,13 @@ const AdminInboxPage = () => {
   };
 
   useEffect(() => {
-    setCurrentPage(1); // Reiniciar página al buscar o filtrar
+    setCurrentPage(1);
   }, [searchTerm, filter]);
 
   return (
     <div className="admin-inbox-container">
       <h2>📨 Conversaciones de Soporte</h2>
 
-      {/* 🔍 Controles */}
       <div className="inbox-controls" style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
         <input
           type="text"
@@ -129,8 +131,7 @@ const AdminInboxPage = () => {
                       )}
                       {u.lastMessageTime && (
                         <span className="timestamp" style={{ marginLeft: "auto" }}>
-                          🕓{" "}
-                          {new Date(u.lastMessageTime).toLocaleString("es-CO", {
+                          🕓 {new Date(u.lastMessageTime).toLocaleString("es-CO", {
                             hour: "2-digit",
                             minute: "2-digit",
                             day: "2-digit",
@@ -144,13 +145,25 @@ const AdminInboxPage = () => {
                     <p className="last-message">
                       {u.lastMessage || "Sin mensajes aún."}
                     </p>
+                    <div style={{ marginTop: "0.5rem" }}>
+                      <label htmlFor={`status-${u._id}`}>Estado:</label>
+                      <select
+                        id={`status-${u._id}`}
+                        value={u.status || "abierto"}
+                        onChange={(e) => updateStatus(u._id, e.target.value)}
+                        className={`status-select ${u.status}`}
+                      >
+                        <option value="abierto">Abierto</option>
+                        <option value="en_espera">En espera</option>
+                        <option value="cerrado">Cerrado</option>
+                      </select>
+                    </div>
                   </div>
                 </button>
               </li>
             ))}
           </ul>
 
-          {/* 📄 Controles de paginación */}
           <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem", gap: "1rem" }}>
             <button
               onClick={() => handlePageChange("prev")}

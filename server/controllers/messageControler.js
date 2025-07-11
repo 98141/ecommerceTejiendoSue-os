@@ -24,7 +24,6 @@ exports.getMessageHistory = async (req, res) => {
 };
 
 // Enviar mensaje
-// Enviar mensaje
 exports.sendMessage = async (req, res) => {
   try {
     const { to, content } = req.body;
@@ -35,13 +34,11 @@ exports.sendMessage = async (req, res) => {
 
     const io = req.app.get("io");
 
-    // Emitir mensaje a todos los conectados (puedes filtrar por usuario en el futuro)
     io.emit("newMessage", populatedMessage);
 
-    // Emitir actualización al inbox del admin si el mensaje fue enviado por un usuario
     const sender = await User.findById(from);
     if (sender.role === "user") {
-      io.emit("adminInboxUpdate"); // 🔔 Notifica al admin que hay un nuevo mensaje
+      io.emit("adminInboxUpdate");
     }
 
     res.status(201).json(populatedMessage);
@@ -83,7 +80,6 @@ exports.getInboxUsers = async (req, res) => {
   try {
     const adminId = req.user.id;
 
-    // Obtener todos los mensajes que involucren al admin (enviados o recibidos)
     const messages = await Message.find({
       $or: [{ from: adminId }, { to: adminId }],
     })
@@ -93,13 +89,10 @@ exports.getInboxUsers = async (req, res) => {
     const userMap = {};
 
     for (let msg of messages) {
-      // Identificar con quién fue la conversación (usuario, no admin)
       const other = msg.from._id.toString() === adminId ? msg.to : msg.from;
       const otherId = other._id.toString();
 
-      // Si el usuario no está en el mapa, lo agregamos
       if (!userMap[otherId]) {
-        // Buscar si hay al menos un mensaje sin leer de este usuario al admin
         const hasUnread = await Message.exists({
           from: otherId,
           to: adminId,
@@ -111,25 +104,25 @@ exports.getInboxUsers = async (req, res) => {
           name: other.name,
           email: other.email,
           lastMessage: msg.content,
-          lastMessageTime: msg.createdAt, // 🕓 nuevo campo
+          lastMessageTime: msg.createdAt,
           unread: !!hasUnread,
+          status: msg.status || "abierto", // ✅ importante
         };
       }
     }
 
-    //nuevo componente para mostrar usuarios
     const inboxList = Object.values(userMap).sort(
       (a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime)
     );
 
-    res.json(Object.values(userMap));
+    res.json(inboxList);
   } catch (err) {
     console.error("Error en getInboxUsers:", err);
     res.status(500).json({ error: "Error al obtener inbox de admin" });
   }
 };
 
-// Obtener lista de usuarios con los que el admin ha hablado
+// Obtener lista de usuarios con los que se ha hablado
 exports.getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -140,7 +133,6 @@ exports.getConversations = async (req, res) => {
       .populate("from", "name role")
       .populate("to", "name role");
 
-    // Extraer IDs únicos de usuarios con los que se ha hablado
     const usersMap = {};
 
     messages.forEach((msg) => {
@@ -154,32 +146,35 @@ exports.getConversations = async (req, res) => {
       }
     });
 
-    // Obtener usuarios únicos con los que el admin ha hablado
-    exports.getInboxUsers = async (req, res) => {
-      try {
-        const adminId = req.user.id;
-        const messages = await Message.find({
-          $or: [{ from: adminId }, { to: adminId }],
-        }).populate("from to", "name");
-
-        // Extraer usuarios únicos con los que el admin ha hablado
-        const userMap = {};
-
-        messages.forEach((msg) => {
-          const user = msg.from._id.toString() === adminId ? msg.to : msg.from;
-
-          userMap[user._id] = user;
-        });
-
-        const users = Object.values(userMap);
-        res.json(users);
-      } catch (err) {
-        res.status(500).json({ error: "Error al cargar inbox" });
-      }
-    };
-
     res.json(Object.values(usersMap));
   } catch (err) {
     res.status(500).json({ error: "Error al obtener conversaciones" });
+  }
+};
+
+// Cambiar el estado de un mensaje
+exports.updateConversationStatus = async (req, res) => {
+  const { userId, status } = req.body;
+  const adminId = req.user.id;
+
+  if (!["abierto", "cerrado", "en_espera"].includes(status)) {
+    return res.status(400).json({ error: "Estado no válido" });
+  }
+
+  try {
+    await Message.updateMany(
+      {
+        $or: [
+          { from: adminId, to: userId },
+          { from: userId, to: adminId },
+        ],
+      },
+      { $set: { status } }
+    );
+
+    res.json({ success: true, message: "Estado actualizado correctamente" });
+  } catch (err) {
+    console.error("Error al actualizar estado:", err);
+    res.status(500).json({ error: "Error al actualizar estado" });
   }
 };

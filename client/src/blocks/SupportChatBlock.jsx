@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import "./SupportChatBlock.css";
 
 const SupportChatBlock = ({ messages, onSendMessage, user }) => {
   const [newMessage, setNewMessage] = useState("");
