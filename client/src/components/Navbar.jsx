@@ -14,7 +14,6 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const [showConfirm, setShowConfirm] = useState(false);
-
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleLogoutConfirm = () => {
@@ -25,34 +24,46 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className="bg-gray-800 text-white px-4 py-2 flex justify-between">
-        <div>
-          <Link to="/" className="mr-4">Inicio</Link>
+      <nav className="bg-gray-800 text-white px-4 py-2 flex justify-between items-center">
+        <div className="flex items-center space-x-4">
+          <Link to="/" className="hover:text-yellow-300">
+            Inicio
+          </Link>
 
           {user?.role === "admin" && (
             <>
-              <Link to="/admin" className="mr-4">Pedidos</Link>
-              <Link to="/admin/orders" className="mr-4">Historial</Link>
-              <Link to="/admin/products" className="mr-4">Productos</Link>
+              <Link to="/admin" className="hover:text-yellow-300">
+                Pedidos
+              </Link>
+              <Link to="/admin/orders" className="hover:text-yellow-300">
+                Historial
+              </Link>
+              <Link to="/admin/products" className="hover:text-yellow-300">
+                Productos
+              </Link>
             </>
           )}
 
           {user?.role === "user" && (
             <>
-              <Link to="/cart" className="mr-4">Carrito ({totalItems})</Link>
-              <Link to="/my-orders" className="mr-4">Mis pedidos</Link>
+              <Link to="/cart" className="hover:text-yellow-300">
+                Carrito ({totalItems})
+              </Link>
+              <Link to="/my-orders" className="hover:text-yellow-300">
+                Mis pedidos
+              </Link>
             </>
           )}
 
           {user && (
             <Link
               to={user.role === "admin" ? "/admin/inbox" : "/support"}
-              className="mr-4"
+              className="relative hover:text-yellow-300"
             >
-              Soporte{" "}
+              Soporte
               {unreadCount > 0 && (
-                <span className="text-yellow-300 font-semibold">
-                  ({unreadCount})
+                <span className="absolute -top-2 -right-5 bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5 animate-pulse">
+                  {unreadCount}
                 </span>
               )}
             </Link>
@@ -65,15 +76,19 @@ const Navbar = () => {
               <span className="mr-2">Hola, {user.name}</span>
               <button
                 onClick={() => setShowConfirm(true)}
-                className="text-red-300"
+                className="text-red-300 hover:underline"
               >
                 Salir
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className="mr-4">Login</Link>
-              <Link to="/register">Registro</Link>
+              <Link to="/login" className="mr-4 hover:text-yellow-300">
+                Login
+              </Link>
+              <Link to="/register" className="hover:text-yellow-300">
+                Registro
+              </Link>
             </>
           )}
         </div>

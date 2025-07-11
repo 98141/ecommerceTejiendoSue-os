@@ -1,9 +1,10 @@
 // SupportContext.jsx
+// SupportContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
 import { AuthContext } from "./AuthContext";
 import { useToast } from "./ToastContext";
-import { socket } from "../socket"; // nuevo
+import { socket } from "../socket";
 
 export const SupportContext = createContext();
 
@@ -30,9 +31,22 @@ export const SupportProvider = ({ children }) => {
       });
 
       socket.on("newMessage", (msg) => {
-        setMessages((prev) => [...prev, msg]);
-        showToast("Nuevo mensaje recibido", "info");
-        fetchUnreadMessagesCount(); // actualiza contador
+        const currentChatId =
+          user?.role === "user"
+            ? "686c4d1c64583fa5d6a198dd"
+            : window.location.pathname.split("/support/")[1]; // para admin
+
+        // Mostrar solo si el mensaje pertenece a la conversación actual
+        if (msg.from._id === currentChatId || msg.to._id === currentChatId) {
+          setMessages((prev) => [...prev, msg]);
+        }
+
+        // Mostrar toast solo si el mensaje fue recibido (no enviado por el mismo usuario)
+        if (msg.from._id !== user.id) {
+          showToast("Nuevo mensaje recibido", "info");
+        }
+
+        fetchUnreadMessagesCount();
       });
 
       return () => {
@@ -42,6 +56,7 @@ export const SupportProvider = ({ children }) => {
     }
   }, [token, user]);
 
+  // Obtener historial de mensajes
   const fetchMessages = async (withUserId) => {
     if (!token || !withUserId) return;
     try {
@@ -58,16 +73,16 @@ export const SupportProvider = ({ children }) => {
     }
   };
 
+  // ✅ Enviar mensaje sin agregarlo manualmente (evita duplicados)
   const sendMessage = async (to, content) => {
     if (!token || !to || !content.trim()) return;
     try {
-      const res = await axios.post(
+      await axios.post(
         `http://localhost:5000/api/messages`,
         { to, content: content.trim() },
         authHeaders
       );
-      socket.emit("sendMessage", res.data); // envía mensaje por socket
-      await fetchMessages(to);
+      // No se hace setMessages ni showToast aquí
     } catch (err) {
       console.error("Error al enviar mensaje", err);
     }
@@ -94,7 +109,7 @@ export const SupportProvider = ({ children }) => {
         { from: fromUserId },
         authHeaders
       );
-      await fetchUnreadMessagesCount(); // actualiza global
+      await fetchUnreadMessagesCount();
     } catch (err) {
       console.error("Error al marcar mensajes como leídos", err);
     }

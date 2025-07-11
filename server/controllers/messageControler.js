@@ -24,18 +24,25 @@ exports.getMessageHistory = async (req, res) => {
 };
 
 // Enviar mensaje
+// Enviar mensaje
 exports.sendMessage = async (req, res) => {
   try {
     const { to, content } = req.body;
     const from = req.user.id;
 
     const message = await Message.create({ from, to, content });
-
     const populatedMessage = await message.populate("from to", "name email");
 
-    // Enviar mensaje en tiempo real usando Socket.IO
     const io = req.app.get("io");
-    io.emit("newMessage", populatedMessage); // Puedes filtrar esto por usuario más adelante
+
+    // Emitir mensaje a todos los conectados (puedes filtrar por usuario en el futuro)
+    io.emit("newMessage", populatedMessage);
+
+    // Emitir actualización al inbox del admin si el mensaje fue enviado por un usuario
+    const sender = await User.findById(from);
+    if (sender.role === "user") {
+      io.emit("adminInboxUpdate"); // 🔔 Notifica al admin que hay un nuevo mensaje
+    }
 
     res.status(201).json(populatedMessage);
   } catch (err) {
