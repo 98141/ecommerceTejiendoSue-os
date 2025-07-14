@@ -1,22 +1,21 @@
-const express = require('express');
+const express = require("express");
 const {
   createProduct,
   getProducts,
   getProductById,
   updateProduct,
-  deleteProduct
-} = require('../controllers/productController');
-const { verifyToken, isAdmin } = require('../middleware/auth');
+  deleteProduct,
+} = require("../controllers/productController");
+const { verifyToken, isAdmin } = require("../middleware/auth");
+const upload = require("../middleware/uploadMiddleware");
 
 const router = express.Router();
 
-// Público
-router.get('/', getProducts);                       
-router.get('/:id', getProductById);                
+router.get("/", getProducts);
+router.get("/:id", getProductById);
 
-// Admin
-router.post('/', verifyToken, isAdmin, createProduct);   
-router.put('/:id', verifyToken, isAdmin, updateProduct); 
-router.delete('/:id', verifyToken, isAdmin, deleteProduct); 
+router.post("/", verifyToken, isAdmin, upload.array("images", 10), createProduct);
+router.put("/:id", verifyToken, isAdmin, updateProduct);
+router.delete("/:id", verifyToken, isAdmin, deleteProduct);
 
 module.exports = router;

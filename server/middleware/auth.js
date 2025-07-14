@@ -14,10 +14,11 @@ const verifyToken = (req, res, next) => {
 };
 
 const isAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Acceso restringido a administradores' });
+  if (req.user && req.user.role === "admin") {
+    next();
+  } else {
+    return res.status(403).json({ error: "Acceso denegado: solo administradores" });
   }
-  next();
 };
 
 module.exports = { verifyToken, isAdmin };
