@@ -1,9 +1,10 @@
-// src/pages/AdminCategoryPage.jsx
 import { useEffect, useState, useContext } from "react";
 import axios from "axios";
-import { AuthContext } from "../contexts/AuthContext";
-import { useToast } from "../contexts/ToastContext";
-import ConfirmModal from "../blocks/ConfirmModal";
+import { AuthContext } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
+import ConfirmModal from "../../../blocks/ConfirmModalBlock";
+import CategoryFormBlock from "../../../blocks/admin/AdminCategoriFormBlock";
+import CategoryTableBlock from "../../../blocks/admin/AdminCategoriTableBlock";
 
 const AdminCategoryPage = () => {
   const { token } = useContext(AuthContext);
@@ -77,61 +78,22 @@ const AdminCategoryPage = () => {
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>📂 Gestión de Categorías</h2>
+    <div className="admin-category-page">
+      <h2 className="category-title">📂 Gestión de Categorías</h2>
 
-      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
-        <input
-          type="text"
-          value={newCategory}
-          onChange={(e) => setNewCategory(e.target.value)}
-          placeholder="Nueva categoría"
-        />
-        <button onClick={handleCreate} className="btn-save">Crear</button>
-      </div>
+      <CategoryFormBlock
+        newCategory={newCategory}
+        setNewCategory={setNewCategory}
+        handleCreate={handleCreate}
+      />
 
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {categories.map((cat) => (
-            <tr key={cat._id}>
-              <td>
-                {editingCategory?._id === cat._id ? (
-                  <input
-                    value={editingCategory.name}
-                    onChange={(e) =>
-                      setEditingCategory({ ...editingCategory, name: e.target.value })
-                    }
-                  />
-                ) : (
-                  cat.name
-                )}
-              </td>
-              <td>
-                {editingCategory?._id === cat._id ? (
-                  <>
-                    <button onClick={handleEdit}>Guardar</button>
-                    <button onClick={() => setEditingCategory(null)}>Cancelar</button>
-                  </>
-                ) : (
-                  <>
-                    <button onClick={() => setEditingCategory(cat)}>Editar</button>
-                    <button onClick={() => {
-                      setEditingCategory(cat);
-                      setShowConfirm(true);
-                    }}>Eliminar</button>
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <CategoryTableBlock
+        categories={categories}
+        editingCategory={editingCategory}
+        setEditingCategory={setEditingCategory}
+        setShowConfirm={setShowConfirm}
+        handleEdit={handleEdit}
+      />
 
       {showConfirm && (
         <ConfirmModal

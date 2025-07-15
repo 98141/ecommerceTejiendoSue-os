@@ -1,8 +1,8 @@
 import { useEffect, useState, useContext } from "react";
 import axios from "axios";
-import { AuthContext } from "../contexts/AuthContext";
-import ConfirmModal from "../blocks/ConfirmModal";
-import { useToast } from "../contexts/ToastContext";
+import { AuthContext } from "../../../contexts/AuthContext";
+import ConfirmModal from "../../../blocks/ConfirmModalBlock";
+import { useToast } from "../../../contexts/ToastContext";
 import { useNavigate } from "react-router-dom";
 
 const AdminProductPage = () => {

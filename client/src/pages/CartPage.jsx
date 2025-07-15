@@ -3,7 +3,7 @@ import { CartContext } from "../contexts/CartContext";
 import { AuthContext } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import CartItem from "../blocks/CartItem";
+import CartItem from "../blocks/users/CartItem";
 
 const CartPage = () => {
   const { cart, removeFromCart, clearCart } = useContext(CartContext);
@@ -77,7 +77,7 @@ const CartPage = () => {
                 cursor: "pointer"
               }}
             >
-              Finalizar compra
+              Finalizar compra ya
             </button>
           </div>
         </div>

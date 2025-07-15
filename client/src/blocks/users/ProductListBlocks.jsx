@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
-const ProductCard = ({ product }) => {
-  const mainImage = product.images?.[0] || "/placeholder.jpg"; // imagen por defecto
+const ProductListBlocks = ({ product }) => {
+  const mainImage = product.images?.[0] || "/placeholder.jpg";
 
   return (
     <div className="product-card">
@@ -23,4 +23,4 @@ const ProductCard = ({ product }) => {
   );
 };
 
-export default ProductCard;
+export default ProductListBlocks;

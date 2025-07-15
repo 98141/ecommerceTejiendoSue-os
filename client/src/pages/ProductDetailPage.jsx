@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState, useContext } from "react";
 import axios from "axios";
-import ProductDetailBlock from "../blocks/ProductDetailBlock";
+import ProductDetailBlock from "../blocks/users/ProductDetailBlock";
 import { CartContext } from "../contexts/CartContext";
 
 const ProductDetail = () => {

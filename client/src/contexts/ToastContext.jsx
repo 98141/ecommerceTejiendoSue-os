@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from "react";
-import Toast from "../blocks/Toast";
+import Toast from "../blocks/ToastBlock";
 
 const ToastContext = createContext();
 
@@ -24,4 +24,5 @@ export const ToastProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useToast = () => useContext(ToastContext);

@@ -1,4 +1,4 @@
-import LoginForm from "../blocks/LoginForm";
+import LoginForm from "../blocks/LoginFormBlock";
 
 const LoginPage = () => {
   return <LoginForm />;

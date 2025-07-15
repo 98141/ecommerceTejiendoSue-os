@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import { AuthContext } from "../contexts/AuthContext";
-import AdminOrderRow from "../blocks/AdminOrderRow";
+import AdminOrderRow from "../blocks/admin/AdminOrderBlock";
 
 const AdminOrderPage = () => {
   const [orders, setOrders] = useState([]);
@@ -35,6 +35,7 @@ const AdminOrderPage = () => {
             <th>Total</th>
             <th>Fecha</th>
             <th>Productos</th>
+            <th>Cantidad</th>
             <th>Estado</th>
           </tr>
         </thead>

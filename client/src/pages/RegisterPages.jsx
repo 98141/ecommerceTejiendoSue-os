@@ -1,4 +1,4 @@
-import RegisterForm from "../blocks/RegisterForm";
+import RegisterForm from "../blocks/RegisterFormBlock";
 
 const RegisterPage = () => {
   return <RegisterForm />;

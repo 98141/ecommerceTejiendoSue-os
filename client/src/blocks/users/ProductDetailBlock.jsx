@@ -1,7 +1,7 @@
 import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../contexts/AuthContext";
-import { useToast } from "../contexts/ToastContext";
+import { AuthContext } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
 import { Link } from "react-router-dom";
 
 const ProductDetailBlock = ({ product, onAddToCart }) => {
@@ -56,7 +56,7 @@ const ProductDetailBlock = ({ product, onAddToCart }) => {
           <p className="stock">Stock disponible: {product.stock}</p>
 
           <div className="quantity-box">
-            <label>Cantidad:</label>
+            <label>Cantidad Pedido:</label>
             <input
               type="number"
               min="1"

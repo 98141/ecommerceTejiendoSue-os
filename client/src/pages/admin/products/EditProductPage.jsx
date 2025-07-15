@@ -1,8 +1,8 @@
 import { useEffect, useState, useContext } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
-import { AuthContext } from "../contexts/AuthContext";
-import { useToast } from "../contexts/ToastContext";
+import { AuthContext } from "../../../contexts/AuthContext";
+import { useToast } from "../../../contexts/ToastContext";
 
 const AdminEditProductPage = () => {
   const { id } = useParams();

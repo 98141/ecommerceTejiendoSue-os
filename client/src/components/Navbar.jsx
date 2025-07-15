@@ -4,7 +4,7 @@ import { AuthContext } from "../contexts/AuthContext";
 import { CartContext } from "../contexts/CartContext";
 import { SupportContext } from "../contexts/SupportContext";
 import { useToast } from "../contexts/ToastContext";
-import ConfirmModal from "../blocks/ConfirmModal";
+import ConfirmModal from "../blocks/ConfirmModalBlock";
 
 const Navbar = () => {
   const { user, logout } = useContext(AuthContext);

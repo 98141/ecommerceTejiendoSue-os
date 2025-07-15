@@ -6,10 +6,15 @@ const AdminOrderRow = ({ order }) => {
       <td>{new Date(order.createdAt).toLocaleString()}</td>
       <td>
         <ul>
-          {order.items.map(item => (
-            <li key={item._id}>
-              {item.product?.name || "Producto eliminado"} × {item.quantity}
-            </li>
+          {order.items.map((item) => (
+            <li key={item._id}>{item.product?.name || "Producto eliminado"}</li>
+          ))}
+        </ul>
+      </td>
+      <td>
+        <ul>
+          {order.items.map((item) => (
+            <li key={item._id}>{item.quantity}</li>
           ))}
         </ul>
       </td>

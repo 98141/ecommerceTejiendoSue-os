@@ -37,3 +37,13 @@ table.admin-table {
 .btn-delete:hover {
   background-color: #c62828;
 }
+
+.admin-table td ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.admin-table td ul li {
+  padding: 2px 0;
+}

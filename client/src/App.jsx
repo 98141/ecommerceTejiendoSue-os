@@ -1,21 +1,21 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import LoginPage from "./pages/LoginPages";
 import RegisterPage from "./pages/RegisterPages";
-import ProductList from "./pages/ProductList";
+import ProductListPage from "./pages/ProductListPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import Navbar from "./components/Navbar";
-import AdminProductManager from "./pages/AdminProductManager";
+import AdminProductManager from "./pages/admin/products/AdminProductManager";
 import CartPage from "./pages/CartPage";
-import ProductDetail from "./pages/ProductDetail";
+import ProductDetailPage from "./pages/ProductDetailPage";
 import MyOrders from "./pages/Myorders";
 import AdminOrderPage from "./pages/AdminOrderPage";
-import NewProductPage from "./pages/RegisterProductPage";
-import EditProductPage from "./pages/EditProductPage";
+import NewProductPage from "./pages/admin/products/RegisterProductPage";
+import EditProductPage from "./pages/admin/products/EditProductPage";
 import PrivateRoute from "./routes/PrivateRoutes";
 import NotFoundPage from "./pages/NotFoundPage";
 import AdminInboxPage from "./pages/AdminInboxPage";
 import SupportChatPage from "./pages/SupportChatPage";
-import AdminCategoryPage from "./pages/AdminCategoryPage";
+import AdminCategoryPage from "./pages/admin/products/AdminCategoryPage";
 
 function App() {
   return (
@@ -23,14 +23,14 @@ function App() {
       <Navbar />
       <Routes>
         {/* Públicas */}
-        <Route path="/" element={<ProductList />} />
+        <Route path="/" element={<ProductListPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         {/* Privadas para usuarios */}
         <Route element={<PrivateRoute allowedRoles={["user"]} />}>
           <Route path="/cart" element={<CartPage />} />
           <Route path="/my-orders" element={<MyOrders />} />
-          <Route path="/product/:id" element={<ProductDetail />} />
+          <Route path="/product/:id" element={<ProductDetailPage />} />
         </Route>
         {/* Privadas para administrador */}
         <Route element={<PrivateRoute allowedRoles={["admin"]} />}>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useContext } from "react";
 import axios from "axios";
-import ProductCard from "../blocks/ProductCard";
+import ProductListBlocks from "../blocks/users/ProductListBlocks";
 import { AuthContext } from "../contexts/AuthContext";
 
 const ProductList = () => {
@@ -33,7 +33,7 @@ const ProductList = () => {
         justifyContent: "center"
       }}>
         {products.map(p => (
-          <ProductCard key={p._id} product={p} />
+          <ProductListBlocks key={p._id} product={p} />
         ))}
       </div>
     </div>
