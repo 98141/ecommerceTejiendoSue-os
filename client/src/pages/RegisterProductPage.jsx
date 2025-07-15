@@ -1,58 +1,136 @@
-import { useContext, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useContext } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
-import ProductForm from "../blocks/ProductForm";
-import ConfirmModal from "../blocks/ConfirmModal";
 
-const NewProductPage = () => {
+const AdminAddProduct = () => {
   const { token } = useContext(AuthContext);
   const { showToast } = useToast();
   const navigate = useNavigate();
 
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState(""); // ahora string vacío
+  const [stock, setStock] = useState(""); // ahora string vacío
+  const [images, setImages] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
 
-  const handleAdd = async (product) => {
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await axios.get("http://localhost:5000/api/categories");
+        setCategories(res.data);
+      } catch {
+        showToast("Error al cargar categorías", "error");
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  const handleImageChange = (e) => {
+    setImages(Array.from(e.target.files));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!selectedCategory) {
+      return showToast("Debes seleccionar una categoría", "error");
+    }
+
+    if (Number(price) <= 0) {
+      return showToast("El precio debe ser mayor a 0", "error");
+    }
+
+    if (Number(stock) <= 0) {
+      return showToast("El stock debe ser mayor a 0", "error");
+    }
+
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("description", description);
+    formData.append("price", price);
+    formData.append("stock", stock);
+    formData.append("categories", selectedCategory);
+
+    images.forEach((file) => formData.append("images", file));
+
     try {
-      await axios.post("http://localhost:5000/api/products", product, {
-        headers: { Authorization: `Bearer ${token}` },
+      await axios.post("http://localhost:5000/api/products", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
       });
-      showToast("Producto agregado exitosamente", "success");
+      showToast("Producto creado correctamente", "success");
       navigate("/admin/products");
-    } catch (err) {
-      showToast("Error al guardar el producto" + (err.response?.data?.error || ""), "error");
+    } catch {
+      showToast("Error al crear producto", "error");
     }
   };
 
-  const handleCancel = () => {
-    setShowConfirm(true); // Mostrar el modal
-  };
-
-  const confirmCancel = () => {
-    setShowConfirm(false);
-    navigate("/admin/products");
-  };
-
-  const cancelModal = () => {
-    setShowConfirm(false);
-  };
-
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Agregar nuevo producto</h2>
-      <ProductForm onSubmit={handleAdd} onCancel={handleCancel} />
-
-      {showConfirm && (
-        <ConfirmModal
-          title="Cancelar registro"
-          message="¿Estás seguro de cancelar el registro del producto?"
-          onConfirm={confirmCancel}
-          onCancel={cancelModal}
+    <div className="form-container">
+      <h2>Nuevo Producto</h2>
+      <form onSubmit={handleSubmit} className="product-form">
+        <input
+          type="text"
+          placeholder="Nombre"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
         />
-      )}
+
+        <textarea
+          placeholder="Descripción"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+
+        <input
+          type="number"
+          placeholder="Precio"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          min="1"
+          required
+        />
+
+        <input
+          type="number"
+          placeholder="Stock"
+          value={stock}
+          onChange={(e) => setStock(e.target.value)}
+          min="1"
+          required
+        />
+
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          required
+        >
+          <option value="">Selecciona una categoría</option>
+          {categories.map((cat) => (
+            <option key={cat._id} value={cat._id}>
+              {cat.name}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="file"
+          multiple
+          accept="image/*"
+          onChange={handleImageChange}
+        />
+
+        <button type="submit" className="btn-save">Crear producto</button>
+      </form>
     </div>
   );
 };
 
-export default NewProductPage;
+export default AdminAddProduct;

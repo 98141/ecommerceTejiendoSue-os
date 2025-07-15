@@ -1,19 +1,35 @@
 import { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import { AuthContext } from "../contexts/AuthContext";
-import AdminProductRow from "../blocks/AdminProductRow";
+import ConfirmModal from "../blocks/ConfirmModal";
+import { useToast } from "../contexts/ToastContext";
 import { useNavigate } from "react-router-dom";
-import ConfirmModal from "../blocks/ConfirmModal"; 
-import { useToast } from "../contexts/ToastContext"; 
 
 const AdminProductPage = () => {
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [productToDelete, setProductToDelete] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const { token } = useContext(AuthContext);
   const { showToast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    const lower = searchTerm.toLowerCase();
+    const filtered = products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(lower) ||
+        (Array.isArray(p.categories) &&
+          p.categories.some((cat) => cat.toLowerCase().includes(lower)))
+    );
+    setFilteredProducts(filtered);
+  }, [searchTerm, products]);
 
   const fetchProducts = async () => {
     try {
@@ -24,21 +40,15 @@ const AdminProductPage = () => {
     }
   };
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const requestDelete = (product) => {
-    setProductToDelete(product);
-    setShowConfirm(true);
-  };
-
-  const confirmDelete = async () => {
+  const handleDelete = async () => {
     if (!productToDelete) return;
     try {
-      await axios.delete(`http://localhost:5000/api/products/${productToDelete._id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.delete(
+        `http://localhost:5000/api/products/${productToDelete._id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       showToast("Producto eliminado correctamente", "success");
       fetchProducts();
     } catch {
@@ -54,34 +64,80 @@ const AdminProductPage = () => {
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Administrar Productos</h2>
+    <div className="admin-products">
+      <div className="header">
+        <h2>Administrar Productos</h2>
+        <button
+          onClick={() => navigate("/admin/products/new")}
+          className="btn-add"
+        >
+          + Agregar producto
+        </button>
+        <button
+          onClick={() => navigate("/admin/categories")}
+          className="btn-add"
+        >
+          + Categoria
+        </button>
+      </div>
 
-      <button
-        onClick={() => navigate("/admin/products/new")}
-        className="btn-save"
-        style={{ marginBottom: "20px" }}
-      >
-        + Agregar nuevo producto
-      </button>
+      <input
+        type="text"
+        placeholder="Buscar por nombre o categoría..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="search-input"
+      />
 
-      <table className="admin-table">
+      <table className="product-table">
         <thead>
           <tr>
+            <th>Imagen</th>
             <th>Nombre</th>
             <th>Precio</th>
             <th>Stock</th>
+            <th>Categorías</th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
-          {products.map((p) => (
-            <AdminProductRow
-              key={p._id}
-              product={p}
-              onEdit={handleEdit}
-              onDelete={() => requestDelete(p)} 
-            />
+          {filteredProducts.map((p) => (
+            <tr key={p._id}>
+              <td>
+                <img
+                  src={`http://localhost:5000${p.images?.[0]}`}
+                  alt={p.name}
+                  className="thumbnail"
+                />
+              </td>
+              <td>{p.name}</td>
+              <td>${p.price}</td>
+              <td>{p.stock}</td>
+              <td>
+                {p.category?.name ||
+                  (Array.isArray(p.categories)
+                    ? p.categories
+                        .map((cat) =>
+                          typeof cat === "object" ? cat.name : cat
+                        )
+                        .join(", ")
+                    : "Sin categoría")}
+              </td>
+              <td>
+                <button className="btn-edit" onClick={() => handleEdit(p)}>
+                  Editar
+                </button>
+                <button
+                  className="btn-delete"
+                  onClick={() => {
+                    setProductToDelete(p);
+                    setShowConfirm(true);
+                  }}
+                >
+                  Eliminar
+                </button>
+              </td>
+            </tr>
           ))}
         </tbody>
       </table>
@@ -89,11 +145,11 @@ const AdminProductPage = () => {
       {showConfirm && (
         <ConfirmModal
           title="Eliminar producto"
-          message={`¿Estás seguro de eliminar "${productToDelete?.name}"? Esta acción no se puede deshacer.`}
-          onConfirm={confirmDelete}
+          message={`¿Estás seguro de eliminar "${productToDelete?.name}"?`}
+          onConfirm={handleDelete}
           onCancel={() => {
-            setShowConfirm(false);
             setProductToDelete(null);
+            setShowConfirm(false);
           }}
         />
       )}

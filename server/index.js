@@ -9,6 +9,8 @@ const userRoutes = require("./routes/userRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const messageRoutes = require("./routes/messageRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
+
 const ensureUploadsFolderExists = require("./utils/products");
 
 const app = express();
@@ -42,6 +44,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/categories", categoryRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)

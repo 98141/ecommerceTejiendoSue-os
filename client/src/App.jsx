@@ -15,6 +15,7 @@ import PrivateRoute from "./routes/PrivateRoutes";
 import NotFoundPage from "./pages/NotFoundPage";
 import AdminInboxPage from "./pages/AdminInboxPage";
 import SupportChatPage from "./pages/SupportChatPage";
+import AdminCategoryPage from "./pages/AdminCategoryPage";
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
           <Route path="/admin/orders" element={<AdminOrderPage />} />
           <Route path="/admin/products" element={<AdminProductManager />} />
           <Route path="/admin/products/new" element={<NewProductPage />} />
+          <Route path="/admin/categories" element={<AdminCategoryPage />} />
           <Route
             path="/admin/products/edit/:id"
             element={<EditProductPage />}

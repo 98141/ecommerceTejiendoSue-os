@@ -1,11 +1,15 @@
+@import url("../src/style/adminCategoryPage.css");
 @import url("../src/style/adminInboxPages.css");
 @import url("../src/style/adminOrderRow.css");
 @import url("../src/style/adminProductRow.css");
+@import url("../src/style/adminProductManager.css");
 @import url("../src/style/cardItem.css");
 @import url("../src/style/confirmModal.css");
+@import url("../src/style/editProduckPage.css");
 @import url("../src/style/producDetailBlock.css");
 @import url("../src/style/productForm.css");
 @import url("../src/style/produtCard.css");
 @import url("../src/style/styles.css");
 @import url("../src/style/supportChatBlock.css");
 @import url("../src/style/toast.css");
+@import url("../src/style/registerProductpage.css");
