@@ -10,6 +10,8 @@ const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
+const sizeRoutes = require("./routes/sizeRoutes");
+const colorRoutes = require("./routes/colorRoutes");
 
 const ensureUploadsFolderExists = require("./utils/products");
 
@@ -45,6 +47,8 @@ app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/sizes", sizeRoutes);
+app.use("/api/colors", colorRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)

@@ -16,6 +16,8 @@ import NotFoundPage from "./pages/NotFoundPage";
 import AdminInboxPage from "./pages/AdminInboxPage";
 import SupportChatPage from "./pages/SupportChatPage";
 import AdminCategoryPage from "./pages/admin/products/AdminCategoryPage";
+import AdminSizesPage from "./pages/admin/products/AdminSizesPage";
+import AdminColorsPage from "./pages/admin/products/AdminColorsPages";
 
 function App() {
   return (
@@ -45,6 +47,8 @@ function App() {
           />
           <Route path="/support/:withUserId" element={<SupportChatPage />} />
           <Route path="/admin/inbox" element={<AdminInboxPage />} />
+          <Route path="/admin/sizes" element={<AdminSizesPage />} />
+          <Route path="/admin/colors" element={<AdminColorsPage />} />
         </Route>
         {/* Ruta compartida para soporte (usuarios y administradores) */}
         <Route element={<PrivateRoute allowedRoles={["user", "admin"]} />}>

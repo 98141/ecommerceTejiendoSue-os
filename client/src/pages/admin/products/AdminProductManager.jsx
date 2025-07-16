@@ -79,6 +79,18 @@ const AdminProductPage = () => {
         >
           + Categoria
         </button>
+        <button
+          onClick={() => navigate("/admin/sizes")}
+          className="btn-add"
+        >
+          + Tallas
+        </button>
+        <button
+          onClick={() => navigate("/admin/colors")}
+          className="btn-add"
+        >
+          + Colores
+        </button>
       </div>
 
       <input
