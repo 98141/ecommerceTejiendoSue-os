@@ -4,7 +4,7 @@ const CartItem = ({ item, removeFromCart, updateItem }) => {
   const handleChange = (e) => {
     const newQty = Number(e.target.value);
     if (newQty >= 1) {
-      updateItem(product._id, size, color, newQty);
+      updateItem(product._id, size._id, color._id, newQty);
     }
   };
 
@@ -18,8 +18,8 @@ const CartItem = ({ item, removeFromCart, updateItem }) => {
       <div className="cart-info">
         <h4>{product.name}</h4>
         <p>Precio unitario: ${product.price}</p>
-        <p>Talla: {size}</p>
-        <p>Color: {color}</p>
+        <p>Talla: {size.label}</p>
+        <p>Color: {color.name}</p>
         <label>Cantidad:</label>
         <input
           type="number"
@@ -33,7 +33,7 @@ const CartItem = ({ item, removeFromCart, updateItem }) => {
       </div>
       <button
         className="cart-remove"
-        onClick={() => removeFromCart(product._id, size, color)}
+        onClick={() => removeFromCart(product._id,  size._id, color._id)}
       >
         Quitar
       </button>

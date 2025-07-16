@@ -50,50 +50,45 @@ const ProductDetailBlock = ({ product, onAddToCart }) => {
     return colors.filter(c => colorIds.includes(c._id));
   };
 
-  const handleAdd = () => {
-    if (!user || user.role === "admin") {
-      showToast("Debes iniciar sesión como usuario para comprar", "warning");
-      return navigate("/login");
-    }
+const handleAdd = () => {
+  if (!user || user.role === "admin") {
+    showToast("Debes iniciar sesión como usuario para comprar", "warning");
+    return navigate("/login");
+  }
 
-    if (!selectedSize || !selectedColor) {
-      showToast("Debes seleccionar talla y color", "warning");
-      return;
-    }
+  if (!selectedSize || !selectedColor) {
+    showToast("Debes seleccionar talla y color", "warning");
+    return;
+  }
 
-    const variant = product.variants.find(
-      (v) => v.size === selectedSize && v.color === selectedColor
-    );
+  const variant = product.variants.find(
+    (v) => v.size === selectedSize && v.color === selectedColor
+  );
 
-    if (!variant) {
-      showToast("La combinación seleccionada no está disponible", "error");
-      return;
-    }
+  if (!variant) {
+    showToast("La combinación seleccionada no está disponible", "error");
+    return;
+  }
 
-    if (variant.stock < quantity) {
-      showToast("Stock insuficiente para la variante seleccionada", "error");
-      return;
-    }
+  if (variant.stock < quantity) {
+    showToast("Stock insuficiente para la variante seleccionada", "error");
+    return;
+  }
 
-    const sizeLabel = sizes.find(s => s._id === selectedSize)?.label || "Talla";
-    const colorName = colors.find(c => c._id === selectedColor)?.name || "Color";
+  const sizeObj = sizes.find(s => s._id === selectedSize);
+  const colorObj = colors.find(c => c._id === selectedColor);
 
-    // Crear una clave única para el carrito
-    const cartItem = {
-      product: {
-        ...product,
-        variantId: variant._id,
-        size: sizeLabel,
-        color: colorName,
-        variantStock: variant.stock
-      },
-      quantity
-    };
-
-    onAddToCart(cartItem.product, cartItem.quantity);
-
-    showToast("Producto agregado al carrito", "success");
+  const cartItem = {
+    ...product,
+    size: sizeObj,   // objeto { _id, label }
+    color: colorObj  // objeto { _id, name }
   };
+
+  onAddToCart(cartItem, quantity);
+
+  showToast("Producto agregado al carrito", "success");
+};
+
 
   return (
     <div className="product-detail">

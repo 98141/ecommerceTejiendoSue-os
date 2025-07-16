@@ -6,7 +6,8 @@ import axios from "axios";
 import CartItem from "../blocks/users/CartItem";
 
 const CartPage = () => {
-  const { cart, updateItem, removeFromCart, clearCart } = useContext(CartContext);
+  const { cart, updateItem, removeFromCart, clearCart } =
+    useContext(CartContext);
   const { token } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -21,29 +22,38 @@ const CartPage = () => {
       return navigate("/login");
     }
 
-    const items = cart.map(item => ({
+    const items = cart.map((item) => ({
       product: item.product._id,
-      size: item.size,
-      color: item.color,
+      size: item.size._id,
+      color: item.color._id,
       quantity: item.quantity,
     }));
 
     try {
-      await axios.post("http://localhost:5000/api/orders", { items, total }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.post(
+        "http://localhost:5000/api/orders",
+        { items, total },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       alert("Pedido realizado exitosamente");
       clearCart();
       navigate("/my-orders");
     } catch (err) {
-      alert("Error al realizar el pedido: " + (err.response?.data?.error || "Intenta más tarde."));
+      alert(
+        "Error al realizar el pedido: " +
+          (err.response?.data?.error || "Intenta más tarde.")
+      );
     }
   };
 
   return (
     <div style={{ padding: "20px" }}>
-      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>Carrito de Compras</h2>
+      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
+        Carrito de Compras
+      </h2>
 
       {cart.length === 0 ? (
         <p style={{ textAlign: "center" }}>Tu carrito está vacío.</p>
@@ -71,7 +81,7 @@ const CartPage = () => {
                 border: "none",
                 padding: "10px 16px",
                 borderRadius: "4px",
-                cursor: "pointer"
+                cursor: "pointer",
               }}
             >
               Finalizar compra
