@@ -4,7 +4,27 @@ const Product = require("../models/Product");
 
 exports.createProduct = async (req, res) => {
   try {
-    const { name, description, price, stock, categories } = req.body;
+    const { name, description, price, categories } = req.body;
+    const rawVariants = req.body.variants;
+
+    // Validación inicial
+    if (!rawVariants) {
+      return res
+        .status(400)
+        .json({ error: "Debes incluir al menos una variante" });
+    }
+
+    const variants = JSON.parse(rawVariants);
+
+    // Validar variantes
+    const validVariants = variants.filter(
+      (v) => v.size && v.color && Number(v.stock) >= 0
+    );
+
+    if (validVariants.length === 0) {
+      return res.status(400).json({ error: "Las variantes no son válidas" });
+    }
+
     const imagePaths = req.files.map(
       (file) => `/uploads/products/${file.filename}`
     );
@@ -13,11 +33,11 @@ exports.createProduct = async (req, res) => {
       name,
       description,
       price,
-      stock,
       categories: Array.isArray(categories)
         ? categories
         : categories.split(","),
       images: imagePaths,
+      variants: validVariants,
     });
 
     await newProduct.save();
@@ -55,20 +75,20 @@ exports.updateProduct = async (req, res) => {
       name,
       description,
       price,
-      stock,
       categories,
       existingImages = [],
+      variants: rawVariants,
     } = req.body;
-
-    const existingImagesArray = Array.isArray(existingImages)
-      ? existingImages
-      : [existingImages];
 
     const product = await Product.findById(productId);
     if (!product)
       return res.status(404).json({ error: "Producto no encontrado" });
 
-    // 🗑 Eliminar imágenes que ya no se desean
+    // Manejo de imágenes
+    const existingImagesArray = Array.isArray(existingImages)
+      ? existingImages
+      : [existingImages];
+
     const imagesToDelete = product.images.filter(
       (img) => !existingImagesArray.includes(img)
     );
@@ -80,22 +100,30 @@ exports.updateProduct = async (req, res) => {
       }
     }
 
-    // 📥 Agregar nuevas imágenes
     const newImages = req.files.map(
       (file) => `/uploads/products/${file.filename}`
     );
-
     const finalImages = [...existingImagesArray, ...newImages];
 
-    // 🔄 Actualizar producto
+    // Parsear variantes
+    let parsedVariants = [];
+    if (rawVariants) {
+      parsedVariants = JSON.parse(rawVariants);
+    }
+
+    const validVariants = parsedVariants.filter(
+      (v) => v.size && v.color && Number(v.stock) >= 0
+    );
+
+    // Actualizar campos
     product.name = name;
     product.description = description;
     product.price = price;
-    product.stock = stock;
     product.categories = Array.isArray(categories)
       ? categories
       : categories.split(",");
     product.images = finalImages;
+    product.variants = validVariants;
 
     await product.save();
 

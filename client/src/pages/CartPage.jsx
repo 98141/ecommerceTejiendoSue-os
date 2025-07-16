@@ -6,7 +6,7 @@ import axios from "axios";
 import CartItem from "../blocks/users/CartItem";
 
 const CartPage = () => {
-  const { cart, removeFromCart, clearCart } = useContext(CartContext);
+  const { cart, updateItem, removeFromCart, clearCart } = useContext(CartContext);
   const { token } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -23,7 +23,9 @@ const CartPage = () => {
 
     const items = cart.map(item => ({
       product: item.product._id,
-      quantity: item.quantity
+      size: item.size,
+      color: item.color,
+      quantity: item.quantity,
     }));
 
     try {
@@ -46,17 +48,12 @@ const CartPage = () => {
       {cart.length === 0 ? (
         <p style={{ textAlign: "center" }}>Tu carrito está vacío.</p>
       ) : (
-        <div>
-          {cart.map(item => (
+        <>
+          {cart.map((item) => (
             <CartItem
-              key={item.product._id}
-              item={{
-                _id: item.product._id,
-                name: item.product.name,
-                price: item.product.price,
-                imageUrl: item.product.imageUrl,
-                quantity: item.quantity
-              }}
+              key={`${item.product._id}-${item.size}-${item.color}`}
+              item={item}
+              updateItem={updateItem}
               removeFromCart={removeFromCart}
             />
           ))}
@@ -77,10 +74,10 @@ const CartPage = () => {
                 cursor: "pointer"
               }}
             >
-              Finalizar compra ya
+              Finalizar compra
             </button>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

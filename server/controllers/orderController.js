@@ -7,52 +7,77 @@ exports.createOrder = async (req, res) => {
     const { items, total } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'Debes incluir al menos un producto' });
+      return res.status(400).json({ error: "Debes incluir al menos un producto" });
     }
 
     let calculatedTotal = 0;
 
-    // Verificar stock y calcular total real
     for (const item of items) {
-      const product = await Product.findById(item.product);
+      const { product: productId, size, color, quantity } = item;
 
-      if (!product) {
-        return res.status(404).json({ error: `Producto con ID ${item.product} no encontrado` });
+      if (!productId || !size || !color || !quantity) {
+        return res.status(400).json({ error: "Datos incompletos en uno de los ítems del pedido" });
       }
 
-      if (product.stock < item.quantity) {
+      const product = await Product.findById(productId);
+      if (!product) {
+        return res.status(404).json({ error: `Producto con ID ${productId} no encontrado` });
+      }
+
+      // Buscar variante específica
+      const variant = product.variants.find(
+        (v) =>
+          v.size.toString() === size &&
+          v.color.toString() === color
+      );
+
+      if (!variant) {
         return res.status(400).json({
-          error: `Stock insuficiente para el producto: ${product.name}. Disponible: ${product.stock}`
+          error: `La combinación de talla y color no está disponible para el producto: ${product.name}`
         });
       }
 
-      calculatedTotal += product.price * item.quantity;
+      if (variant.stock < quantity) {
+        return res.status(400).json({
+          error: `Stock insuficiente para la combinación seleccionada de ${product.name}. Disponible: ${variant.stock}`
+        });
+      }
+
+      calculatedTotal += product.price * quantity;
     }
 
-    // Verificar si el total enviado coincide con el calculado
     if (calculatedTotal !== total) {
       return res.status(400).json({
         error: `Total incorrecto. Total real: ${calculatedTotal}`
       });
     }
 
-    // Crear pedido
+    // 🧮 Descontar stock y registrar pedido
+    for (const item of items) {
+      const product = await Product.findById(item.product);
+
+      const variantIndex = product.variants.findIndex(
+        (v) =>
+          v.size.toString() === item.size &&
+          v.color.toString() === item.color
+      );
+
+      if (variantIndex >= 0) {
+        product.variants[variantIndex].stock -= item.quantity;
+        await product.save();
+      }
+    }
+
     const order = await Order.create({
       user: req.user.id,
       items,
       total
     });
 
-    // Descontar stock
-    for (const item of items) {
-      await Product.findByIdAndUpdate(item.product, {
-        $inc: { stock: -item.quantity }
-      });
-    }
-
     res.status(201).json(order);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Error en orden:", err);
+    res.status(500).json({ error: "Error al procesar pedido" });
   }
 };
 

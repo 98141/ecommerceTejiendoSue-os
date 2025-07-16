@@ -1,18 +1,39 @@
-const CartItem = ({ item, removeFromCart }) => {
-  const total = item.price * item.quantity;
+const CartItem = ({ item, removeFromCart, updateItem }) => {
+  const { product, quantity, size, color } = item;
+
+  const handleChange = (e) => {
+    const newQty = Number(e.target.value);
+    if (newQty >= 1) {
+      updateItem(product._id, size, color, newQty);
+    }
+  };
 
   return (
     <div className="cart-item">
-      <img src={item.imageUrl} alt={item.name} className="cart-image" />
+      <img
+        src={`http://localhost:5000${product.images?.[0]}`}
+        alt={product.name}
+        className="cart-image"
+      />
       <div className="cart-info">
-        <h4>{item.name}</h4>
-        <p>Precio: ${item.price}</p>
-        <p>Cantidad: {item.quantity}</p>
-        <p><strong>Total: ${total}</strong></p>
+        <h4>{product.name}</h4>
+        <p>Precio unitario: ${product.price}</p>
+        <p>Talla: {size}</p>
+        <p>Color: {color}</p>
+        <label>Cantidad:</label>
+        <input
+          type="number"
+          value={quantity}
+          min={1}
+          onChange={handleChange}
+        />
+        <p>
+          <strong>Total: ${product.price * quantity}</strong>
+        </p>
       </div>
       <button
         className="cart-remove"
-        onClick={() => removeFromCart(item._id)}
+        onClick={() => removeFromCart(product._id, size, color)}
       >
         Quitar
       </button>

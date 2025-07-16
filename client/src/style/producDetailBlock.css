@@ -1,13 +1,12 @@
 .product-detail {
   display: flex;
-  flex-direction: row;
-  gap: 20px;
+  gap: 30px;
   margin: 40px auto;
+  max-width: 900px;
   padding: 20px;
-  max-width: 1000px;
-  background-color: white;
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.1);
 }
 
 .side-images {
@@ -16,83 +15,109 @@
   gap: 10px;
 }
 
-.thumb-image {
-  width: 80px;
-  height: 80px;
+.side-images img {
+  width: 70px;
+  height: 70px;
   object-fit: cover;
-  border: 2px solid transparent;
   border-radius: 6px;
   cursor: pointer;
-  transition: transform 0.2s, border 0.2s;
+  border: 2px solid transparent;
+  transition: border-color 0.2s;
 }
 
-.thumb-image:hover,
-.thumb-image.active {
+.side-images img.active {
   border-color: #2d89e5;
-  transform: scale(1.05);
 }
 
 .main-section {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
 }
 
 .main-image {
   width: 100%;
-  max-width: 500px;
   height: auto;
-  aspect-ratio: 4 / 3; /* forma rectangular controlada */
-  object-fit: contain;
-  border-radius: 8px;
-  background-color: #f0f0f0;
+  border-radius: 10px;
+  object-fit: cover;
+  margin-bottom: 20px;
 }
 
-
 .detail-info {
-  flex: 1;
-  min-width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .detail-info h2 {
-  font-size: 24px;
-  margin-bottom: 10px;
+  font-size: 28px;
+  margin: 0;
+  color: #333;
 }
 
 .detail-info p {
-  margin: 8px 0;
+  margin: 0;
+  font-size: 16px;
 }
 
 .price {
-  color: #2d89e5;
   font-weight: bold;
+  color: #2d89e5;
+  font-size: 20px;
 }
 
 .stock {
-  color: #4caf50;
+  color: #888;
+}
+
+.select-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.select-box label {
+  font-weight: 500;
+}
+
+.select-box select {
+  padding: 8px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  outline: none;
 }
 
 .quantity-box {
   margin-top: 10px;
-  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
 }
 
 .quantity-box input {
-  width: 60px;
-  padding: 5px;
-  margin-left: 10px;
+  width: 80px;
+  padding: 8px;
+  font-size: 16px;
+  margin-top: 5px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
 }
 
 .btn-add {
+  margin-top: 15px;
   background-color: #2d89e5;
   color: white;
-  padding: 10px 16px;
+  padding: 10px 14px;
+  font-size: 16px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
+  transition: background-color 0.2s;
 }
 
 .btn-add:hover {
   background-color: #1c5cbf;
+}
+
+.btn-view {
+  color: white;
+  text-decoration: none;
 }
