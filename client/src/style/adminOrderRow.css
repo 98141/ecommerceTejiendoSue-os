@@ -15,3 +15,77 @@
   padding-left: 16px;
   list-style: disc;
 }
+
+.admin-orders-container {
+  padding: 20px;
+}
+
+.admin-orders-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.admin-orders-filter {
+  margin-bottom: 20px;
+  text-align: right;
+}
+
+.admin-orders-filter label {
+  margin-right: 8px;
+  font-weight: 500;
+}
+
+.admin-orders-select {
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.admin-order-card {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 16px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.admin-order-id {
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.admin-order-user,
+.admin-order-date,
+.admin-order-total,
+.admin-order-status {
+  margin-bottom: 6px;
+}
+
+.admin-order-status span {
+  font-weight: bold;
+}
+
+.status-pendiente {
+  color: orange;
+}
+
+.status-enviado {
+  color: blue;
+}
+
+.status-entregado {
+  color: green;
+}
+
+.status-cancelado {
+  color: red;
+}
+
+.admin-order-link {
+  text-decoration: underline;
+  color: #2d89e5;
+  font-weight: 500;
+}

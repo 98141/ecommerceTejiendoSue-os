@@ -1,9 +1,8 @@
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import axios from "axios";
-import { Link } from "react-router-dom";
 
-const MyOrders = () => {
+const MyOrdersPage = () => {
   const { token } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
@@ -29,13 +28,16 @@ const MyOrders = () => {
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Mis pedidos</h2>
+    <div className="orders-container" style={{ padding: "20px" }}>
+      <h2>Mis Pedidos</h2>
+
       {orders.length === 0 ? (
         <p>No tienes pedidos registrados.</p>
       ) : (
         orders.map(order => (
-          <div key={order._id} style={{ border: "1px solid #ccc", marginBottom: 20, padding: 10 }}>
+          <div key={order._id} className="order-card" style={{
+            border: "1px solid #ccc", padding: "15px", marginBottom: "20px", borderRadius: "8px"
+          }}>
             <p><strong>Fecha:</strong> {new Date(order.createdAt).toLocaleString()}</p>
             <p>
               <strong>Estado:</strong>{" "}
@@ -44,10 +46,19 @@ const MyOrders = () => {
               </span>
             </p>
             <p><strong>Total:</strong> ${order.total}</p>
+
             <ul>
-              {order.items.map(item => (
-                <li key={item._id}>
-                  {item.quantity} x {item.product.name} (${item.product.price} c/u)
+              {order.items.map((item, idx) => (
+                <li key={idx}>
+                  {item.product ? (
+                    <>
+                      {item.quantity} x {item.product.name} (${item.product.price} c/u)
+                      {item.size?.label && ` | Talla: ${item.size.label}`}
+                      {item.color?.name && ` | Color: ${item.color.name}`}
+                    </>
+                  ) : (
+                    <em>Producto no disponible</em>
+                  )}
                 </li>
               ))}
             </ul>
@@ -55,8 +66,7 @@ const MyOrders = () => {
         ))
       )}
     </div>
-
   );
 };
 
-export default MyOrders;
+export default MyOrdersPage;
