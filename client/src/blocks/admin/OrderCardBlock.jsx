@@ -1,4 +1,8 @@
+import { useNavigate } from "react-router-dom";
+
 const OrderCardBlock = ({ order, onStatusChange }) => {
+  const navigate = useNavigate();
+
   const getStatusColor = (status) => {
     switch (status) {
       case "pendiente": return "orange";
@@ -9,9 +13,7 @@ const OrderCardBlock = ({ order, onStatusChange }) => {
   };
 
   return (
-    <div className="order-card" style={{
-      border: "1px solid #ccc", padding: "15px", marginBottom: "20px", borderRadius: "8px"
-    }}>
+    <div className="order-card">
       <p><strong>Nombre de usuario:</strong> {order.user?.name || "N/A"}</p>
       <p><strong>Usuario:</strong> {order.user?.email || "N/A"}</p>
       <p><strong>Fecha:</strong> {new Date(order.createdAt).toLocaleString()}</p>
@@ -30,7 +32,7 @@ const OrderCardBlock = ({ order, onStatusChange }) => {
         </select>
       </label>
 
-      <ul style={{ marginTop: "20px" }}>
+      <ul className="order-items-list">
         {order.items.map((item, i) => (
           <li key={i}>
             {item.product ? (
@@ -45,6 +47,13 @@ const OrderCardBlock = ({ order, onStatusChange }) => {
           </li>
         ))}
       </ul>
+
+      <button
+        className="btn-detail"
+        onClick={() => navigate(`/admin/orders/${order._id}`)}
+      >
+        Ver detalle
+      </button>
     </div>
   );
 };

@@ -18,6 +18,7 @@ import SupportChatPage from "./pages/SupportChatPage";
 import AdminCategoryPage from "./pages/admin/products/AdminCategoryPage";
 import AdminSizesPage from "./pages/admin/products/AdminSizesPage";
 import AdminColorsPage from "./pages/admin/products/AdminColorsPages";
+import AdminOrderDetailPage from "./pages/admin/products/AdminOrderDetailPage";
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
         <Route element={<PrivateRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/orders" element={<AdminOrderPage />} />
+          <Route path="/admin/orders/:id" element={<AdminOrderDetailPage />} />
           <Route path="/admin/products" element={<AdminProductManager />} />
           <Route path="/admin/products/new" element={<NewProductPage />} />
           <Route path="/admin/categories" element={<AdminCategoryPage />} />

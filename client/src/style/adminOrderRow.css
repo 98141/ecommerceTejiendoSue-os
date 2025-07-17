@@ -89,3 +89,44 @@
   color: #2d89e5;
   font-weight: 500;
 }
+
+.admin-order-detail {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.admin-order-detail h2 {
+  margin-bottom: 10px;
+}
+
+.admin-order-detail ul {
+  list-style: none;
+  padding: 0;
+}
+
+.admin-order-detail li {
+  margin-bottom: 8px;
+}
+
+.order-card {
+  border: 1px solid #ccc;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  background-color: #fafafa;
+}
+
+.btn-detail {
+  margin-top: 10px;
+  padding: 6px 12px;
+  background-color: #2d89e5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-detail:hover {
+  background-color: #1c5fab;
+}
