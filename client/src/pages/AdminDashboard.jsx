@@ -1,4 +1,5 @@
 import { useEffect, useState, useContext } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -9,10 +10,10 @@ import { AuthContext } from "../contexts/AuthContext";
 import FilterExportControls from "../blocks/admin/FilterExportControls";
 import OrderCardBlock from "../blocks/admin/OrderCardBlock";
 
-const AdminOrdersPage = () => {
+const AdminOrdersPage = ({ statusFilterProp = "todos" }) => {
   const { token } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("todos");
+  const [statusFilter, setStatusFilter] = useState(statusFilterProp);
   const [emailFilter, setEmailFilter] = useState("");
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
 
@@ -111,7 +112,7 @@ const AdminOrdersPage = () => {
         Usuario: order.user?.email || "N/A",
         Fecha: new Date(order.createdAt).toLocaleString(),
         Producto: item.product?.name || "Eliminado",
-        Talla: item.size?.label || "-" ,
+        Talla: item.size?.label || "-",
         Color: item.color?.name || "-",
         Cantidad: item.quantity,
         "Precio Unitario": item.product?.price || "-",
@@ -132,9 +133,33 @@ const AdminOrdersPage = () => {
     saveAs(data, "pedidos.xlsx");
   };
 
+  const handleCancel = (id) => {
+    if (window.confirm("¿Estás seguro de cancelar este pedido?")) {
+      axios
+        .put(
+          `http://localhost:5000/api/orders/cancel/${id}`,
+          {},
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+        .then(() => fetchOrders())
+        .catch(() => alert("Error al cancelar el pedido"));
+    }
+  };
+
   return (
     <div className="admin-orders-container" style={{ padding: "20px" }}>
       <h2>Gestión de Pedidos</h2>
+      <Link to="/admin">
+        <button>Todos</button>
+      </Link>
+      <Link to="/admin/orders/shipped">
+        <button>Enviados</button>
+      </Link>
+      <Link to="/admin/orders/delivered">
+        <button>Entregados</button>
+      </Link>
 
       <FilterExportControls
         statusFilter={statusFilter}
@@ -155,6 +180,7 @@ const AdminOrdersPage = () => {
             key={order._id}
             order={order}
             onStatusChange={handleStatusChange}
+            onCancel={handleCancel}
           />
         ))
       )}

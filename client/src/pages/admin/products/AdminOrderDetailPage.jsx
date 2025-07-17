@@ -4,6 +4,7 @@ import axios from "axios";
 import { AuthContext } from "../../../contexts/AuthContext";
 import OrderItemEditor from "../../../blocks/admin/OrderItemEditorBlocks";
 import AdminOrderCommentBlock from "../../../blocks/admin/AdminOrderCommentBlock";
+import { toast } from "react-toastify";
 
 const AdminOrderDetailPage = () => {
   const { id } = useParams();
@@ -18,6 +19,8 @@ const AdminOrderDetailPage = () => {
     shippingCompany: "",
     adminComment: "",
   });
+
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     axios
@@ -46,6 +49,8 @@ const AdminOrderDetailPage = () => {
   };
 
   const handleSave = () => {
+    setIsSaving(true); // Desactiva el botón
+
     axios
       .put(
         `http://localhost:5000/api/orders/orders/${id}`,
@@ -58,14 +63,17 @@ const AdminOrderDetailPage = () => {
         }
       )
       .then(() => {
-        alert("Pedido actualizado con éxito");
+        toast.success("Pedido actualizado con éxito");
         setTimeout(() => {
           navigate("/admin");
-        }, 2000);
+        }, 3500);
       })
-      .catch((err) =>
-        alert("Error al guardar cambios: " + err.response?.data?.error)
-      );
+      .catch((err) => {
+        toast.error(
+          err.response?.data?.error || "Error al guardar los cambios"
+        );
+        setIsSaving(false); // ✅ Reactivar el botón en caso de error
+      });
   };
 
   const handleCancel = () => {
@@ -103,7 +111,16 @@ const AdminOrderDetailPage = () => {
         onFieldChange={handleFieldChange}
       />
 
-      <button onClick={handleSave}>Guardar cambios</button>
+      <button
+        onClick={handleSave}
+        disabled={isSaving}
+        style={{
+          opacity: isSaving ? 0.6 : 1,
+          cursor: isSaving ? "not-allowed" : "pointer",
+        }}
+      >
+        {isSaving ? "Guardando..." : "Guardar cambios"}
+      </button>
       <button onClick={handleCancel}>Cancelar</button>
     </div>
   );

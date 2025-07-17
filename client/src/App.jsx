@@ -1,4 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+
+import "react-toastify/dist/ReactToastify.css";
+
 import LoginPage from "./pages/LoginPages";
 import RegisterPage from "./pages/RegisterPages";
 import ProductListPage from "./pages/ProductListPage";
@@ -19,6 +23,8 @@ import AdminCategoryPage from "./pages/admin/products/AdminCategoryPage";
 import AdminSizesPage from "./pages/admin/products/AdminSizesPage";
 import AdminColorsPage from "./pages/admin/products/AdminColorsPages";
 import AdminOrderDetailPage from "./pages/admin/products/AdminOrderDetailPage";
+import AdminShippedOrderPage from "./pages/admin/products/adminShippedOrderPage";
+import AdminDeliveredOrdersPage from "./pages/admin/products/AdminDeliveredOrdersPage";
 
 function App() {
   return (
@@ -40,6 +46,8 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/orders" element={<AdminOrderPage />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetailPage />} />
+          <Route path="/admin/orders/shipped" element={<AdminShippedOrderPage />} />
+          <Route path="/admin/orders/delivered" element={<AdminDeliveredOrdersPage />} />
           <Route path="/admin/products" element={<AdminProductManager />} />
           <Route path="/admin/products/new" element={<NewProductPage />} />
           <Route path="/admin/categories" element={<AdminCategoryPage />} />
@@ -59,6 +67,8 @@ function App() {
         {/* tus otras rutas... */}
         <Route path="*" element={<NotFoundPage />} /> {/* 👈 ruta comodín */}
       </Routes>
+      {/* Contenedor de notificaciones */}
+      <ToastContainer position="top-right" autoClose={3000} />
     </Router>
   );
 }

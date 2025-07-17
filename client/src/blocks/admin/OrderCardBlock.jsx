@@ -1,23 +1,35 @@
 import { useNavigate } from "react-router-dom";
 
-const OrderCardBlock = ({ order, onStatusChange }) => {
+const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
   const navigate = useNavigate();
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "pendiente": return "orange";
-      case "enviado": return "blue";
-      case "entregado": return "green";
-      default: return "gray";
+      case "pendiente":
+        return "orange";
+      case "enviado":
+        return "blue";
+      case "entregado":
+        return "green";
+      default:
+        return "gray";
     }
   };
 
   return (
     <div className="order-card">
-      <p><strong>Nombre de usuario:</strong> {order.user?.name || "N/A"}</p>
-      <p><strong>Usuario:</strong> {order.user?.email || "N/A"}</p>
-      <p><strong>Fecha:</strong> {new Date(order.createdAt).toLocaleString()}</p>
-      <p><strong>Total:</strong> ${order.total}</p>
+      <p>
+        <strong>Nombre de usuario:</strong> {order.user?.name || "N/A"}
+      </p>
+      <p>
+        <strong>Usuario:</strong> {order.user?.email || "N/A"}
+      </p>
+      <p>
+        <strong>Fecha:</strong> {new Date(order.createdAt).toLocaleString()}
+      </p>
+      <p>
+        <strong>Total:</strong> ${order.total}
+      </p>
 
       <label>
         <strong>Estado:</strong>{" "}
@@ -37,7 +49,8 @@ const OrderCardBlock = ({ order, onStatusChange }) => {
           <li key={i}>
             {item.product ? (
               <>
-                {item.quantity} x {item.product.name} (${item.product.price} c/u)
+                {item.quantity} x {item.product.name} (${item.product.price}{" "}
+                c/u)
                 {item.size && ` | Talla: ${item.size.label}`}
                 {item.color && ` | Color: ${item.color.name}`}
               </>
@@ -47,6 +60,18 @@ const OrderCardBlock = ({ order, onStatusChange }) => {
           </li>
         ))}
       </ul>
+      {order.status === "pendiente" && (
+        <button
+          style={{
+            backgroundColor: "crimson",
+            color: "white",
+            marginTop: "10px",
+          }}
+          onClick={() => onCancel(order._id)}
+        >
+          Cancelar pedido
+        </button>
+      )}
 
       <button
         className="btn-detail"
