@@ -331,3 +331,12 @@ exports.cancelOrder = async (req, res) => {
     res.status(500).json({ error: "Error al cancelar el pedido" });
   }
 };
+
+exports.getAllOrderIds = async (req, res) => {
+  try {
+    const orders = await Order.find({}, "_id").sort({ createdAt: -1 });
+    res.json(orders.map((o) => o._id)); // Devuelve un array de IDs
+  } catch (err) {
+    res.status(500).json({ error: "Error al obtener pedidos" });
+  }
+};

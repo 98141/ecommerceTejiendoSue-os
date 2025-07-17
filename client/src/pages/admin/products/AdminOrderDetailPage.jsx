@@ -6,6 +6,9 @@ import OrderItemEditor from "../../../blocks/admin/OrderItemEditorBlocks";
 import AdminOrderCommentBlock from "../../../blocks/admin/AdminOrderCommentBlock";
 import { toast } from "react-toastify";
 
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 import {
   FaSave,
   FaTimesCircle,
@@ -29,6 +32,8 @@ const AdminOrderDetailPage = () => {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [orderIds, setOrderIds] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(-1);
 
   useEffect(() => {
     axios
@@ -43,6 +48,19 @@ const AdminOrderDetailPage = () => {
           shippingCompany: res.data.shippingCompany || "",
           adminComment: res.data.adminComment || "",
         });
+      });
+  }, [id, token]);
+
+  useEffect(() => {
+    axios
+      .get("http://localhost:5000/api/orders/ids/all", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+        const ids = res.data;
+        setOrderIds(ids);
+        const index = ids.findIndex((oid) => oid === id);
+        setCurrentIndex(index);
       });
   }, [id, token]);
 
@@ -91,6 +109,62 @@ const AdminOrderDetailPage = () => {
     // }
   };
 
+  const goToOrder = (offset) => {
+    const newIndex = currentIndex + offset;
+    if (newIndex >= 0 && newIndex < orderIds.length) {
+      const nextId = orderIds[newIndex];
+      navigate(`/admin/orders/${nextId}`);
+    }
+  };
+
+  const exportSingleOrderToPDF = () => {
+    const doc = new jsPDF();
+    doc.text(`Factura de Pedido`, 14, 14);
+    doc.text(`ID del pedido: ${order._id}`, 14, 24);
+    doc.text(`Usuario: ${order.user?.email || "N/A"}`, 14, 32);
+    doc.text(`Fecha: ${new Date(order.createdAt).toLocaleString()}`, 14, 40);
+    doc.text(`Estado: ${order.status}`, 14, 48);
+
+    if (order.trackingNumber) {
+      doc.text(`Guía: ${order.trackingNumber}`, 14, 56);
+    }
+    if (order.shippingCompany) {
+      doc.text(`Transportadora: ${order.shippingCompany}`, 14, 64);
+    }
+
+    const itemsRows = order.items.map((item) => [
+      item.product?.name || "Producto eliminado",
+      item.size?.label || "-",
+      item.color?.name || "-",
+      item.quantity,
+      `$${item.product?.price?.toFixed(2) || "-"}`,
+      `$${(item.quantity * (item.product?.price || 0)).toFixed(2)}`,
+    ]);
+
+    autoTable(doc, {
+      head: [["Producto", "Talla", "Color", "Cantidad", "Precio", "Subtotal"]],
+      body: itemsRows,
+      startY: 72,
+    });
+
+    doc.text(
+      `Total: $${order.total.toFixed(2)}`,
+      14,
+      doc.lastAutoTable.finalY + 10
+    );
+
+    if (order.adminComment) {
+      doc.text(
+        "Comentario del administrador:",
+        14,
+        doc.lastAutoTable.finalY + 20
+      );
+      doc.text(order.adminComment, 14, doc.lastAutoTable.finalY + 28);
+    }
+
+    doc.save(`pedido_${order._id}.pdf`);
+  };
+
   if (!order) return <p>Cargando detalles del pedido...</p>;
 
   return (
@@ -108,6 +182,9 @@ const AdminOrderDetailPage = () => {
         <p>
           <strong>Estado actual:</strong> {order.status}
         </p>
+      </div>
+      <div>
+        <button onClick={exportSingleOrderToPDF}>Descargar PDF</button>
       </div>
 
       <div className="admin-order-section">
@@ -159,6 +236,27 @@ const AdminOrderDetailPage = () => {
           <FaTimesCircle style={{ marginRight: "6px" }} />
           Cancelar
         </button>
+        <div style={{ marginTop: "1rem" }}>
+          <button onClick={() => navigate("/admin")}>
+            🔙 Volver al listado
+          </button>
+
+          <button
+            onClick={() => goToOrder(-1)}
+            disabled={currentIndex <= 0}
+            style={{ marginLeft: "1rem" }}
+          >
+            ⬅ Pedido anterior
+          </button>
+
+          <button
+            onClick={() => goToOrder(1)}
+            disabled={currentIndex >= orderIds.length - 1}
+            style={{ marginLeft: "1rem" }}
+          >
+            Pedido siguiente ➡
+          </button>
+        </div>
       </div>
     </div>
   );
