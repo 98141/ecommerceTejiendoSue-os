@@ -25,6 +25,7 @@ import AdminColorsPage from "./pages/admin/products/AdminColorsPages";
 import AdminOrderDetailPage from "./pages/admin/products/AdminOrderDetailPage";
 import AdminShippedOrderPage from "./pages/admin/products/adminShippedOrderPage";
 import AdminDeliveredOrdersPage from "./pages/admin/products/AdminDeliveredOrdersPage";
+import Footer from "./components/Footer";
 
 function App() {
   return (
@@ -69,7 +70,9 @@ function App() {
       </Routes>
       {/* Contenedor de notificaciones */}
       <ToastContainer position="top-right" autoClose={3000} />
+      <Footer />
     </Router>
+    
   );
 }
 

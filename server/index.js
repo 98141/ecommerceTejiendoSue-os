@@ -12,6 +12,7 @@ const messageRoutes = require("./routes/messageRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const sizeRoutes = require("./routes/sizeRoutes");
 const colorRoutes = require("./routes/colorRoutes");
+const visitRoutes = require("./routes/visitRouter");
 
 const ensureUploadsFolderExists = require("./utils/products");
 
@@ -49,6 +50,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/sizes", sizeRoutes);
 app.use("/api/colors", colorRoutes);
+app.use("/api/visits", visitRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)
