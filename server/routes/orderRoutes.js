@@ -4,7 +4,8 @@ const {
   getMyOrders,
   getAllOrders,
   updateOrderStatus,
-  getOrderById
+  getOrderById,
+  updateOrder
 } = require('../controllers/orderController');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
@@ -15,5 +16,6 @@ router.get('/my', verifyToken, getMyOrders); // Ver mis pedidos
 router.get('/', verifyToken, isAdmin, getAllOrders); // Admin: ver todos
 router.put('/:id', verifyToken, isAdmin, updateOrderStatus); // Admin: cambiar estado
 router.get("/:id", verifyToken, isAdmin, getOrderById); // Admin: ver detalle de pedido por ID
+router.put("/orders/:id", verifyToken, isAdmin, updateOrder); // Admin: actualizar pedido
 
 module.exports = router;

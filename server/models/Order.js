@@ -1,23 +1,31 @@
 const mongoose = require("mongoose");
 
-const orderSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  items: [
-    {
-      product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
-      quantity: { type: Number, required: true },
-      size: { type: mongoose.Schema.Types.ObjectId, ref: "Size", required: true },
-      color: { type: mongoose.Schema.Types.ObjectId, ref: "Color", required: true },
-    }
-  ],
-  total: { type: Number, required: true },
-  status: {
-    type: String,
-    enum: ["pendiente", "enviado", "entregado"],
-    default: "pendiente"
+const orderItemSchema = new mongoose.Schema({
+  product: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Product",
+    required: true,
   },
-  createdAt: { type: Date, default: Date.now }
+  quantity: { type: Number, required: true },
+  size: { type: mongoose.Schema.Types.ObjectId, ref: "Size" },
+  color: { type: mongoose.Schema.Types.ObjectId, ref: "Color" },
 });
 
-module.exports = mongoose.model("Order", orderSchema);
+const orderSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    items: [orderItemSchema],
+    total: { type: Number, required: true },
+    status: {
+      type: String,
+      enum: ["pendiente", "enviado", "entregado", "cancelado"],
+      default: "pendiente",
+    },
+    trackingNumber: { type: String, default: "" },
+    shippingCompany: { type: String, default: "" },
+    adminComment: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
 
+module.exports = mongoose.model("Order", orderSchema);

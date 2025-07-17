@@ -130,3 +130,43 @@
 .btn-detail:hover {
   background-color: #1c5fab;
 }
+
+.admin-order-detail-container {
+  padding: 20px;
+  max-width: 900px;
+  margin: auto;
+}
+
+.order-item-editor {
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.order-item-editor label,
+.admin-order-comment-block label {
+  display: block;
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+.order-item-editor input,
+.order-item-editor select,
+.admin-order-comment-block textarea,
+.admin-order-comment-block input {
+  width: 100%;
+  padding: 8px;
+  margin-top: 4px;
+}
+
+button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  font-weight: bold;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}

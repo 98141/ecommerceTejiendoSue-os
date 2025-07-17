@@ -127,8 +127,7 @@ exports.getAllOrders = async (req, res) => {
         path: "items.color",
         select: "name",
       })
-      .sort({ createdAt: -1 }); // Ordenar por fecha reciente
-
+      .sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -173,5 +172,56 @@ exports.getOrderById = async (req, res) => {
     res.json(order);
   } catch (err) {
     res.status(500).json({ error: "Error al obtener el pedido" });
+  }
+};
+
+exports.updateOrder = async (req, res) => {
+  const { id } = req.params;
+  const { status, items, trackingNumber, shippingCompany, adminComment } = req.body;
+
+  try {
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
+
+    // ✅ Actualización de estado
+    if (status) order.status = status;
+
+    // ✅ Actualización de productos del pedido
+    if (Array.isArray(items)) {
+      const updatedItems = items.map(item => {
+        if (!item.product || !item.quantity) {
+          throw new Error("Cada producto debe incluir ID y cantidad");
+        }
+        return {
+          product: item.product,
+          quantity: item.quantity,
+          size: item.size || null,
+          color: item.color || null
+        };
+      });
+      order.items = updatedItems;
+    }
+
+    // ✅ Nuevos campos administrativos
+    if (trackingNumber !== undefined) order.trackingNumber = trackingNumber;
+    if (shippingCompany !== undefined) order.shippingCompany = shippingCompany;
+    if (adminComment !== undefined) order.adminComment = adminComment;
+
+    // ✅ Recalcular total
+    let total = 0;
+    for (let item of order.items) {
+      const productData = await Order.populate(item, { path: "product" });
+      if (!item.product || !item.product.price) {
+        throw new Error("Producto inválido o eliminado");
+      }
+      total += item.product.price * item.quantity;
+    }
+    order.total = total;
+
+    await order.save();
+    res.json({ message: "Pedido actualizado correctamente", order });
+  } catch (error) {
+    console.error("Error actualizando pedido:", error.message);
+    res.status(400).json({ error: error.message || "Error al actualizar pedido" });
   }
 };

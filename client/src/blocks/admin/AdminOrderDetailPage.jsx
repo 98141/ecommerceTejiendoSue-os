@@ -2,14 +2,14 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import { AuthContext } from "../../../contexts/AuthContext";
-import OrderItemEditor from "../../../blocks/admin/OrderItemEditorBlocks";
+import OrderItemEditor from "../../../blocks/admin/OrderItemEditor";
 import AdminOrderCommentBlock from "../../../blocks/admin/AdminOrderCommentBlock";
 
 const AdminOrderDetailPage = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
-
   const { token } = useContext(AuthContext);
+
+  const navigate = useNavigate();
 
   const [order, setOrder] = useState(null);
   const [items, setItems] = useState([]);
@@ -69,17 +69,17 @@ const AdminOrderDetailPage = () => {
   };
 
   const handleCancel = () => {
-    // Si necesitas confirmar con el usuario:
-    // if (window.confirm("¿Estás seguro de cancelar los cambios?")) {
-    navigate("/admin");
-    // }
-  };
+  // Si necesitas confirmar con el usuario:
+  // if (window.confirm("¿Estás seguro de cancelar los cambios?")) {
+  navigate('/admin/orders');
+  // }
+};
 
   if (!order) return <p>Cargando detalles del pedido...</p>;
 
   return (
     <div className="admin-order-detail-container">
-      <h2>Detalles del pedido</h2>
+      <h2>Detalles del pedido prueba</h2>
       <p>
         <strong>Usuario:</strong> {order.user?.email}
       </p>
@@ -104,7 +104,7 @@ const AdminOrderDetailPage = () => {
       />
 
       <button onClick={handleSave}>Guardar cambios</button>
-      <button onClick={handleCancel}>Cancelar</button>
+      <button  onClick={handleCancel}>Cancelar</button>
     </div>
   );
 };
