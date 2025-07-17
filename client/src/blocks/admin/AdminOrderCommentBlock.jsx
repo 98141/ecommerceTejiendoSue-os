@@ -6,7 +6,7 @@ const AdminOrderCommentBlock = ({
 }) => {
   return (
     <div className="admin-order-comment-block">
-      <label>
+      <label title="Comentario visible solo para administración">
         Comentario del administrador:
         <textarea
           value={comment}
@@ -14,7 +14,7 @@ const AdminOrderCommentBlock = ({
         />
       </label>
 
-      <label>
+      <label title="Número de seguimiento del envío">
         Número de guía:
         <input
           type="text"
@@ -23,7 +23,7 @@ const AdminOrderCommentBlock = ({
         />
       </label>
 
-      <label>
+      <label title="Empresa encargada del envío">
         Transportadora:
         <input
           type="text"

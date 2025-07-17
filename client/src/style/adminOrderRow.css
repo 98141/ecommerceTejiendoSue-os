@@ -170,3 +170,49 @@ button {
   border-radius: 6px;
   cursor: pointer;
 }
+
+.admin-order-detail-container {
+  max-width: 800px;
+  margin: 30px auto;
+  padding: 30px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.admin-order-section {
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.admin-order-section h3 {
+  margin-bottom: 10px;
+  font-size: 20px;
+  border-left: 4px solid #0077cc;
+  padding-left: 10px;
+  color: #0077cc;
+}
+
+.order-item-editor {
+  background: #f9f9f9;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+}
+
+button {
+  margin-right: 10px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  background-color: #0077cc;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #005fa3;
+}

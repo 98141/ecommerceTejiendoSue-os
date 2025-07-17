@@ -6,6 +6,14 @@ import OrderItemEditor from "../../../blocks/admin/OrderItemEditorBlocks";
 import AdminOrderCommentBlock from "../../../blocks/admin/AdminOrderCommentBlock";
 import { toast } from "react-toastify";
 
+import {
+  FaSave,
+  FaTimesCircle,
+  FaUser,
+  FaTruck,
+  FaClipboardList,
+} from "react-icons/fa";
+
 const AdminOrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -87,41 +95,71 @@ const AdminOrderDetailPage = () => {
 
   return (
     <div className="admin-order-detail-container">
-      <h2>Detalles del pedido</h2>
-      <p>
-        <strong>Usuario:</strong> {order.user?.email}
-      </p>
-      <p>
-        <strong>Estado actual:</strong> {order.status}
-      </p>
+      <div className="admin-order-section">
+        <h3>
+          <FaClipboardList /> Información del pedido
+        </h3>
+        <p>
+          <strong>
+            <FaUser /> Usuario:
+          </strong>{" "}
+          {order.user?.email}
+        </p>
+        <p>
+          <strong>Estado actual:</strong> {order.status}
+        </p>
+      </div>
 
-      {items.map((item, index) => (
-        <OrderItemEditor
-          key={item._id || index}
-          item={item}
-          index={index}
-          onChange={handleItemChange}
+      <div className="admin-order-section">
+        <h3>
+          <FaClipboardList /> Productos del pedido
+        </h3>
+        {items.map((item, index) => (
+          <OrderItemEditor
+            key={item._id || index}
+            item={item}
+            index={index}
+            onChange={handleItemChange}
+          />
+        ))}
+      </div>
+
+      <div className="admin-order-section">
+        <h3>
+          <FaTruck /> Información de envío
+        </h3>
+        <AdminOrderCommentBlock
+          comment={fields.adminComment}
+          trackingNumber={fields.trackingNumber}
+          shippingCompany={fields.shippingCompany}
+          onFieldChange={handleFieldChange}
         />
-      ))}
+      </div>
 
-      <AdminOrderCommentBlock
-        comment={fields.adminComment}
-        trackingNumber={fields.trackingNumber}
-        shippingCompany={fields.shippingCompany}
-        onFieldChange={handleFieldChange}
-      />
+      <div className="admin-order-section">
+        <h3>💾 Acciones</h3>
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          title="Guardar cambios en el pedido"
+          style={{
+            opacity: isSaving ? 0.6 : 1,
+            cursor: isSaving ? "not-allowed" : "pointer",
+          }}
+        >
+          <FaSave style={{ marginRight: "8px" }} />
+          {isSaving ? "Guardando..." : "Guardar cambios"}
+        </button>
 
-      <button
-        onClick={handleSave}
-        disabled={isSaving}
-        style={{
-          opacity: isSaving ? 0.6 : 1,
-          cursor: isSaving ? "not-allowed" : "pointer",
-        }}
-      >
-        {isSaving ? "Guardando..." : "Guardar cambios"}
-      </button>
-      <button onClick={handleCancel}>Cancelar</button>
+        <button
+          onClick={handleCancel}
+          title="Cancelar cambios y volver"
+          style={{ backgroundColor: "#ccc", color: "#333" }}
+        >
+          <FaTimesCircle style={{ marginRight: "6px" }} />
+          Cancelar
+        </button>
+      </div>
     </div>
   );
 };

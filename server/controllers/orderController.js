@@ -177,51 +177,157 @@ exports.getOrderById = async (req, res) => {
 
 exports.updateOrder = async (req, res) => {
   const { id } = req.params;
-  const { status, items, trackingNumber, shippingCompany, adminComment } = req.body;
+  const { status, items, trackingNumber, shippingCompany, adminComment } =
+    req.body;
 
   try {
     const order = await Order.findById(id);
     if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
 
-    // ✅ Actualización de estado
-    if (status) order.status = status;
-
-    // ✅ Actualización de productos del pedido
+    // 1. Validar y preparar nuevos ítems
     if (Array.isArray(items)) {
-      const updatedItems = items.map(item => {
+      const updatedItems = [];
+
+      for (let item of items) {
         if (!item.product || !item.quantity) {
-          throw new Error("Cada producto debe incluir ID y cantidad");
+          return res
+            .status(400)
+            .json({ error: "Datos incompletos en los ítems" });
         }
-        return {
+
+        const productData = await Product.findById(item.product);
+        if (!productData) {
+          return res.status(404).json({ error: "Producto no encontrado" });
+        }
+
+        const variant = productData.variants.find(
+          (v) =>
+            v.size.toString() === item.size && v.color.toString() === item.color
+        );
+
+        if (!variant) {
+          return res.status(400).json({
+            error: `Variante no disponible (producto: ${productData.name})`,
+          });
+        }
+
+        // Buscar ítem anterior
+        const existingItem = order.items.find(
+          (i) =>
+            i.product.toString() === item.product &&
+            i.size?.toString() === item.size &&
+            i.color?.toString() === item.color
+        );
+
+        const prevQty = existingItem ? existingItem.quantity : 0;
+        const qtyDiff = item.quantity - prevQty;
+
+        if (qtyDiff > 0 && qtyDiff > variant.stock) {
+          return res.status(400).json({
+            error: `Stock insuficiente para ${productData.name} (Talla: ${item.size}, Color: ${item.color})`,
+          });
+        }
+
+        updatedItems.push({
           product: item.product,
+          size: item.size,
+          color: item.color,
           quantity: item.quantity,
-          size: item.size || null,
-          color: item.color || null
-        };
-      });
+        });
+      }
+
+      // 2. Ajustar stock (tanto aumento como disminución)
+      for (let item of updatedItems) {
+        const product = await Product.findById(item.product);
+        const variantIndex = product.variants.findIndex(
+          (v) =>
+            v.size.toString() === item.size && v.color.toString() === item.color
+        );
+
+        const existingItem = order.items.find(
+          (i) =>
+            i.product.toString() === item.product &&
+            i.size?.toString() === item.size &&
+            i.color?.toString() === item.color
+        );
+
+        const prevQty = existingItem ? existingItem.quantity : 0;
+        const qtyDiff = item.quantity - prevQty;
+
+        if (qtyDiff !== 0) {
+          product.variants[variantIndex].stock -= qtyDiff;
+
+          if (product.variants[variantIndex].stock < 0) {
+            return res.status(400).json({
+              error: `Stock insuficiente para ${product.name} (Talla: ${item.size}, Color: ${item.color})`,
+            });
+          }
+
+          await product.save();
+        }
+      }
       order.items = updatedItems;
     }
 
-    // ✅ Nuevos campos administrativos
+    // 3. Actualizar campos adicionales
+    if (status) order.status = status;
     if (trackingNumber !== undefined) order.trackingNumber = trackingNumber;
     if (shippingCompany !== undefined) order.shippingCompany = shippingCompany;
     if (adminComment !== undefined) order.adminComment = adminComment;
 
-    // ✅ Recalcular total
+    // 4. Recalcular total
     let total = 0;
     for (let item of order.items) {
-      const productData = await Order.populate(item, { path: "product" });
-      if (!item.product || !item.product.price) {
-        throw new Error("Producto inválido o eliminado");
-      }
-      total += item.product.price * item.quantity;
+      const populated = await Product.findById(item.product);
+      if (!populated) throw new Error("Producto no encontrado");
+      total += populated.price * item.quantity;
     }
     order.total = total;
 
     await order.save();
-    res.json({ message: "Pedido actualizado correctamente", order });
+    res.json({ message: "Pedido actualizado con control de stock", order });
   } catch (error) {
     console.error("Error actualizando pedido:", error.message);
-    res.status(400).json({ error: error.message || "Error al actualizar pedido" });
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.cancelOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id).populate("items.product");
+
+    if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
+
+    if (order.status !== "pendiente") {
+      return res.status(400).json({
+        error: "Solo los pedidos con estado 'pendiente' pueden ser cancelados",
+      });
+    }
+
+    // 🔄 Reestablecer stock para cada producto y variante
+    for (const item of order.items) {
+      const product = await Product.findById(item.product._id);
+      if (!product) continue;
+
+      const variantIndex = product.variants.findIndex(
+        (v) =>
+          v.size.toString() === item.size.toString() &&
+          v.color.toString() === item.color.toString()
+      );
+
+      if (variantIndex !== -1) {
+        product.variants[variantIndex].stock += item.quantity;
+        await product.save();
+      }
+    }
+
+    // 🚫 Cancelar el pedido
+    order.status = "cancelado";
+    await order.save();
+
+    res.json({ message: "Pedido cancelado y stock restablecido", order });
+  } catch (err) {
+    console.error("Error al cancelar pedido:", err.message);
+    res.status(500).json({ error: "Error al cancelar el pedido" });
   }
 };
