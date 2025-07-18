@@ -3,6 +3,6 @@ const router = express.Router();
 const { incrementVisit, getVisits } = require("../controllers/visitController");
 
 router.post("/increment", incrementVisit); 
-router.get("/count", getVisits);           
+router.get("/", getVisits);           
 
 module.exports = router;

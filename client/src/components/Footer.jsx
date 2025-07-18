@@ -1,32 +1,32 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 const Footer = () => {
   const [visits, setVisits] = useState(0);
 
   useEffect(() => {
-    // Solo enviar la visita si no se ha contado esta sesión
-    if (!sessionStorage.getItem("visited")) {
-      axios.post("http://localhost:5000/api/visits/increment")
-        .then(() => {
+    const increaseVisitIfFirst = async () => {
+      try {
+        if (!sessionStorage.getItem("visited")) {
+          await axios.post(`${API_URL}/api/visits/increment`);
           sessionStorage.setItem("visited", "true");
-        })
-        .catch((err) => console.error("Error al incrementar visitas:", err));
-    }
+        }
 
-    // Obtener número de visitas actual
-    axios.get("http://localhost:5000/api/visits/count")
-      .then((res) => {
+        const res = await axios.get(`${API_URL}/api/visits`);
         setVisits(res.data.count);
-      })
-      .catch((err) => {
-        console.error("Error al obtener visitas:", err);
-      });
+      } catch (err) {
+        console.error("Error con contador de visitas:", err);
+      }
+    };
+
+    increaseVisitIfFirst();
   }, []);
 
   return (
     <footer style={{ textAlign: "center", padding: "1rem", marginTop: "2rem", background: "#f1f1f1" }}>
-      <p>© 2025 Mi E-commerce</p>
+      <p>© 2025 Mi Tejiendo Sueños</p>
       <p>Visitas totales: {visits}</p>
     </footer>
   );

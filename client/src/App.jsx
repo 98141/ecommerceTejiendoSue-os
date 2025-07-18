@@ -25,6 +25,7 @@ import AdminColorsPage from "./pages/admin/products/AdminColorsPages";
 import AdminOrderDetailPage from "./pages/admin/products/AdminOrderDetailPage";
 import AdminShippedOrderPage from "./pages/admin/products/adminShippedOrderPage";
 import AdminDeliveredOrdersPage from "./pages/admin/products/AdminDeliveredOrdersPage";
+import AdminDashboarPage from "./pages/admin/AdminDashboardPage";
 import Footer from "./components/Footer";
 
 function App() {
@@ -52,6 +53,7 @@ function App() {
           <Route path="/admin/products" element={<AdminProductManager />} />
           <Route path="/admin/products/new" element={<NewProductPage />} />
           <Route path="/admin/categories" element={<AdminCategoryPage />} />
+          <Route path="/admin/dashboard" element={<AdminDashboarPage />} />
           <Route
             path="/admin/products/edit/:id"
             element={<EditProductPage />}
