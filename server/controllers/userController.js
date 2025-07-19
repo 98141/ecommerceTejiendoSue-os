@@ -1,36 +1,64 @@
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const validator = require("validator");
+const { sendVerificationEmail } = require("../utils/sendEmail");
 
+// Función para crear tokens
+const createAccessToken = (user) => {
+  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: "15m",
+  });
+};
 
+const createRefreshToken = (user) => {
+  return jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: "7d",
+  });
+};
+
+// ✅ Registro
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // Validación de campos obligatorios
+    // Validaciones fuertes
     if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Todos los campos son obligatorios' });
+      return res
+        .status(400)
+        .json({ error: "Todos los campos son obligatorios" });
+    }
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ error: "Correo inválido" });
+    }
+    if (!validator.isStrongPassword(password)) {
+      return res.status(400).json({
+        error:
+          "Contraseña insegura. Usa al menos 8 caracteres, un número y un símbolo.",
+      });
     }
 
-    // Verifica si ya existe el correo
     const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: 'El correo ya está registrado' });
-    }
+    if (existingUser)
+      return res.status(400).json({ error: "El correo ya está registrado" });
 
-    // Crea el usuario (la encriptación ocurre en el modelo con middleware)
     const user = await User.create({ name, email, password });
 
-    // Genera el token
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    const accessToken = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
 
-    // Envía token y datos del usuario al frontend
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
+    });
+
     res.status(201).json({
-      token,
+      token: accessToken,
       user: {
         id: user._id,
         name: user.name,
@@ -39,22 +67,97 @@ exports.register = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ error: 'Error al registrar: ' + err.message });
+    res.status(500).json({ error: "Error al registrar: " + err.message });
   }
+  const verifyToken = jwt.sign({ id: user._id }, process.env.JWT_EMAIL_SECRET, {
+    expiresIn: "15m",
+  });
+
+  await sendVerificationEmail(user.email, verifyToken);
 };
 
+// ✅ Login
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    if (!validator.isEmail(email))
+      return res.status(400).json({ error: "Correo inválido" });
+
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ error: 'Contraseña incorrecta' });
+    if (!match) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token, user: { id: user._id, name: user.name, role: user.role } });
+    if (!user.isVerified)
+      return res
+        .status(403)
+        .json({ error: "Verifica tu cuenta antes de iniciar sesión." });
+
+    const accessToken = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
+
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      token: accessToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        role: user.role,
+      },
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Error al iniciar sesión' });
+    res.status(500).json({ error: "Error al iniciar sesión" });
+  }
+};
+
+// Refrescar token
+exports.refreshToken = async (req, res) => {
+  try {
+    const token = req.cookies.refreshToken;
+    if (!token) return res.status(401).json({ error: "Token requerido" });
+
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user || user.refreshToken !== token) {
+      return res.status(403).json({ error: "Token inválido o caducado" });
+    }
+
+    const newAccessToken = createAccessToken(user);
+    res.json({ token: newAccessToken });
+  } catch (err) {
+    return res.status(403).json({ error: "Error al refrescar el token" });
+  }
+};
+
+//acivar la cuenta
+exports.verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const decoded = jwt.verify(token, process.env.JWT_EMAIL_SECRET);
+
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+
+    if (user.isVerified) {
+      return res.status(200).json({ message: "La cuenta ya está verificada." });
+    }
+
+    user.isVerified = true;
+    await user.save();
+
+    res.status(200).json({ message: "Cuenta verificada exitosamente" });
+  } catch (err) {
+    return res.status(400).json({ error: "Token inválido o expirado" });
   }
 };

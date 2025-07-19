@@ -1,12 +1,12 @@
 import { useState, useContext } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { useToast } from "../contexts/ToastContext"; // ✅
+import api from "../api/axios";
+import { useToast } from "../contexts/ToastContext";
 
 const RegisterForm = () => {
   const { login } = useContext(AuthContext);
-  const { showToast } = useToast(); // ✅
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const [name, setName] = useState("");
@@ -16,18 +16,14 @@ const RegisterForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://localhost:5000/api/users/register", {
-        name,
-        email,
-        password
-      });
+      const res = await api.post("/users/register", { name, email, password });
 
       login(res.data.token, res.data.user);
-      showToast("Registro exitoso", "success"); // ✅
+      showToast("Registro exitoso. Revisa tu correo para verificar tu cuenta.", "info");
       res.data.user.role === "admin" ? navigate("/admin") : navigate("/");
     } catch (err) {
       const msg = err.response?.data?.error || "Error al registrar";
-      showToast(msg, "error"); // ✅
+      showToast(msg, "error");
     }
   };
 

@@ -13,7 +13,7 @@ const {
 
 router.get("/unread/count", verifyToken, getUnreadMessagesCount);
 router.post("/read", verifyToken, markMessagesAsRead);
-router.get("/inbox/admin", verifyToken, isAdmin, getInboxUsers); // solo admin
+router.get("/inbox/admin", verifyToken, isAdmin, getInboxUsers);
 router.get("/conversations/list", verifyToken, getConversations);
 router.post("/status", verifyToken, isAdmin, updateConversationStatus);
 

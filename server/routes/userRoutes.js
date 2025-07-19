@@ -1,11 +1,18 @@
 const express = require("express");
-const { register, login } = require("../controllers/userController");
+const {
+  register,
+  login,
+  refreshToken,
+  verifyEmail 
+} = require("../controllers/userController");
 const { verifyToken, isAdmin } = require("../middleware/auth");
 
 const router = express.Router();
 
 router.post("/register", register);
 router.post("/login", login);
+router.get("/refresh-token", refreshToken);
+router.get("/verify/:token", verifyEmail);
 
 // Ruta protegida para usuarios autenticados
 router.get("/profile", verifyToken, (req, res) => {
@@ -17,7 +24,7 @@ router.get("/admin-dashboard", verifyToken, isAdmin, (req, res) => {
   res.json({ message: "Bienvenido al panel de administrador" });
 });
 
-router.get('/admin/id', verifyToken, isAdmin, async (req, res) => {
+router.get("/admin/id", verifyToken, isAdmin, async (req, res) => {
   try {
     const admin = await User.findOne({ role: "admin" });
     if (!admin) return res.status(404).json({ error: "Admin no encontrado" });

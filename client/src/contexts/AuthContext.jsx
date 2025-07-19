@@ -1,31 +1,28 @@
-import { createContext, useState } from "react";
+import { createContext, useState, useEffect } from "react";
+import { getToken, setToken, removeToken } from "../utils/authHelpers";
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem("token") || null);
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("user");
-    return savedUser ? JSON.parse(savedUser) : null;
+    const storedUser = localStorage.getItem("user");
+    return storedUser ? JSON.parse(storedUser) : null;
   });
 
-  const login = (newToken, newUser) => {
-    setToken(newToken);
-    setUser(newUser);
-    localStorage.setItem("token", newToken);
-    localStorage.setItem("user", JSON.stringify(newUser));
+  const login = (token, userData) => {
+    setToken(token);
+    localStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
   };
 
   const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem("token");
+    removeToken();
     localStorage.removeItem("user");
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

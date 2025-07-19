@@ -27,6 +27,7 @@ import AdminShippedOrderPage from "./pages/admin/products/adminShippedOrderPage"
 import AdminDeliveredOrdersPage from "./pages/admin/products/AdminDeliveredOrdersPage";
 import AdminDashboarPage from "./pages/admin/AdminDashboardPage";
 import Footer from "./components/Footer";
+import EmailVerificationPage from "./pages/EmailVerificationPage";
 
 function App() {
   return (
@@ -37,6 +38,10 @@ function App() {
         <Route path="/" element={<ProductListPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/verify-email/:token"
+          element={<EmailVerificationPage />}
+        />
         {/* Privadas para usuarios */}
         <Route element={<PrivateRoute allowedRoles={["user"]} />}>
           <Route path="/cart" element={<CartPage />} />
@@ -48,8 +53,14 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/orders" element={<AdminOrderPage />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetailPage />} />
-          <Route path="/admin/orders/shipped" element={<AdminShippedOrderPage />} />
-          <Route path="/admin/orders/delivered" element={<AdminDeliveredOrdersPage />} />
+          <Route
+            path="/admin/orders/shipped"
+            element={<AdminShippedOrderPage />}
+          />
+          <Route
+            path="/admin/orders/delivered"
+            element={<AdminDeliveredOrdersPage />}
+          />
           <Route path="/admin/products" element={<AdminProductManager />} />
           <Route path="/admin/products/new" element={<NewProductPage />} />
           <Route path="/admin/categories" element={<AdminCategoryPage />} />
@@ -74,7 +85,6 @@ function App() {
       <ToastContainer position="top-right" autoClose={3000} />
       <Footer />
     </Router>
-    
   );
 }
 
