@@ -3,7 +3,8 @@ const {
   register,
   login,
   refreshToken,
-  verifyEmail 
+  verifyEmail,
+  resendVerification 
 } = require("../controllers/userController");
 const { verifyToken, isAdmin } = require("../middleware/auth");
 
@@ -13,6 +14,7 @@ router.post("/register", register);
 router.post("/login", login);
 router.get("/refresh-token", refreshToken);
 router.get("/verify/:token", verifyEmail);
+router.get("/resend-verification", resendVerification);
 
 // Ruta protegida para usuarios autenticados
 router.get("/profile", verifyToken, (req, res) => {
