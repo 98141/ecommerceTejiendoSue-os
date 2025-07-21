@@ -4,14 +4,16 @@ const {
   login,
   refreshToken,
   verifyEmail,
-  resendVerification 
+  resendVerification,
+  logout 
 } = require("../controllers/userController");
-const { verifyToken, isAdmin } = require("../middleware/auth");
+const { verifyToken, isAdmin, loginLimiter } = require("../middleware/auth");
 
 const router = express.Router();
 
 router.post("/register", register);
-router.post("/login", login);
+router.post("/login", loginLimiter, login);
+router.post("/logout", logout);
 router.get("/refresh-token", refreshToken);
 router.get("/verify/:token", verifyEmail);
 router.get("/resend-verification", resendVerification);

@@ -11,18 +11,32 @@ const LoginForm = () => {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (loading) return; // Evita múltiples envíos
+    setLoading(true);
+
     try {
       const res = await api.post("/users/login", { email, password });
-
       login(res.data.token, res.data.user);
+
       showToast("Inicio de sesión exitoso", "success");
       res.data.user.role === "admin" ? navigate("/admin") : navigate("/");
     } catch (err) {
-      const msg = err.response?.data?.error || "Error al iniciar sesión";
+      let msg = "Error al iniciar sesión";
+
+      // Manejo específico del error 429
+      if (err.response?.status === 429) {
+        msg = "Demasiados intentos fallidos. Intenta de nuevo más tarde.";
+      } else if (err.response?.data?.error) {
+        msg = err.response.data.error;
+      }
+
       showToast(msg, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -46,9 +60,13 @@ const LoginForm = () => {
           required
         />
 
-        <button type="submit">Ingresar</button>
+        <button type="submit" disabled={loading}>
+          {loading ? "Ingresando..." : "Ingresar"}
+        </button>
       </form>
-      <p>¿No tienes cuenta? <a href="/register">Regístrate</a></p>
+      <p>
+        ¿No tienes cuenta? <a href="/register">Regístrate</a>
+      </p>
     </div>
   );
 };

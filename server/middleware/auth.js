@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const rateLimit = require("express-rate-limit");
 
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -24,4 +25,13 @@ const isAdmin = (req, res, next) => {
   }
 };
 
-module.exports = { verifyToken, isAdmin };
+// Limita a 5 intentos cada 15 minutos
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 5, // máximo de intentos
+  message: { error: "Demasiados intentos fallidos. Intenta nuevamente en unos minutos." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+module.exports = { verifyToken, isAdmin, loginLimiter };

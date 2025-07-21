@@ -199,3 +199,22 @@ exports.resendVerification = async (req, res) => {
     res.status(500).json({ error: "No se pudo reenviar el correo" });
   }
 };
+
+//intentos limitados de login
+exports.logout = async (req, res) => {
+  try {
+    const token = req.cookies.refreshToken;
+    if (!token) return res.status(200).json({ message: "Sesión cerrada" });
+
+    const user = await User.findOne({ refreshToken: token });
+    if (user) {
+      user.refreshToken = null;
+      await user.save();
+    }
+
+    res.clearCookie("refreshToken", { httpOnly: true, sameSite: "Strict", secure: true });
+    res.status(200).json({ message: "Sesión cerrada correctamente" });
+  } catch (err) {
+    res.status(500).json({ error: "Error al cerrar sesión" });
+  }
+};
