@@ -12,15 +12,30 @@ const RegisterForm = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState({});
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const passwordRegex = /^(?=.*[0-9])(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+
+  const validate = () => {
+    const newErrors = {};
+    if (!name.trim()) newErrors.name = "El nombre es obligatorio.";
+    if (!emailRegex.test(email)) newErrors.email = "Correo inválido.";
+    if (!passwordRegex.test(password))
+      newErrors.password = "Mínimo 8 caracteres, 1 número y 1 símbolo.";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validate()) return;
+
     try {
       const res = await api.post("/users/register", { name, email, password });
-
       login(res.data.token, res.data.user);
-      showToast("Registro exitoso. Revisa tu correo para verificar tu cuenta.", "info");
-      res.data.user.role === "admin" ? navigate("/admin") : navigate("/");
+      showToast("Registro exitoso. Revisa tu correo.", "info");
+      navigate("/");
     } catch (err) {
       const msg = err.response?.data?.error || "Error al registrar";
       showToast(msg, "error");
@@ -36,24 +51,24 @@ const RegisterForm = () => {
           placeholder="Nombre completo"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          required
         />
+        {errors.name && <p className="form-error">{errors.name}</p>}
 
         <input
           type="email"
           placeholder="Correo electrónico"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          required
         />
+        {errors.email && <p className="form-error">{errors.email}</p>}
 
         <input
           type="password"
           placeholder="Contraseña"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          required
         />
+        {errors.password && <p className="form-error">{errors.password}</p>}
 
         <button type="submit">Registrarse</button>
       </form>

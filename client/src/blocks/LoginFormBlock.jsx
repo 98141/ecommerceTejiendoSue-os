@@ -12,10 +12,22 @@ const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validate = () => {
+    const newErrors = {};
+    if (!emailRegex.test(email)) newErrors.email = "Correo inválido.";
+    if (!password.trim()) newErrors.password = "La contraseña es requerida.";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (loading) return; // Evita múltiples envíos
+    if (loading) return;
+    if (!validate()) return;
     setLoading(true);
 
     try {
@@ -27,7 +39,6 @@ const LoginForm = () => {
     } catch (err) {
       let msg = "Error al iniciar sesión";
 
-      // Manejo específico del error 429
       if (err.response?.status === 429) {
         msg = "Demasiados intentos fallidos. Intenta de nuevo más tarde.";
       } else if (err.response?.data?.error) {
@@ -51,6 +62,7 @@ const LoginForm = () => {
           onChange={(e) => setEmail(e.target.value)}
           required
         />
+        {errors.email && <p className="form-error">{errors.email}</p>}
 
         <input
           type="password"
@@ -59,13 +71,18 @@ const LoginForm = () => {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
+        {errors.password && <p className="form-error">{errors.password}</p>}
 
         <button type="submit" disabled={loading}>
           {loading ? "Ingresando..." : "Ingresar"}
         </button>
       </form>
+
       <p>
         ¿No tienes cuenta? <a href="/register">Regístrate</a>
+      </p>
+      <p>
+        <a href="/forgot-password">¿Olvidaste tu contraseña?</a>
       </p>
     </div>
   );

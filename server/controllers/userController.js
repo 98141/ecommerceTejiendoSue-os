@@ -2,7 +2,7 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const validator = require("validator");
-const { sendVerificationEmail } = require("../utils/sendEmail");
+const { sendVerificationEmail, sendResetEmail } = require("../utils/sendEmail");
 
 // ====== Funciones para tokens ======
 const createAccessToken = (user) => {
@@ -24,16 +24,26 @@ exports.register = async (req, res) => {
 
     // Validaciones básicas
     if (!name || !email || !password) {
-      return res.status(400).json({ error: "Todos los campos son obligatorios" });
+      return res
+        .status(400)
+        .json({ error: "Todos los campos son obligatorios" });
     }
     if (!validator.isEmail(email)) {
       return res.status(400).json({ error: "Correo inválido" });
     }
-    if (!validator.isStrongPassword(password)) {
-      return res.status(400).json({
-        error:
-          "Contraseña insegura. Usa al menos 8 caracteres, un número y un símbolo.",
-      });
+    if (
+      !validator.isStrongPassword(password, {
+        minLength: 8,
+        minNumbers: 1,
+        minSymbols: 1,
+      })
+    ) {
+      return res
+        .status(400)
+        .json({
+          error:
+            "Contraseña débil. Usa mínimo 8 caracteres, un número y un símbolo.",
+        });
     }
 
     const existingUser = await User.findOne({ email });
@@ -170,11 +180,23 @@ exports.verifyEmail = async (req, res) => {
     user.isVerified = true;
     await user.save();
 
+    // 📩 Enviar notificación
+    await transporter.sendMail({
+      from: `"Tejiendo Sueños" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: "Cuenta verificada exitosamente",
+      html: `
+        <h3>¡Bienvenido!</h3>
+        <p>Tu correo ha sido verificado correctamente. Ya puedes iniciar sesión.</p>
+      `,
+    });
+
     res.status(200).json({ message: "Cuenta verificada exitosamente" });
   } catch (err) {
     return res.status(400).json({ error: "Token inválido o expirado" });
   }
 };
+
 
 // ====== Reenviar verificación ======
 exports.resendVerification = async (req, res) => {
@@ -212,9 +234,62 @@ exports.logout = async (req, res) => {
       await user.save();
     }
 
-    res.clearCookie("refreshToken", { httpOnly: true, sameSite: "Strict", secure: true });
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      sameSite: "Strict",
+      secure: true,
+    });
     res.status(200).json({ message: "Sesión cerrada correctamente" });
   } catch (err) {
     res.status(500).json({ error: "Error al cerrar sesión" });
+  }
+};
+
+//recuperacion de contraseña
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) return res.status(400).json({ error: "Correo requerido" });
+
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+
+  const resetToken = jwt.sign({ id: user._id }, process.env.JWT_RESET_SECRET, {
+    expiresIn: "15m",
+  });
+
+  await sendResetEmail(user.email, resetToken);
+  res
+    .status(200)
+    .json({ message: "Correo enviado para restablecer la contraseña" });
+};
+
+exports.resetPassword = async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+
+    user.password = password;
+    await user.save();
+
+    // 📩 Enviar correo de confirmación
+    await transporter.sendMail({
+      from: `"Tejiendo Sueños" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: "Contraseña actualizada",
+      html: `
+        <p>Hola, ${user.name}.</p>
+        <p>Se ha actualizado la contraseña de tu cuenta correctamente.</p>
+        <p>Si no realizaste esta acción, contáctanos de inmediato.</p>
+      `,
+    });
+
+    res.status(200).json({ message: "Contraseña actualizada con éxito" });
+  } catch (err) {
+    return res.status(400).json({ error: "Token inválido o expirado" });
   }
 };

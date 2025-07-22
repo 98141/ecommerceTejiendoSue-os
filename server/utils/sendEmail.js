@@ -31,3 +31,18 @@ exports.sendVerificationEmail = async (to, token) => {
     console.error(`❌ Error al enviar correo a ${to}:`, err.message);
   }
 };
+
+exports.sendResetEmail = async (to, token) => {
+  const link = `${process.env.CLIENT_URL}/reset-password/${token}`;
+  await transporter.sendMail({
+    from: `"Tejiendo Sueños" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: "Restablecer contraseña",
+    html: `
+      <h3>¿Olvidaste tu contraseña?</h3>
+      <p>Haz clic en el siguiente enlace para establecer una nueva:</p>
+      <a href="${link}">Restablecer contraseña</a>
+      <p>Este enlace expirará en 15 minutos.</p>
+    `,
+  });
+};

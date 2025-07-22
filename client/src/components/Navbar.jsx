@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useContext, useState } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { CartContext } from "../contexts/CartContext";
@@ -12,36 +12,51 @@ const Navbar = () => {
   const { unreadCount } = useContext(SupportContext);
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation(); // 👈 ubicación actual
 
   const [showConfirm, setShowConfirm] = useState(false);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const handleLogoutConfirm = () => {
-    logout();
+  const handleLogoutConfirm = async () => {
+    await logout();
     showToast("Sesión cerrada correctamente", "success");
     navigate("/");
   };
+
+  // 🔧 Función auxiliar para clase activa
+  const linkClass = (path) =>
+    `hover:text-yellow-300 ${
+      location.pathname === path
+        ? "text-yellow-400 font-semibold underline"
+        : ""
+    }`;
 
   return (
     <>
       <nav className="bg-gray-800 text-white px-4 py-2 flex justify-between items-center">
         <div className="flex items-center space-x-4">
-          <Link to="/" className="hover:text-yellow-300">
+          <Link to="/" className={linkClass("/")}>
             Inicio
           </Link>
 
           {user?.role === "admin" && (
             <>
-            <Link to="/admin/dashboard" className="hover:text-yellow-300">
+              <Link
+                to="/admin/dashboard"
+                className={linkClass("/admin/dashboard")}
+              >
                 Dashboard
               </Link>
-              <Link to="/admin" className="hover:text-yellow-300">
+              <Link to="/admin" className={linkClass("/admin")}>
                 Pedidos
               </Link>
-              <Link to="/admin/orders" className="hover:text-yellow-300">
+              <Link to="/admin/orders" className={linkClass("/admin/orders")}>
                 Historial
               </Link>
-              <Link to="/admin/products" className="hover:text-yellow-300">
+              <Link
+                to="/admin/products"
+                className={linkClass("/admin/products")}
+              >
                 Productos
               </Link>
             </>
@@ -49,10 +64,10 @@ const Navbar = () => {
 
           {user?.role === "user" && (
             <>
-              <Link to="/cart" className="hover:text-yellow-300">
+              <Link to="/cart" className={linkClass("/cart")}>
                 Carrito ({totalItems})
               </Link>
-              <Link to="/my-orders" className="hover:text-yellow-300">
+              <Link to="/my-orders" className={linkClass("/my-orders")}>
                 Mis pedidos
               </Link>
             </>
@@ -61,7 +76,9 @@ const Navbar = () => {
           {user && (
             <Link
               to={user.role === "admin" ? "/admin/inbox" : "/support"}
-              className="relative hover:text-yellow-300"
+              className={`relative ${linkClass(
+                user.role === "admin" ? "/admin/inbox" : "/support"
+              )}`}
             >
               Soporte
               {unreadCount > 0 && (
@@ -86,10 +103,10 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              <Link to="/login" className="mr-4 hover:text-yellow-300">
+              <Link to="/login" className={linkClass("/login") + " mr-4"}>
                 Login
               </Link>
-              <Link to="/register" className="hover:text-yellow-300">
+              <Link to="/register" className={linkClass("/register")}>
                 Registro
               </Link>
             </>

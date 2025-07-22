@@ -5,7 +5,9 @@ const {
   refreshToken,
   verifyEmail,
   resendVerification,
-  logout 
+  logout,
+  forgotPassword,
+  resetPassword,
 } = require("../controllers/userController");
 const { verifyToken, isAdmin, loginLimiter } = require("../middleware/auth");
 
@@ -17,6 +19,8 @@ router.post("/logout", logout);
 router.get("/refresh-token", refreshToken);
 router.get("/verify/:token", verifyEmail);
 router.get("/resend-verification", resendVerification);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password/:token", resetPassword);
 
 // Ruta protegida para usuarios autenticados
 router.get("/profile", verifyToken, (req, res) => {

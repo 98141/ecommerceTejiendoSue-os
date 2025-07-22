@@ -28,6 +28,8 @@ import AdminDeliveredOrdersPage from "./pages/admin/products/AdminDeliveredOrder
 import AdminDashboarPage from "./pages/admin/AdminDashboardPage";
 import Footer from "./components/Footer";
 import EmailVerificationPage from "./pages/EmailVerificationPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 function App() {
   return (
@@ -42,6 +44,8 @@ function App() {
           path="/verify-email/:token"
           element={<EmailVerificationPage />}
         />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         {/* Privadas para usuarios */}
         <Route element={<PrivateRoute allowedRoles={["user"]} />}>
           <Route path="/cart" element={<CartPage />} />
