@@ -12,7 +12,7 @@ const Navbar = () => {
   const { unreadCount } = useContext(SupportContext);
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const location = useLocation(); // 👈 ubicación actual
+  const location = useLocation();
 
   const [showConfirm, setShowConfirm] = useState(false);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -23,92 +23,58 @@ const Navbar = () => {
     navigate("/");
   };
 
-  // 🔧 Función auxiliar para clase activa
   const linkClass = (path) =>
-    `hover:text-yellow-300 ${
-      location.pathname === path
-        ? "text-yellow-400 font-semibold underline"
-        : ""
-    }`;
+    `nav-link ${location.pathname === path ? "active" : ""}`;
 
   return (
     <>
-      <nav className="bg-gray-800 text-white px-4 py-2 flex justify-between items-center">
-        <div className="flex items-center space-x-4">
-          <Link to="/" className={linkClass("/")}>
-            Inicio
-          </Link>
+      <nav className="navbar-container">
+        <div className="nav-left">
+          <Link to="/" className={linkClass("/")}>Inicio</Link>
 
           {user?.role === "admin" && (
             <>
-              <Link
-                to="/admin/dashboard"
-                className={linkClass("/admin/dashboard")}
-              >
-                Dashboard
-              </Link>
-              <Link to="/admin" className={linkClass("/admin")}>
-                Pedidos
-              </Link>
-              <Link to="/admin/orders" className={linkClass("/admin/orders")}>
-                Historial
-              </Link>
-              <Link
-                to="/admin/products"
-                className={linkClass("/admin/products")}
-              >
-                Productos
-              </Link>
+              <Link to="/admin/dashboard" className={linkClass("/admin/dashboard")}>Dashboard</Link>
+              <Link to="/admin" className={linkClass("/admin")}>Pedidos</Link>
+              <Link to="/admin/orders" className={linkClass("/admin/orders")}>Historial</Link>
+              <Link to="/admin/products" className={linkClass("/admin/products")}>Productos</Link>
             </>
           )}
 
           {user?.role === "user" && (
             <>
-              <Link to="/cart" className={linkClass("/cart")}>
-                Carrito ({totalItems})
-              </Link>
-              <Link to="/my-orders" className={linkClass("/my-orders")}>
-                Mis pedidos
-              </Link>
+              <Link to="/cart" className={linkClass("/cart")}>Carrito ({totalItems})</Link>
+              <Link to="/my-orders" className={linkClass("/my-orders")}>Mis pedidos</Link>
             </>
           )}
 
           {user && (
             <Link
               to={user.role === "admin" ? "/admin/inbox" : "/support"}
-              className={`relative ${linkClass(
-                user.role === "admin" ? "/admin/inbox" : "/support"
-              )}`}
+              className={`nav-link relative ${
+                linkClass(user.role === "admin" ? "/admin/inbox" : "/support")
+              }`}
             >
               Soporte
               {unreadCount > 0 && (
-                <span className="absolute -top-2 -right-5 bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5 animate-pulse">
-                  {unreadCount}
-                </span>
+                <span className="notification-badge">{unreadCount}</span>
               )}
             </Link>
           )}
         </div>
 
-        <div>
+        <div className="nav-right">
           {user ? (
             <>
-              <span className="mr-2">Hola, {user.name}</span>
-              <button
-                onClick={() => setShowConfirm(true)}
-                className="text-red-300 hover:underline"
-              >
+              <span className="nav-user">Hola, {user.name}</span>
+              <button onClick={() => setShowConfirm(true)} className="logout-button">
                 Salir
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className={linkClass("/login") + " mr-4"}>
-                Login
-              </Link>
-              <Link to="/register" className={linkClass("/register")}>
-                Registro
-              </Link>
+              <Link to="/login" className={linkClass("/login")}>Login</Link>
+              <Link to="/register" className={linkClass("/register")}>Registro</Link>
             </>
           )}
         </div>

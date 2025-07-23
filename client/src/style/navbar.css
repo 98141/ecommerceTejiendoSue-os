@@ -1,0 +1,70 @@
+.navbar-container {
+  background-color: #1f2937; /* gray-800 */
+  color: white;
+  padding: 0.5rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav-left,
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-link {
+  transition: color 0.3s ease;
+  text-decoration: none;
+  color: white;
+}
+
+.nav-link:hover {
+  color: #facc15; /* yellow-300 */
+}
+
+.nav-link.active {
+  color: #fbbf24; /* yellow-400 */
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.nav-user {
+  margin-right: 0.75rem;
+}
+
+.logout-button {
+  color: #fca5a5;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  text-decoration: underline;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -0.5rem;
+  right: -1.25rem;
+  background: #ef4444;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 9999px;
+  padding: 0.1rem 0.4rem;
+  animation: pulse 1.2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.75;
+  }
+}

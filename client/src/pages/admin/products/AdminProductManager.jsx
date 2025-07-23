@@ -12,12 +12,14 @@ const AdminProductPage = () => {
   const [productToDelete, setProductToDelete] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const { token } = useContext(AuthContext);
+  const { token, user } = useContext(AuthContext);
   const { showToast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchProducts();
+    console.log("🧑 Usuario desde AuthContext:", user);
+    console.log("🔑 Token JWT:", token);
   }, []);
 
   useEffect(() => {
@@ -79,16 +81,10 @@ const AdminProductPage = () => {
         >
           + Categoria
         </button>
-        <button
-          onClick={() => navigate("/admin/sizes")}
-          className="btn-add"
-        >
+        <button onClick={() => navigate("/admin/sizes")} className="btn-add">
           + Tallas
         </button>
-        <button
-          onClick={() => navigate("/admin/colors")}
-          className="btn-add"
-        >
+        <button onClick={() => navigate("/admin/colors")} className="btn-add">
           + Colores
         </button>
       </div>
