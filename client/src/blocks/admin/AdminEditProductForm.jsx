@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { FaTimesCircle, FaPlusCircle } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
   const [categories, setCategories] = useState([]);
   const [sizes, setSizes] = useState([]);
   const [colors, setColors] = useState([]);
+
+  const navigate = useNavigate();
 
   const [form, setForm] = useState({
     name: "",
@@ -27,16 +31,20 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
 
   const fetchInitialData = async () => {
     try {
-      const [productRes, categoriesRes, sizesRes, colorsRes] = await Promise.all([
-        axios.get(`http://localhost:5000/api/products/${productId}`),
-        axios.get("http://localhost:5000/api/categories"),
-        axios.get("http://localhost:5000/api/sizes"),
-        axios.get("http://localhost:5000/api/colors"),
-      ]);
+      const [productRes, categoriesRes, sizesRes, colorsRes] =
+        await Promise.all([
+          axios.get(`http://localhost:5000/api/products/${productId}`),
+          axios.get("http://localhost:5000/api/categories"),
+          axios.get("http://localhost:5000/api/sizes"),
+          axios.get("http://localhost:5000/api/colors"),
+        ]);
 
-      const { name, description, price, categories, images, variants } = productRes.data;
+      const { name, description, price, categories, images, variants } =
+        productRes.data;
       setForm({ name, description, price });
-      setSelectedCategory(Array.isArray(categories) ? categories[0] : categories);
+      setSelectedCategory(
+        Array.isArray(categories) ? categories[0] : categories
+      );
       setExistingImages(images || []);
       setVariants(variants || []);
       setCategories(categoriesRes.data);
@@ -107,12 +115,16 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
         formData.append("images", file);
       });
 
-      await axios.put(`http://localhost:5000/api/products/${productId}`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      await axios.put(
+        `http://localhost:5000/api/products/${productId}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
       showToast("Producto actualizado correctamente", "success");
       onSuccess();
@@ -121,10 +133,21 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
     }
   };
 
+  const handleCancel = () => {
+    // Si necesitas confirmar con el usuario:
+    // if (window.confirm("¿Estás seguro de cancelar los cambios?")) {
+    navigate("/admin/products");
+    // }
+  };
+
   return (
     <div className="form-container">
       <h2>Editar Producto</h2>
-      <form onSubmit={handleSubmit} className="product-form" encType="multipart/form-data">
+      <form
+        onSubmit={handleSubmit}
+        className="product-form"
+        encType="multipart/form-data"
+      >
         <input
           type="text"
           name="name"
@@ -163,7 +186,10 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
         </select>
 
         <div className="variant-selector">
-          <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)}>
+          <select
+            value={selectedSize}
+            onChange={(e) => setSelectedSize(e.target.value)}
+          >
             <option value="">Talla</option>
             {sizes.map((s) => (
               <option key={s._id} value={s._id}>
@@ -172,7 +198,10 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
             ))}
           </select>
 
-          <select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)}>
+          <select
+            value={selectedColor}
+            onChange={(e) => setSelectedColor(e.target.value)}
+          >
             <option value="">Color</option>
             {colors.map((c) => (
               <option key={c._id} value={c._id}>
@@ -189,7 +218,11 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
             min="1"
           />
 
-          <button type="button" className="btn-variant" onClick={handleAddVariant}>
+          <button
+            type="button"
+            className="btn-variant"
+            onClick={handleAddVariant}
+          >
             + Añadir Variante
           </button>
         </div>
@@ -213,7 +246,10 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
           {existingImages.map((img, index) => (
             <div key={index} className="preview-box">
               <img src={`http://localhost:5000${img}`} alt="" />
-              <button type="button" onClick={() => handleRemoveExistingImage(index)}>
+              <button
+                type="button"
+                onClick={() => handleRemoveExistingImage(index)}
+              >
                 🗑
               </button>
             </div>
@@ -221,14 +257,31 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
         </div>
 
         <label>Agregar nuevas imágenes:</label>
-        <input type="file" accept="image/*" multiple onChange={handleFileChange} />
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileChange}
+        />
         <div className="image-preview">
           {preview.map((img, i) => (
             <img key={i} src={img} alt="preview" />
           ))}
         </div>
-
-        <button type="submit" className="btn-save">Guardar cambios</button>
+        <div>
+          <button type="submit" className="btn-save">
+            <FaPlusCircle style={{ marginRight: "6px" }} />
+            Guardar cambios
+          </button>
+          <button
+            onClick={handleCancel}
+            title="Cancelar cambios y volver"
+            style={{ backgroundColor: "#ccc", color: "#333" }}
+          >
+            <FaTimesCircle style={{ marginRight: "6px" }} />
+            Cancelar
+          </button>
+        </div>
       </form>
     </div>
   );

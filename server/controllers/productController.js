@@ -50,7 +50,10 @@ exports.createProduct = async (req, res) => {
 
 exports.getProducts = async (req, res) => {
   try {
-    const products = await Product.find().populate("categories", "name");
+    const products = await Product.find()
+      .populate("categories", "name")
+      .populate("variants.size", "label")
+      .populate("variants.color", "name");
     res.json(products);
   } catch (err) {
     res.status(500).json({ message: "Error al obtener productos" });

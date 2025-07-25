@@ -1,7 +1,9 @@
 import { useState, useEffect, useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
+import { FaTimesCircle, FaPlusCircle  } from "react-icons/fa";
 
 const AdminListManager = ({ title, apiEndpoint, fieldName }) => {
   const { token } = useContext(AuthContext);
@@ -69,6 +71,15 @@ const AdminListManager = ({ title, apiEndpoint, fieldName }) => {
     }
   };
 
+  const navigate = useNavigate();
+
+  const handleCancel = () => {
+    // Si necesitas confirmar con el usuario:
+    // if (window.confirm("¿Estás seguro de cancelar los cambios?")) {
+    navigate("/admin/products");
+    // }
+  };
+
   return (
     <div className="admin-list-manager">
       <h2>Administrar {title}</h2>
@@ -80,13 +91,21 @@ const AdminListManager = ({ title, apiEndpoint, fieldName }) => {
           value={newValue}
           onChange={(e) => setNewValue(e.target.value)}
         />
-        <button onClick={handleCreate}>Agregar</button>
+        <button onClick={handleCreate} > <FaPlusCircle style={{ marginRight: "6px" }} /> Agregar</button>
+        <button
+          onClick={handleCancel}
+          title="Cancelar cambios y volver"
+          style={{ backgroundColor: "#ccc", color: "#333" }}
+        >
+          <FaTimesCircle style={{ marginRight: "6px" }} />
+          Cancelar
+        </button>
       </div>
 
       <table className="admin-list-table">
         <thead>
           <tr>
-            <th>{title.slice(0, -1)}</th>
+            <th>{title.slice(0)}</th>
             <th>Acciones</th>
           </tr>
         </thead>

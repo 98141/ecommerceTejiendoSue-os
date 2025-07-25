@@ -6,6 +6,7 @@ import { AuthContext } from "./AuthContext";
 import { useToast } from "./ToastContext";
 import { socket } from "../socket";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const SupportContext = createContext();
 
 export const SupportProvider = ({ children }) => {
@@ -26,9 +27,7 @@ export const SupportProvider = ({ children }) => {
       socket.auth = { token };
       socket.connect();
 
-      socket.on("connect", () => {
-        console.log("🔌 Conectado al socket:", socket.id);
-      });
+      socket.on("connect", () => {});
 
       socket.on("newMessage", (msg) => {
         const currentChatId =

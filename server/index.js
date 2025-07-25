@@ -28,20 +28,17 @@ const io = new Server(server, {
 });
 
 io.on("connection", (socket) => {
-  console.log("🔌 Cliente conectado:", socket.id);
   socket.on("sendMessage", (message) => {
     io.emit("newMessage", message);
   });
-  socket.on("disconnect", () => {
-    console.log("❌ Cliente desconectado:", socket.id);
-  });
+  socket.on("disconnect", () => {});
 });
 
 const corsOptions = {
   origin: "http://localhost:5173", // 👈 origen frontend exacto
-  credentials: true,              // 👈 permite envío de cookies
+  credentials: true, // 👈 permite envío de cookies
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // opcional
-  allowedHeaders: ["Content-Type", "Authorization"],    // opcional
+  allowedHeaders: ["Content-Type", "Authorization"], // opcional
 };
 
 app.use(cors(corsOptions));
@@ -66,7 +63,9 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     server.listen(process.env.PORT, () => {
-      console.log(`🚀 Servidor backend en http://localhost:${process.env.PORT}`);
+      console.log(
+        `🚀 Servidor backend en http://localhost:${process.env.PORT}`
+      );
     });
   })
   .catch((err) => console.error("❌ Error de conexión a MongoDB:", err));
