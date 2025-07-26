@@ -24,17 +24,18 @@ const AdminProductPage = () => {
 
   useEffect(() => {
     const lower = searchTerm.toLowerCase();
-    const filtered = products.filter((p) =>
-      p.name.toLowerCase().includes(lower) ||
-      (Array.isArray(p.categories)
-        ? p.categories.some((cat) =>
-            typeof cat === "object"
-              ? cat.name.toLowerCase().includes(lower)
-              : cat.toLowerCase().includes(lower)
-          )
-        : typeof p.categories === "object"
-        ? p.categories.name.toLowerCase().includes(lower)
-        : false)
+    const filtered = products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(lower) ||
+        (Array.isArray(p.categories)
+          ? p.categories.some((cat) =>
+              typeof cat === "object"
+                ? cat.name.toLowerCase().includes(lower)
+                : cat.toLowerCase().includes(lower)
+            )
+          : typeof p.categories === "object"
+          ? p.categories.name.toLowerCase().includes(lower)
+          : false)
     );
     setFilteredProducts(filtered);
   }, [searchTerm, products]);
@@ -84,10 +85,27 @@ const AdminProductPage = () => {
     <div className="admin-products">
       <div className="header">
         <h2>Administrar Productos</h2>
-        <button onClick={() => navigate("/admin/products/new")} className="btn-add">+ Agregar producto</button>
-        <button onClick={() => navigate("/admin/categories")} className="btn-add">+ Categorías</button>
-        <button onClick={() => navigate("/admin/sizes")} className="btn-add">+ Tallas</button>
-        <button onClick={() => navigate("/admin/colors")} className="btn-add">+ Colores</button>
+        <button
+          onClick={() => navigate("/admin/products/new")}
+          className="btn-add"
+        >
+          + Agregar producto
+        </button>
+        <button
+          onClick={() => navigate("/admin/categories")}
+          className="btn-add"
+        >
+          + Categorías
+        </button>
+        <button onClick={() => navigate("/admin/sizes")} className="btn-add">
+          + Tallas
+        </button>
+        <button onClick={() => navigate("/admin/colors")} className="btn-add">
+          + Colores
+        </button>
+         <button onClick={() => navigate("/admin/historial")} className="btn-add">
+          + Historial
+        </button>
       </div>
 
       <input
@@ -125,15 +143,19 @@ const AdminProductPage = () => {
                 <td>{getTotalStock(p.variants)}</td>
                 <td>
                   {Array.isArray(p.categories)
-                    ? p.categories.map((cat) =>
-                        typeof cat === "object" ? cat.name : cat
-                      ).join(", ")
+                    ? p.categories
+                        .map((cat) =>
+                          typeof cat === "object" ? cat.name : cat
+                        )
+                        .join(", ")
                     : typeof p.categories === "object"
                     ? p.categories.name
                     : "Sin categoría"}
                 </td>
                 <td>
-                  <button className="btn-edit" onClick={() => handleEdit(p)}>Editar</button>
+                  <button className="btn-edit" onClick={() => handleEdit(p)}>
+                    Editar
+                  </button>
                   <button
                     className="btn-delete"
                     onClick={() => {
@@ -148,7 +170,16 @@ const AdminProductPage = () => {
                     onClick={() => toggleRow(p._id)}
                     style={{ marginTop: "4px", backgroundColor: "#e3e3e3" }}
                   >
-                    {expandedProductId === p._id ? "Ocultar variantes" : "Ver variantes"}
+                    {expandedProductId === p._id
+                      ? "Ocultar variantes"
+                      : "Ver variantes"}
+                  </button>
+                  <button
+                    className="btn-history"
+                    onClick={() => navigate(`/admin/products/${p._id}/history`)}
+                    style={{ marginTop: "4px", backgroundColor: "#d9edf7" }}
+                  >
+                    Historial
                   </button>
                 </td>
               </tr>

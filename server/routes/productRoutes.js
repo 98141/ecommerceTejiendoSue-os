@@ -5,6 +5,8 @@ const {
   getProductById,
   updateProduct,
   deleteProduct,
+  getProductHistory,
+  getProductEntryHistory 
 } = require("../controllers/productController");
 const { verifyToken, isAdmin } = require("../middleware/auth");
 const uploadMiddleware = require("../middleware/uploadMiddleware");
@@ -41,5 +43,7 @@ router.put(
 );
 
 router.delete("/:id", verifyToken, isAdmin, deleteProduct);
+router.get("/:id/history", verifyToken, isAdmin, getProductHistory);
+router.get("/history/all", verifyToken, isAdmin, getProductEntryHistory);
 
 module.exports = router;

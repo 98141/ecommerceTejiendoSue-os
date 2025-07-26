@@ -30,6 +30,8 @@ import Footer from "./components/Footer";
 import EmailVerificationPage from "./pages/EmailVerificationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import ProductHistoryPage from "./pages/admin/products/AdminProductHistoryPage";
+import AdminProductEntryHistoryPage from "./pages/admin/products/AdminProductEntryHistoyPage";
 
 function App() {
   return (
@@ -66,6 +68,7 @@ function App() {
             element={<AdminDeliveredOrdersPage />}
           />
           <Route path="/admin/products" element={<AdminProductManager />} />
+          <Route path="/admin/products/:id/history" element={<ProductHistoryPage />} />
           <Route path="/admin/products/new" element={<NewProductPage />} />
           <Route path="/admin/categories" element={<AdminCategoryPage />} />
           <Route path="/admin/dashboard" element={<AdminDashboarPage />} />
@@ -77,6 +80,7 @@ function App() {
           <Route path="/admin/inbox" element={<AdminInboxPage />} />
           <Route path="/admin/sizes" element={<AdminSizesPage />} />
           <Route path="/admin/colors" element={<AdminColorsPage />} />
+          <Route path="/admin/historial" element={<AdminProductEntryHistoryPage />} />
         </Route>
         {/* Ruta compartida para soporte (usuarios y administradores) */}
         <Route element={<PrivateRoute allowedRoles={["user", "admin"]} />}>
