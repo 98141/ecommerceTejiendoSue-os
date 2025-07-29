@@ -154,12 +154,6 @@ const AdminOrdersPage = ({ statusFilterProp = "todos" }) => {
       <Link to="/admin">
         <button>Todos</button>
       </Link>
-      <Link to="/admin/orders/shipped">
-        <button>Enviados</button>
-      </Link>
-      <Link to="/admin/orders/delivered">
-        <button>Entregados</button>
-      </Link>
 
       <FilterExportControls
         statusFilter={statusFilter}

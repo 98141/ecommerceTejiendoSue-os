@@ -23,8 +23,6 @@ import AdminCategoryPage from "./pages/admin/products/AdminCategoryPage";
 import AdminSizesPage from "./pages/admin/products/AdminSizesPage";
 import AdminColorsPage from "./pages/admin/products/AdminColorsPages";
 import AdminOrderDetailPage from "./pages/admin/products/AdminOrderDetailPage";
-import AdminShippedOrderPage from "./pages/admin/products/adminShippedOrderPage";
-import AdminDeliveredOrdersPage from "./pages/admin/products/AdminDeliveredOrdersPage";
 import AdminDashboarPage from "./pages/admin/AdminDashboardPage";
 import Footer from "./components/Footer";
 import EmailVerificationPage from "./pages/EmailVerificationPage";
@@ -59,14 +57,7 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/orders" element={<AdminOrderPage />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetailPage />} />
-          <Route
-            path="/admin/orders/shipped"
-            element={<AdminShippedOrderPage />}
-          />
-          <Route
-            path="/admin/orders/delivered"
-            element={<AdminDeliveredOrdersPage />}
-          />
+
           <Route path="/admin/products" element={<AdminProductManager />} />
           <Route path="/admin/products/:id/history" element={<ProductHistoryPage />} />
           <Route path="/admin/products/new" element={<NewProductPage />} />
