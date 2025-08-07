@@ -14,8 +14,9 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
   const { token } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState(statusFilterProp);
-  const [emailFilter, setEmailFilter] = useState("");
+  const [searchFilter, setSearchFilter] = useState("");
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
+  const [dateError, setDateError] = useState(""); // ✅ mensaje de error
 
   useEffect(() => {
     fetchOrders();
@@ -43,39 +44,58 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
       .catch(() => alert("Error al actualizar estado"));
   };
 
-  const applyFilters = () => {
-    return orders.filter((order) => {
-      const emailMatch = order.user?.email
-        .toLowerCase()
-        .includes(emailFilter.toLowerCase());
-      const statusMatch =
-        statusFilter === "todos" || order.status === statusFilter;
-      const dateMatch =
-        (!dateRange.from ||
-          dayjs(order.createdAt).isAfter(
-            dayjs(dateRange.from).startOf("day")
-          )) &&
-        (!dateRange.to ||
-          dayjs(order.createdAt).isBefore(dayjs(dateRange.to).endOf("day")));
+  // ✅ Validar fechas sin causar re-render
+  const validateDateRange = (from, to) => {
+    if (from && !to) return "Seleccione también una fecha de fin (Hasta).";
+    if (!from && to) return "Seleccione también una fecha de inicio (Desde).";
+    if (from && to && dayjs(to).isBefore(dayjs(from)))
+      return "La fecha Hasta no puede ser anterior a la fecha Desde.";
+    return "";
+  };
 
-      return emailMatch && statusMatch && dateMatch;
+  useEffect(() => {
+    const error = validateDateRange(dateRange.from, dateRange.to);
+    setDateError(error);
+  }, [dateRange]);
+
+  const applyFilters = () => {
+    const isValid = validateDateRange(dateRange.from, dateRange.to) === "";
+
+    return orders.filter((order) => {
+      const search = searchFilter.toLowerCase();
+
+      const matchSearch =
+        order._id.toLowerCase().includes(search) ||
+        order.user?.email?.toLowerCase().includes(search) ||
+        order.user?.name?.toLowerCase().includes(search);
+
+      const matchStatus =
+        statusFilter === "todos" || order.status === statusFilter;
+
+      const matchDate = isValid
+        ? (!dateRange.from ||
+            dayjs(order.createdAt).isAfter(
+              dayjs(dateRange.from).startOf("day")
+            )) &&
+          (!dateRange.to ||
+            dayjs(order.createdAt).isBefore(dayjs(dateRange.to).endOf("day")))
+        : true;
+
+      return matchSearch && matchStatus && matchDate;
     });
   };
 
   const filteredOrders = applyFilters();
 
-  // ✅ Función para exportar a PDF
   const exportToPDF = () => {
+    if (dateError) return alert(dateError);
+
     const doc = new jsPDF("landscape");
-
-    // Logo
     doc.addImage(logo, "PNG", 14, 10, 30, 15);
-
-    // Título
     doc.setFontSize(18);
     doc.setTextColor(40);
     doc.text("Reporte de Pedidos", 14, 30);
-    doc.line(14, 32, 285, 32); // línea horizontal (landscape)
+    doc.line(14, 32, 285, 32);
 
     const rows = filteredOrders.flatMap((order) =>
       order.items.map((item) => [
@@ -136,11 +156,14 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
       },
     });
 
-    doc.save(`pedidos_${statusFilter}.pdf`);
+    const friendlyName = searchFilter || statusFilter || "todos";
+    const today = dayjs().format("YYYY-MM-DD");
+    doc.save(`pedidos_${friendlyName}_${today}.pdf`);
   };
 
-  // ✅ Función para exportar a Excel
   const exportToExcel = () => {
+    if (dateError) return alert(dateError);
+
     const rows = filteredOrders.flatMap((order) =>
       order.items.map((item) => ({
         ID: order._id,
@@ -165,7 +188,10 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
       bookType: "xlsx",
     });
     const data = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(data, "pedidos.xlsx");
+
+    const friendlyName = searchFilter || statusFilter || "todos";
+    const today = dayjs().format("YYYY-MM-DD");
+    saveAs(data, `pedidos_${friendlyName}_${today}.xlsx`);
   };
 
   const handleCancel = (id) => {
@@ -187,15 +213,23 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
     <div className="admin-orders-container" style={{ padding: "20px" }}>
       <h2>Gestión de Pedidos</h2>
 
+      {dateError && (
+        <div style={{ color: "red", fontWeight: "bold", marginBottom: "10px" }}>
+          {dateError}
+        </div>
+      )}
+
       <FilterExportControls
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
-        emailFilter={emailFilter}
-        setEmailFilter={setEmailFilter}
+        searchFilter={searchFilter}
+        setSearchFilter={setSearchFilter}
         dateRange={dateRange}
         setDateRange={setDateRange}
         exportToPDF={exportToPDF}
         exportToExcel={exportToExcel}
+        dateError={dateError}
+        hasResults={filteredOrders.length > 0}
       />
 
       {filteredOrders.length === 0 ? (
