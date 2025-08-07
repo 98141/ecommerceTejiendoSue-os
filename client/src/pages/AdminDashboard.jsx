@@ -1,5 +1,4 @@
 import { useEffect, useState, useContext } from "react";
-import { Link } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -9,8 +8,9 @@ import dayjs from "dayjs";
 import { AuthContext } from "../contexts/AuthContext";
 import FilterExportControls from "../blocks/admin/FilterExportControls";
 import OrderCardBlock from "../blocks/admin/OrderCardBlock";
+import logo from "../assets/PPFINAL.png";
 
-const AdminOrdersPage = ({ statusFilterProp = "todos" }) => {
+const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
   const { token } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState(statusFilterProp);
@@ -64,30 +64,40 @@ const AdminOrdersPage = ({ statusFilterProp = "todos" }) => {
 
   const filteredOrders = applyFilters();
 
+  // ✅ Función para exportar a PDF
   const exportToPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Pedidos", 14, 14);
+    const doc = new jsPDF("landscape");
+
+    // Logo
+    doc.addImage(logo, "PNG", 14, 10, 30, 15);
+
+    // Título
+    doc.setFontSize(18);
+    doc.setTextColor(40);
+    doc.text("Reporte de Pedidos", 14, 30);
+    doc.line(14, 32, 285, 32); // línea horizontal (landscape)
 
     const rows = filteredOrders.flatMap((order) =>
       order.items.map((item) => [
-        order._id,
+        order.user?.name || "N/A",
         order.user?.email || "N/A",
         new Date(order.createdAt).toLocaleString(),
         item.product?.name || "Eliminado",
         item.size?.label || "-",
         item.color?.name || "-",
         item.quantity,
-        item.product?.price || "-",
-        order.total,
+        item.product?.price?.toFixed(2) || "-",
+        order.total?.toFixed(2) || "-",
         order.status,
       ])
     );
 
     autoTable(doc, {
+      startY: 36,
       head: [
         [
-          "ID",
           "Usuario",
+          "Email",
           "Fecha",
           "Producto",
           "Talla",
@@ -99,12 +109,37 @@ const AdminOrdersPage = ({ statusFilterProp = "todos" }) => {
         ],
       ],
       body: rows,
-      startY: 20,
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+        overflow: "linebreak",
+      },
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        halign: "center",
+      },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 40 },
+      },
+      didDrawPage: (data) => {
+        const pageHeight = doc.internal.pageSize.height;
+        doc.setFontSize(10);
+        doc.text(
+          `Página ${doc.internal.getNumberOfPages()}`,
+          data.settings.margin.left,
+          pageHeight - 10
+        );
+      },
     });
 
-    doc.save("pedidos.pdf");
+    doc.save(`pedidos_${statusFilter}.pdf`);
   };
 
+  // ✅ Función para exportar a Excel
   const exportToExcel = () => {
     const rows = filteredOrders.flatMap((order) =>
       order.items.map((item) => ({
@@ -151,9 +186,6 @@ const AdminOrdersPage = ({ statusFilterProp = "todos" }) => {
   return (
     <div className="admin-orders-container" style={{ padding: "20px" }}>
       <h2>Gestión de Pedidos</h2>
-      <Link to="/admin">
-        <button>Todos</button>
-      </Link>
 
       <FilterExportControls
         statusFilter={statusFilter}
