@@ -35,10 +35,12 @@ io.on("connection", (socket) => {
 });
 
 const corsOptions = {
-  origin: "http://localhost:5173", // 👈 origen frontend exacto
-  credentials: true, // 👈 permite envío de cookies
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // opcional
-  allowedHeaders: ["Content-Type", "Authorization"], // opcional
+  // origen frontend exacto
+  origin: "http://localhost:5173", 
+  // permite envío de cookies
+  credentials: true, 
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
+  allowedHeaders: ["Content-Type", "Authorization"], 
 };
 
 app.use(cors(corsOptions));

@@ -26,6 +26,14 @@ const Navbar = () => {
   const linkClass = (path) =>
     `nav-link ${location.pathname === path ? "active" : ""}`;
 
+  const capitalizeInitials = (name) => {
+  if (!name) return "";
+  return name
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
   return (
     <>
       <nav className="navbar-container">
@@ -66,7 +74,7 @@ const Navbar = () => {
         <div className="nav-right">
           {user ? (
             <>
-              <span className="nav-user">Hola, {user.name}</span>
+              <span className="nav-user">Hola, {capitalizeInitials(user.name)}</span>
               <button onClick={() => setShowConfirm(true)} className="logout-button">
                 Salir
               </button>
