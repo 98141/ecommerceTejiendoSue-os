@@ -2,7 +2,7 @@ import { useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../../contexts/AuthContext";
 import { useToast } from "../../../contexts/ToastContext";
-import EditProductForm from "../../../blocks/admin/AdminEditProductForm";
+import AdminEditProductForm from "../../../blocks/admin/AdminEditProductForm";
 
 const AdminEditProductPage = () => {
   const { id } = useParams();
@@ -10,12 +10,10 @@ const AdminEditProductPage = () => {
   const { token } = useContext(AuthContext);
   const { showToast } = useToast();
 
-  const handleSuccess = () => {
-    navigate("/admin/products");
-  };
+  const handleSuccess = () => navigate("/admin/products");
 
   return (
-    <EditProductForm
+    <AdminEditProductForm
       productId={id}
       token={token}
       onSuccess={handleSuccess}

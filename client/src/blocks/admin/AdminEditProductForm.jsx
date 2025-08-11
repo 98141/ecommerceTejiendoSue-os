@@ -1,9 +1,65 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import axios from "axios";
 import { FaTimesCircle, FaPlusCircle } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
-const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
+/** Util: convierte fecha ISO a valor compatible con <input type="datetime-local"> */
+const toDatetimeLocal = (iso) => {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const mm = pad(d.getMonth() + 1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mi = pad(d.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  } catch {
+    return "";
+  }
+};
+
+const getIdVal = (x) => (typeof x === "object" && x?._id ? x._id : x);
+
+/** Normaliza variantes a IDs (lo que el backend espera) */
+const normalizeVariantsForSubmit = (vars) =>
+  (Array.isArray(vars) ? vars : []).map((v) => ({
+    size: getIdVal(v.size),
+    color: getIdVal(v.color),
+    stock: Number(v.stock) || 0,
+  }));
+
+/** Componente de preview del precio con descuento */
+const DiscountPreview = ({ price, discount }) => {
+  const { enabled, type, value } = discount || {};
+  const has = enabled && price > 0 && Number(value) > 0;
+
+  const effective = useMemo(() => {
+    if (!has) return price || 0;
+    let eff = price;
+    if (type === "PERCENT") eff = price - (price * Number(value) / 100);
+    else eff = price - Number(value);
+    return Math.max(0, Number(eff.toFixed(2)));
+  }, [has, price, type, value]);
+
+  if (!price) return null;
+
+  return (
+    <div className="discount-preview">
+      {has ? (
+        <p>
+          Precio actual: <b>${Number(price).toFixed(2)}</b> —{" "}
+          Precio con promo: <b>${effective.toFixed(2)}</b>
+        </p>
+      ) : (
+        <p>Precio actual: <b>${Number(price).toFixed(2)}</b></p>
+      )}
+    </div>
+  );
+};
+
+const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
   const [categories, setCategories] = useState([]);
   const [sizes, setSizes] = useState([]);
   const [colors, setColors] = useState([]);
@@ -14,6 +70,12 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
     name: "",
     description: "",
     price: "",
+    // Campos de descuento
+    discountEnabled: false,
+    discountType: "PERCENT", // PERCENT | FIXED
+    discountValue: "",
+    discountStartAt: "",
+    discountEndAt: "",
   });
   const [selectedCategory, setSelectedCategory] = useState("");
 
@@ -21,7 +83,7 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
   const [images, setImages] = useState([]);
   const [preview, setPreview] = useState([]);
 
-  // Imágenes que ya existen en el servidor (paths)
+  // Imágenes existentes (paths del server)
   const [existingImages, setExistingImages] = useState([]);
 
   const [variants, setVariants] = useState([]);
@@ -29,9 +91,12 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
   const [selectedColor, setSelectedColor] = useState("");
   const [variantStock, setVariantStock] = useState("");
 
+  // Para detectar cambios reales
+  const originalVariantsRef = useRef("[]");
+  const originalDiscountRef = useRef("{}");
+
   useEffect(() => {
     fetchInitialData();
-    // Limpieza: revocar todos los blob URLs al desmontar
     return () => {
       preview.forEach((url) => URL.revokeObjectURL(url));
     };
@@ -40,34 +105,64 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
 
   const fetchInitialData = async () => {
     try {
-      const [productRes, categoriesRes, sizesRes, colorsRes] =
-        await Promise.all([
-          axios.get(`http://localhost:5000/api/products/${productId}`),
-          axios.get("http://localhost:5000/api/categories"),
-          axios.get("http://localhost:5000/api/sizes"),
-          axios.get("http://localhost:5000/api/colors"),
-        ]);
+      const [productRes, categoriesRes, sizesRes, colorsRes] = await Promise.all([
+        axios.get(`http://localhost:5000/api/products/${productId}`),
+        axios.get("http://localhost:5000/api/categories"),
+        axios.get("http://localhost:5000/api/sizes"),
+        axios.get("http://localhost:5000/api/colors"),
+      ]);
 
-      const { name, description, price, categories, images, variants } =
-        productRes.data;
+      const p = productRes.data;
+      const {
+        name, description, price, images, variants,
+        categories: catField, discount
+      } = p;
 
-      setForm({ name, description, price });
-      setSelectedCategory(Array.isArray(categories) ? categories[0] : categories);
+      // catField puede venir como objeto populado o como id
+      const catId = typeof catField === "string" ? catField : catField?._id || "";
+
+      setForm({
+        name: name || "",
+        description: description || "",
+        price: price || "",
+        discountEnabled: !!discount?.enabled,
+        discountType: discount?.type || "PERCENT",
+        discountValue: discount?.value ?? "",
+        discountStartAt: discount?.startAt ? toDatetimeLocal(discount.startAt) : "",
+        discountEndAt: discount?.endAt ? toDatetimeLocal(discount.endAt) : "",
+      });
+      setSelectedCategory(catId);
       setExistingImages(images || []);
       setVariants(variants || []);
-      setCategories(categoriesRes.data);
-      setSizes(sizesRes.data);
-      setColors(colorsRes.data);
-    } catch {
+
+      // Guardamos versiones originales normalizadas para comparar
+      originalVariantsRef.current = JSON.stringify(normalizeVariantsForSubmit(variants || []));
+      originalDiscountRef.current = JSON.stringify({
+        enabled: !!discount?.enabled,
+        type: discount?.type || "PERCENT",
+        value: Number(discount?.value || 0),
+        startAt: discount?.startAt ? toDatetimeLocal(discount.startAt) : "",
+        endAt: discount?.endAt ? toDatetimeLocal(discount.endAt) : "",
+      });
+
+      setCategories(categoriesRes.data || []);
+      setSizes(sizesRes.data || []);
+      setColors(colorsRes.data || []);
+    } catch (e) {
+      console.error(e);
       showToast("Error al cargar datos", "error");
     }
   };
 
   const handleInputChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setForm((f) => ({
+      ...f,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
-  // Añadir nuevas imágenes (no reemplazar las ya seleccionadas)
+  // Añadir nuevas imágenes
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -75,21 +170,17 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
     const urls = files.map((file) => URL.createObjectURL(file));
     setImages((prev) => [...prev, ...files]);
     setPreview((prev) => [...prev, ...urls]);
-
-    // Opcional: limpiar el input para permitir volver a cargar el mismo archivo
     e.target.value = "";
   };
 
-  // Elimina UNA imagen existente por índice (del arreglo de paths)
   const handleRemoveExistingImage = (index) => {
     setExistingImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Elimina UNA imagen nueva por índice (File + preview URL)
   const handleRemoveNewImage = (index) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
     setPreview((prev) => {
-      URL.revokeObjectURL(prev[index]); // liberar memoria
+      URL.revokeObjectURL(prev[index]);
       return prev.filter((_, i) => i !== index);
     });
   };
@@ -97,13 +188,14 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
   const handleAddVariant = () => {
     if (!selectedSize || !selectedColor || Number(variantStock) <= 0) return;
 
-    const duplicate = variants.find(
-      (v) => v.size === selectedSize && v.color === selectedColor
+    // Evita duplicados comparando por IDs aunque el estado tenga objetos
+    const exists = (variants || []).some(
+      (v) => getIdVal(v.size) === selectedSize && getIdVal(v.color) === selectedColor
     );
-    if (duplicate) return;
+    if (exists) return;
 
-    setVariants([
-      ...variants,
+    setVariants((prev) => [
+      ...prev,
       { size: selectedSize, color: selectedColor, stock: Number(variantStock) },
     ]);
     setSelectedSize("");
@@ -115,12 +207,41 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
     setVariants((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Validación de descuento (cliente)
+  const validateDiscount = () => {
+    if (!form.discountEnabled) return true;
+    const v = Number(form.discountValue);
+    const priceNum = Number(form.price);
+
+    if (form.discountType === "PERCENT") {
+      if (!(v > 0 && v <= 90)) {
+        showToast("Porcentaje inválido (1–90%)", "error");
+        return false;
+      }
+    } else {
+      if (!(v > 0 && v < priceNum)) {
+        showToast("Descuento fijo debe ser mayor a 0 y menor al precio", "error");
+        return false;
+      }
+    }
+    if (form.discountStartAt && form.discountEndAt) {
+      const s = new Date(form.discountStartAt).getTime();
+      const e = new Date(form.discountEndAt).getTime();
+      if (e <= s) {
+        showToast("La fecha fin debe ser posterior a la de inicio", "error");
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!selectedCategory || Number(form.price) <= 0 || variants.length === 0) {
+    if (!selectedCategory || Number(form.price) <= 0) {
       return showToast("Completa todos los campos requeridos", "error");
     }
+    if (!validateDiscount()) return;
 
     try {
       const formData = new FormData();
@@ -128,17 +249,40 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
       formData.append("description", form.description);
       formData.append("price", form.price);
       formData.append("categories", selectedCategory);
-      formData.append("variants", JSON.stringify(variants));
 
-      // Mantener las imágenes existentes que el usuario NO eliminó
-      existingImages.forEach((img) => {
-        formData.append("existingImages[]", img);
-      });
+      // Variantes: solo enviamos si CAMBIARON respecto al original
+      const normalized = normalizeVariantsForSubmit(variants);
+      const nowStr = JSON.stringify(normalized);
+      const originalStr = originalVariantsRef.current;
+      if (nowStr !== originalStr) {
+        formData.append("variants", nowStr);
+      }
 
-      // Adjuntar nuevas imágenes seleccionadas
-      images.forEach((file) => {
-        formData.append("images", file);
-      });
+      // Mantener imágenes existentes (las no eliminadas)
+      existingImages.forEach((img) => formData.append("existingImages", img));
+
+      // Adjuntar nuevas
+      images.forEach((file) => formData.append("images", file));
+
+      // Adjuntar descuento solo si cambió
+      const discountPayload = {
+        enabled: form.discountEnabled,
+        type: form.discountType,
+        value: Number(form.discountValue) || 0,
+        startAt: form.discountStartAt || null,
+        endAt: form.discountEndAt || null,
+      };
+      const originalDiscount = JSON.parse(originalDiscountRef.current);
+      const changedDiscount =
+        originalDiscount.enabled !== discountPayload.enabled ||
+        originalDiscount.type !== discountPayload.type ||
+        Number(originalDiscount.value || 0) !== Number(discountPayload.value || 0) ||
+        (originalDiscount.startAt || "") !== (form.discountStartAt || "") ||
+        (originalDiscount.endAt || "") !== (form.discountEndAt || "");
+
+      if (changedDiscount) {
+        formData.append("discount", JSON.stringify(discountPayload));
+      }
 
       await axios.put(
         `http://localhost:5000/api/products/${productId}`,
@@ -153,13 +297,27 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
 
       showToast("Producto actualizado correctamente", "success");
       onSuccess();
-    } catch {
-      showToast("Error al actualizar producto", "error");
+    } catch (err) {
+      console.error("API error:", err?.response?.data || err);
+      const msg = err?.response?.data?.error || "Error al actualizar producto";
+      showToast(msg, "error");
     }
   };
 
-  const handleCancel = () => {
-    navigate("/admin/products");
+  const handleCancel = () => navigate("/admin/products");
+
+  // Helpers de visualización para variantes (funcionan con id u objeto)
+  const getSizeLabel = (v) => {
+    if (!v) return "—";
+    if (typeof v.size === "object" && v.size?.label) return v.size.label;
+    const id = getIdVal(v.size);
+    return sizes.find((s) => s._id === id)?.label || "—";
+  };
+  const getColorName = (v) => {
+    if (!v) return "—";
+    if (typeof v.color === "object" && v.color?.name) return v.color.name;
+    const id = getIdVal(v.color);
+    return colors.find((c) => c._id === id)?.name || "—";
   };
 
   return (
@@ -174,12 +332,14 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
           onChange={handleInputChange}
           required
         />
+
         <textarea
           name="description"
           placeholder="Descripción"
           value={form.description}
           onChange={handleInputChange}
         />
+
         <input
           type="number"
           name="price"
@@ -189,6 +349,75 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
           min="1"
           required
         />
+
+        {/* Bloque de promoción / descuento */}
+        <div className="discount-block">
+          <label className="discount-toggle">
+            <input
+              type="checkbox"
+              name="discountEnabled"
+              checked={form.discountEnabled}
+              onChange={handleInputChange}
+            />
+            Activar promoción/descuento
+          </label>
+
+          {form.discountEnabled && (
+            <>
+              <div className="discount-row">
+                <select
+                  name="discountType"
+                  value={form.discountType}
+                  onChange={handleInputChange}
+                >
+                  <option value="PERCENT">Porcentaje (%)</option>
+                  <option value="FIXED">Monto fijo</option>
+                </select>
+
+                <input
+                  type="number"
+                  name="discountValue"
+                  placeholder={form.discountType === "PERCENT" ? "% descuento" : "Valor descontado"}
+                  value={form.discountValue}
+                  min="1"
+                  step="0.01"
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="discount-row">
+                <label>
+                  Inicio
+                  <input
+                    type="datetime-local"
+                    name="discountStartAt"
+                    value={form.discountStartAt}
+                    onChange={handleInputChange}
+                  />
+                </label>
+                <label>
+                  Fin
+                  <input
+                    type="datetime-local"
+                    name="discountEndAt"
+                    value={form.discountEndAt}
+                    onChange={handleInputChange}
+                  />
+                </label>
+              </div>
+
+              <DiscountPreview
+                price={Number(form.price)}
+                discount={{
+                  enabled: form.discountEnabled,
+                  type: form.discountType,
+                  value: form.discountValue,
+                }}
+              />
+            </>
+          )}
+        </div>
 
         <select
           value={selectedCategory}
@@ -203,6 +432,7 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
           ))}
         </select>
 
+        {/* Variantes */}
         <div className="variant-selector">
           <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)}>
             <option value="">Talla</option>
@@ -235,30 +465,29 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
           </button>
         </div>
 
-        {variants.length > 0 && (
+        {Array.isArray(variants) && variants.length > 0 && (
           <ul className="variant-list">
             {variants.map((v, i) => (
               <li key={i}>
-                Talla: {sizes.find((s) => s._id === v.size)?.label} | Color:{" "}
-                {colors.find((c) => c._id === v.color)?.name} | Stock: {v.stock}
+                Talla: {getSizeLabel(v)} | Color: {getColorName(v)} | Stock: {v.stock}
                 <button type="button" onClick={() => handleRemoveVariant(i)}>✖</button>
               </li>
             ))}
           </ul>
         )}
 
+        {/* Imágenes actuales */}
         <label>Imágenes actuales:</label>
         <div className="image-preview">
           {existingImages.map((img, index) => (
             <div key={`ex-${index}`} className="preview-box">
               <img src={`http://localhost:5000${img}`} alt="" />
-              <button type="button" onClick={() => handleRemoveExistingImage(index)}>
-                🗑
-              </button>
+              <button type="button" onClick={() => handleRemoveExistingImage(index)}>🗑</button>
             </div>
           ))}
         </div>
 
+        {/* Agregar nuevas imágenes */}
         <label>Agregar nuevas imágenes:</label>
         <input type="file" accept="image/*" multiple onChange={handleFileChange} />
 
@@ -271,17 +500,18 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
           ))}
         </div>
 
-        <div>
+        <div className="form-actions">
           <button type="submit" className="btn-save">
-            <FaPlusCircle style={{ marginRight: "6px" }} />
+            <FaPlusCircle style={{ marginRight: 6 }} />
             Guardar cambios
           </button>
           <button
             onClick={handleCancel}
+            type="button"
             title="Cancelar cambios y volver"
-            style={{ backgroundColor: "#ccc", color: "#333" }}
+            className="btn-cancel"
           >
-            <FaTimesCircle style={{ marginRight: "6px" }} />
+            <FaTimesCircle style={{ marginRight: 6 }} />
             Cancelar
           </button>
         </div>
@@ -290,4 +520,4 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
   );
 };
 
-export default EditProductForm;
+export default AdminEditProductForm;
