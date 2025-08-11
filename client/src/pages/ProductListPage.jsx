@@ -9,8 +9,9 @@ const ProductList = () => {
 
   useEffect(() => {
     if (user?.role !== "admin") {
-      axios.get("http://localhost:5000/api/products")
-        .then(res => setProducts(res.data))
+      axios
+        .get("http://localhost:5000/api/products")
+        .then((res) => setProducts(res.data))
         .catch(() => alert("Error al cargar productos"));
     }
   }, [user]);
@@ -26,13 +27,18 @@ const ProductList = () => {
 
   return (
     <div style={{ padding: "20px" }}>
-      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>Catálogo de Artesanías</h2>
-      <div style={{
-        display: "flex",
-        flexWrap: "wrap",
-        justifyContent: "center"
-      }}>
-        {products.map(p => (
+      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
+        Catálogo de Artesanías
+      </h2>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: "16px",
+        }}
+      >
+        {products.map((p) => (
           <ProductListBlocks key={p._id} product={p} />
         ))}
       </div>

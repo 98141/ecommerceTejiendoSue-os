@@ -26,7 +26,7 @@ const ProductHistoryPage = () => {
       );
       setHistory(res.data);
     } catch (err) {
-      showToast("Error al obtener historial del producto", "error");
+      showToast("Error al obtener historial del producto", err);
     } finally {
       setLoading(false);
     }

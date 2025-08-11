@@ -1,4 +1,6 @@
+import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { FaTimesCircle, FaPlusCircle } from "react-icons/fa";
 import axios from "axios";
 
 const RegisterProductForm = ({ categories, onSubmit }) => {
@@ -18,6 +20,8 @@ const RegisterProductForm = ({ categories, onSubmit }) => {
   const [selectedColor, setSelectedColor] = useState("");
   const [variantStock, setVariantStock] = useState("");
   const [variants, setVariants] = useState([]);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchOptions();
@@ -79,7 +83,8 @@ const RegisterProductForm = ({ categories, onSubmit }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!selectedCategory || Number(price) <= 0 || variants.length === 0) return;
+    if (!selectedCategory || Number(price) <= 0 || variants.length === 0)
+      return;
 
     const formData = new FormData();
     formData.append("name", name);
@@ -93,8 +98,19 @@ const RegisterProductForm = ({ categories, onSubmit }) => {
     onSubmit(formData);
   };
 
+  const handleCancel = () => {
+    // Si necesitas confirmar con el usuario:
+    // if (window.confirm("¿Estás seguro de cancelar los cambios?")) {
+    navigate("/admin/products");
+    // }
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="product-form" encType="multipart/form-data">
+    <form
+      onSubmit={handleSubmit}
+      className="product-form"
+      encType="multipart/form-data"
+    >
       <input
         type="text"
         placeholder="Nombre de Producto"
@@ -132,7 +148,10 @@ const RegisterProductForm = ({ categories, onSubmit }) => {
       </select>
 
       <div className="variant-selector">
-        <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)}>
+        <select
+          value={selectedSize}
+          onChange={(e) => setSelectedSize(e.target.value)}
+        >
           <option value="">Talla</option>
           {sizes.map((s) => (
             <option key={s._id} value={s._id}>
@@ -141,7 +160,10 @@ const RegisterProductForm = ({ categories, onSubmit }) => {
           ))}
         </select>
 
-        <select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)}>
+        <select
+          value={selectedColor}
+          onChange={(e) => setSelectedColor(e.target.value)}
+        >
           <option value="">Color</option>
           {colors.map((c) => (
             <option key={c._id} value={c._id}>
@@ -158,7 +180,11 @@ const RegisterProductForm = ({ categories, onSubmit }) => {
           min="1"
         />
 
-        <button type="button" className="btn-variant" onClick={handleAddVariant}>
+        <button
+          type="button"
+          className="btn-variant"
+          onClick={handleAddVariant}
+        >
           + Añadir Variante
         </button>
       </div>
@@ -169,25 +195,48 @@ const RegisterProductForm = ({ categories, onSubmit }) => {
             <li key={i}>
               Talla: {sizes.find((s) => s._id === v.size)?.label} | Color:{" "}
               {colors.find((c) => c._id === v.color)?.name} | Stock: {v.stock}
-              <button type="button" onClick={() => handleRemoveVariant(i)}>✖</button>
+              <button type="button" onClick={() => handleRemoveVariant(i)}>
+                ✖
+              </button>
             </li>
           ))}
         </ul>
       )}
 
       <label>Imágenes del producto:</label>
-      <input type="file" multiple accept="image/*" onChange={handleImageChange} />
+      <input
+        type="file"
+        multiple
+        accept="image/*"
+        onChange={handleImageChange}
+      />
 
       <div className="image-preview">
         {previews.map((src, i) => (
           <div key={`new-${i}`} className="preview-box">
             <img src={src} alt="preview" />
-            <button type="button" onClick={() => handleRemoveNewImage(i)}>🗑</button>
+            <button type="button" onClick={() => handleRemoveNewImage(i)}>
+              🗑
+            </button>
           </div>
         ))}
       </div>
 
-      <button type="submit" className="btn-save">Crear producto</button>
+      <div className="button__option">
+        <button type="submit" className="btn-save">
+          <FaPlusCircle style={{ marginRight: 6 }} />
+          Crear producto
+        </button>
+
+        <button
+          className="btn-cancel"
+          onClick={handleCancel}
+          title="Cancelar cambios y volver"
+        >
+          <FaTimesCircle style={{ marginRight: 6 }} />
+          Cancelar
+        </button>
+      </div>
     </form>
   );
 };

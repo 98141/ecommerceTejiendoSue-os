@@ -500,7 +500,7 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
           ))}
         </div>
 
-        <div className="form-actions">
+        <div className="button__option">
           <button type="submit" className="btn-save">
             <FaPlusCircle style={{ marginRight: 6 }} />
             Guardar cambios
