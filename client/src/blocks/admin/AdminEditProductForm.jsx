@@ -16,9 +16,13 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
     price: "",
   });
   const [selectedCategory, setSelectedCategory] = useState("");
+
+  // Nuevas imágenes seleccionadas (File[]) y sus previews (blob URLs)
   const [images, setImages] = useState([]);
-  const [existingImages, setExistingImages] = useState([]);
   const [preview, setPreview] = useState([]);
+
+  // Imágenes que ya existen en el servidor (paths)
+  const [existingImages, setExistingImages] = useState([]);
 
   const [variants, setVariants] = useState([]);
   const [selectedSize, setSelectedSize] = useState("");
@@ -27,6 +31,11 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
 
   useEffect(() => {
     fetchInitialData();
+    // Limpieza: revocar todos los blob URLs al desmontar
+    return () => {
+      preview.forEach((url) => URL.revokeObjectURL(url));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchInitialData = async () => {
@@ -41,10 +50,9 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
 
       const { name, description, price, categories, images, variants } =
         productRes.data;
+
       setForm({ name, description, price });
-      setSelectedCategory(
-        Array.isArray(categories) ? categories[0] : categories
-      );
+      setSelectedCategory(Array.isArray(categories) ? categories[0] : categories);
       setExistingImages(images || []);
       setVariants(variants || []);
       setCategories(categoriesRes.data);
@@ -59,16 +67,31 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // Añadir nuevas imágenes (no reemplazar las ya seleccionadas)
   const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    setImages(files);
-    setPreview(files.map((file) => URL.createObjectURL(file)));
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const urls = files.map((file) => URL.createObjectURL(file));
+    setImages((prev) => [...prev, ...files]);
+    setPreview((prev) => [...prev, ...urls]);
+
+    // Opcional: limpiar el input para permitir volver a cargar el mismo archivo
+    e.target.value = "";
   };
 
+  // Elimina UNA imagen existente por índice (del arreglo de paths)
   const handleRemoveExistingImage = (index) => {
-    const updated = [...existingImages];
-    updated.splice(index, 1);
-    setExistingImages(updated);
+    setExistingImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Elimina UNA imagen nueva por índice (File + preview URL)
+  const handleRemoveNewImage = (index) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+    setPreview((prev) => {
+      URL.revokeObjectURL(prev[index]); // liberar memoria
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleAddVariant = () => {
@@ -89,9 +112,7 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
   };
 
   const handleRemoveVariant = (index) => {
-    const updated = [...variants];
-    updated.splice(index, 1);
-    setVariants(updated);
+    setVariants((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
@@ -108,9 +129,13 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
       formData.append("price", form.price);
       formData.append("categories", selectedCategory);
       formData.append("variants", JSON.stringify(variants));
+
+      // Mantener las imágenes existentes que el usuario NO eliminó
       existingImages.forEach((img) => {
         formData.append("existingImages[]", img);
       });
+
+      // Adjuntar nuevas imágenes seleccionadas
       images.forEach((file) => {
         formData.append("images", file);
       });
@@ -134,20 +159,13 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
   };
 
   const handleCancel = () => {
-    // Si necesitas confirmar con el usuario:
-    // if (window.confirm("¿Estás seguro de cancelar los cambios?")) {
     navigate("/admin/products");
-    // }
   };
 
   return (
     <div className="form-container">
       <h2>Editar Producto</h2>
-      <form
-        onSubmit={handleSubmit}
-        className="product-form"
-        encType="multipart/form-data"
-      >
+      <form onSubmit={handleSubmit} className="product-form" encType="multipart/form-data">
         <input
           type="text"
           name="name"
@@ -186,10 +204,7 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
         </select>
 
         <div className="variant-selector">
-          <select
-            value={selectedSize}
-            onChange={(e) => setSelectedSize(e.target.value)}
-          >
+          <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)}>
             <option value="">Talla</option>
             {sizes.map((s) => (
               <option key={s._id} value={s._id}>
@@ -198,10 +213,7 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
             ))}
           </select>
 
-          <select
-            value={selectedColor}
-            onChange={(e) => setSelectedColor(e.target.value)}
-          >
+          <select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)}>
             <option value="">Color</option>
             {colors.map((c) => (
               <option key={c._id} value={c._id}>
@@ -218,11 +230,7 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
             min="1"
           />
 
-          <button
-            type="button"
-            className="btn-variant"
-            onClick={handleAddVariant}
-          >
+          <button type="button" className="btn-variant" onClick={handleAddVariant}>
             + Añadir Variante
           </button>
         </div>
@@ -233,9 +241,7 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
               <li key={i}>
                 Talla: {sizes.find((s) => s._id === v.size)?.label} | Color:{" "}
                 {colors.find((c) => c._id === v.color)?.name} | Stock: {v.stock}
-                <button type="button" onClick={() => handleRemoveVariant(i)}>
-                  ✖
-                </button>
+                <button type="button" onClick={() => handleRemoveVariant(i)}>✖</button>
               </li>
             ))}
           </ul>
@@ -244,12 +250,9 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
         <label>Imágenes actuales:</label>
         <div className="image-preview">
           {existingImages.map((img, index) => (
-            <div key={index} className="preview-box">
+            <div key={`ex-${index}`} className="preview-box">
               <img src={`http://localhost:5000${img}`} alt="" />
-              <button
-                type="button"
-                onClick={() => handleRemoveExistingImage(index)}
-              >
+              <button type="button" onClick={() => handleRemoveExistingImage(index)}>
                 🗑
               </button>
             </div>
@@ -257,17 +260,17 @@ const EditProductForm = ({ productId, token, onSuccess, showToast }) => {
         </div>
 
         <label>Agregar nuevas imágenes:</label>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handleFileChange}
-        />
+        <input type="file" accept="image/*" multiple onChange={handleFileChange} />
+
         <div className="image-preview">
-          {preview.map((img, i) => (
-            <img key={i} src={img} alt="preview" />
+          {preview.map((src, i) => (
+            <div key={`new-${i}`} className="preview-box">
+              <img src={src} alt="preview" />
+              <button type="button" onClick={() => handleRemoveNewImage(i)}>🗑</button>
+            </div>
           ))}
         </div>
+
         <div>
           <button type="submit" className="btn-save">
             <FaPlusCircle style={{ marginRight: "6px" }} />
