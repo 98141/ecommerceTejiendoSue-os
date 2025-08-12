@@ -1,8 +1,14 @@
 const fs = require("fs");
 const path = require("path");
+const mongoose = require("mongoose");
+
 const Product = require("../models/Product");
 const ProductAudit = require("../models/ProductAudit");
 const ProductEntryHistory = require("../models/ProductEntryHistory");
+const ProductVariantLedger = require("../models/ProductVariantLedger");
+const Size = require("../models/Size");
+const Color = require("../models/Color");
+const Order = require("../models/Order");
 
 /** Normaliza category a UN solo ObjectId (si te llega array o CSV, toma el primero) */
 function normalizeCategory(categories) {
@@ -32,16 +38,41 @@ function parseVariants(raw) {
   );
 }
 
+/** Clave lógica de variante */
+function keyOf(sizeId, colorId) {
+  return `${String(sizeId)}::${String(colorId)}`;
+}
+
+/** Snapshots de etiquetas para no depender de populate a futuro */
+async function getVariantSnapshots(sizeId, colorId) {
+  let sizeLabel = "Desconocido";
+  let colorName = "Desconocido";
+  try {
+    const [s, c] = await Promise.all([
+      Size.findById(sizeId).lean(),
+      Color.findById(colorId).lean(),
+    ]);
+    if (s?.label) sizeLabel = s.label;
+    if (c?.name) colorName = c.name;
+  } catch {}
+  return { sizeLabel, colorName };
+}
+
+/** ===================== CREATE ===================== */
 exports.createProduct = async (req, res) => {
   try {
     const { name, description, price } = req.body;
     const categoryId = normalizeCategory(req.body.categories);
     const validVariants = parseVariants(req.body.variants);
 
+    if (!name || typeof price === "undefined") {
+      return res.status(400).json({ error: "Faltan campos obligatorios (name, price)." });
+    }
+    if (!categoryId) {
+      return res.status(400).json({ error: "Categoría inválida o ausente." });
+    }
     if (!validVariants.length) {
-      return res
-        .status(400)
-        .json({ error: "Debes incluir al menos una variante válida" });
+      return res.status(400).json({ error: "Debes incluir al menos una variante válida" });
     }
 
     const imagePaths = (req.files || []).map(
@@ -51,7 +82,7 @@ exports.createProduct = async (req, res) => {
     const newProduct = new Product({
       name,
       description,
-      price,
+      price: Number(price),
       categories: categoryId, // UNA categoría
       images: imagePaths,
       variants: validVariants,
@@ -59,7 +90,31 @@ exports.createProduct = async (req, res) => {
 
     await newProduct.save();
 
-    // Historial: CREACIÓN con todas las variantes (stock inicial)
+    // Ledger — creación de variantes con snapshot
+    const ledgerInserts = [];
+    for (const v of newProduct.variants) {
+      const { sizeLabel, colorName } = await getVariantSnapshots(v.size, v.color);
+      ledgerInserts.push({
+        productId: newProduct._id,
+        size: v.size,
+        color: v.color,
+        sizeLabelSnapshot: sizeLabel,
+        colorNameSnapshot: colorName,
+        variantKey: keyOf(v.size, v.color),
+        eventType: "CREATE_VARIANT",
+        status: "ACTIVE",
+        prevStock: null,
+        newStock: Number(v.stock),
+        priceSnapshot: Number(newProduct.price),
+        note: "Creación con stock inicial",
+        user: req.user?.id || null,
+      });
+    }
+    if (ledgerInserts.length) {
+      await ProductVariantLedger.insertMany(ledgerInserts);
+    }
+
+    // Historial general del producto (tu modelo existente)
     await ProductEntryHistory.create({
       productId: newProduct._id,
       name: newProduct.name,
@@ -70,28 +125,29 @@ exports.createProduct = async (req, res) => {
       variants: newProduct.variants.map((v) => ({
         size: v.size,
         color: v.color,
-        initialStock: v.stock,
+        initialStock: Number(v.stock),
       })),
       kind: "CREATE",
       note: "",
     });
 
-    res.status(201).json(newProduct);
+    return res.status(201).json(newProduct);
   } catch (err) {
     console.error("Error al crear producto:", err);
-    res.status(500).json({ error: "Error al crear producto" });
+    return res.status(500).json({ error: "Error al crear producto" });
   }
 };
 
+/** ===================== READ (LIST/GET) ===================== */
 exports.getProducts = async (req, res) => {
   try {
     const products = await Product.find()
       .populate("categories", "name")
       .populate("variants.size", "label")
       .populate("variants.color", "name");
-    res.json(products);
+    return res.json(products);
   } catch (err) {
-    res.status(500).json({ message: "Error al obtener productos" });
+    return res.status(500).json({ message: "Error al obtener productos" });
   }
 };
 
@@ -101,18 +157,21 @@ exports.getProductById = async (req, res) => {
       .populate("categories", "name")
       .populate("variants.size", "label")
       .populate("variants.color", "name");
-    if (!product)
-      return res.status(404).json({ error: "Producto no encontrado" });
-    res.json(product);
+    if (!product) return res.status(404).json({ error: "Producto no encontrado" });
+    return res.json(product);
   } catch (err) {
-    res.status(500).json({ error: "Error al buscar producto" });
+    return res.status(500).json({ error: "Error al buscar producto" });
   }
 };
 
+/** ===================== UPDATE ===================== */
 exports.updateProduct = async (req, res) => {
   try {
     const productId = req.params.id;
     const userId = req.user?.id;
+
+    const product = await Product.findById(productId);
+    if (!product) return res.status(404).json({ error: "Producto no encontrado" });
 
     const {
       name,
@@ -122,10 +181,6 @@ exports.updateProduct = async (req, res) => {
       existingImages = [],
       variants: rawVariants,
     } = req.body;
-
-    const product = await Product.findById(productId);
-    if (!product)
-      return res.status(404).json({ error: "Producto no encontrado" });
 
     // --- Imágenes: conservar existentes + agregar nuevas ---
     const existingImagesArray = Array.isArray(existingImages)
@@ -140,8 +195,9 @@ exports.updateProduct = async (req, res) => {
       try {
         const safePath = path.join(process.cwd(), imgPath.replace(/^\//, ""));
         const safeBase = path.join(process.cwd(), "uploads", "products");
-        if (safePath.startsWith(safeBase) && fs.existsSync(safePath))
+        if (safePath.startsWith(safeBase) && fs.existsSync(safePath)) {
           fs.unlinkSync(safePath);
+        }
       } catch {}
     }
 
@@ -152,19 +208,99 @@ exports.updateProduct = async (req, res) => {
 
     // --- Snapshot previo para detectar eventos ---
     const prevVariantsSet = new Set(
-      (product.variants || []).map(
-        (v) => `${String(v.size)}::${String(v.color)}`
-      )
+      (product.variants || []).map((v) => keyOf(v.size, v.color))
     );
-    const prevPrice = product.price;
+    const prevByKey = new Map(
+      (product.variants || []).map((v) => [
+        keyOf(v.size, v.color),
+        { ...(v.toObject?.() || v) },
+      ])
+    );
 
     // --- Variantes (solo si se envían) ---
     let addedVariants = [];
     if (typeof rawVariants !== "undefined") {
-      const validVariants = parseVariants(rawVariants); // <- helper existente en tu controlador
-      addedVariants = validVariants.filter(
-        (v) => !prevVariantsSet.has(`${String(v.size)}::${String(v.color)}`)
-      );
+      const validVariants = parseVariants(rawVariants);
+
+      // Añadidas y editadas
+      const nowPrice =
+        typeof product.price === "number"
+          ? product.price
+          : Number(product.price) || 0;
+
+      const nextKeys = new Set(validVariants.map((v) => keyOf(v.size, v.color)));
+
+      // Añadidas
+      for (const v of validVariants) {
+        const k = keyOf(v.size, v.color);
+        if (!prevVariantsSet.has(k)) {
+          const { sizeLabel, colorName } = await getVariantSnapshots(v.size, v.color);
+          await ProductVariantLedger.create({
+            productId,
+            size: v.size,
+            color: v.color,
+            sizeLabelSnapshot: sizeLabel,
+            colorNameSnapshot: colorName,
+            variantKey: k,
+            eventType: "CREATE_VARIANT",
+            status: "ACTIVE",
+            prevStock: null,
+            newStock: Number(v.stock),
+            priceSnapshot: nowPrice,
+            note: "Variante agregada en update",
+            user: userId || null,
+          });
+          addedVariants.push(v);
+        }
+      }
+
+      // Editadas (cambios de stock)
+      for (const v of validVariants) {
+        const k = keyOf(v.size, v.color);
+        const prev = prevByKey.get(k);
+        if (prev && Number(prev.stock) !== Number(v.stock)) {
+          const { sizeLabel, colorName } = await getVariantSnapshots(v.size, v.color);
+          await ProductVariantLedger.create({
+            productId,
+            size: v.size,
+            color: v.color,
+            sizeLabelSnapshot: sizeLabel,
+            colorNameSnapshot: colorName,
+            variantKey: k,
+            eventType: "EDIT_STOCK",
+            status: "ACTIVE",
+            prevStock: Number(prev.stock),
+            newStock: Number(v.stock),
+            priceSnapshot: nowPrice,
+            note: "Edición de stock",
+            user: userId || null,
+          });
+        }
+      }
+
+      // Eliminadas (marcar como DELETED)
+      for (const [k, prev] of prevByKey.entries()) {
+        if (!nextKeys.has(k)) {
+          const { sizeLabel, colorName } = await getVariantSnapshots(prev.size, prev.color);
+          await ProductVariantLedger.create({
+            productId,
+            size: prev.size,
+            color: prev.color,
+            sizeLabelSnapshot: sizeLabel,
+            colorNameSnapshot: colorName,
+            variantKey: k,
+            eventType: "DELETE_VARIANT",
+            status: "DELETED",
+            prevStock: Number(prev.stock),
+            newStock: Number(prev.stock), // último stock conocido
+            priceSnapshot: nowPrice,
+            note: "Eliminación lógica de variante",
+            user: userId || null,
+          });
+        }
+      }
+
+      // confirman reemplazo de variantes en el producto
       product.variants = validVariants;
     }
 
@@ -191,7 +327,7 @@ exports.updateProduct = async (req, res) => {
     }
 
     if (typeof categories !== "undefined") {
-      const newCat = normalizeCategory(categories); // <- helper existente en tu controlador
+      const newCat = normalizeCategory(categories);
       if (newCat && String(newCat) !== String(product.categories)) {
         changes.categories = { old: product.categories, new: newCat };
         product.categories = newCat;
@@ -214,7 +350,7 @@ exports.updateProduct = async (req, res) => {
       });
     }
 
-    // === Entradas de HISTORIAL por eventos ===
+    // === Entradas de HISTORIAL por eventos (tu modelo existente) ===
     let createdHistoryVariantId = null;
     let createdHistoryPriceId = null;
 
@@ -230,14 +366,13 @@ exports.updateProduct = async (req, res) => {
         variants: addedVariants.map((v) => ({
           size: v.size,
           color: v.color,
-          initialStock: v.stock,
+          initialStock: Number(v.stock),
         })),
         kind: "UPDATE_VARIANTS",
         note: "Se añadieron variantes",
       });
       createdHistoryVariantId = doc._id;
 
-      // (Opcional) emitir por socket con labels poblados
       const io = req.app.get("io");
       if (io) {
         const populated = await doc.populate([
@@ -250,10 +385,7 @@ exports.updateProduct = async (req, res) => {
     }
 
     // Cambio de precio
-    if (
-      typeof changes.price !== "undefined" &&
-      changes.price.new !== changes.price.old
-    ) {
+    if (typeof changes.price !== "undefined" && changes.price.new !== changes.price.old) {
       const doc = await ProductEntryHistory.create({
         productId: product._id,
         name: product.name,
@@ -269,14 +401,11 @@ exports.updateProduct = async (req, res) => {
 
       const io = req.app.get("io");
       if (io) {
-        const populated = await doc.populate([
-          { path: "categories", select: "name" },
-        ]);
+        const populated = await doc.populate([{ path: "categories", select: "name" }]);
         io.emit("productHistory:new", populated);
       }
     }
 
-    // --- Respuesta: producto + IDs de eventos creados (para abrir modal directo) ---
     return res.json({
       product,
       historyEvents: {
@@ -286,29 +415,30 @@ exports.updateProduct = async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar producto:", err);
-    res.status(500).json({ error: "Error al actualizar producto" });
+    return res.status(500).json({ error: "Error al actualizar producto" });
   }
 };
 
+/** ===================== DELETE ===================== */
 exports.deleteProduct = async (req, res) => {
   try {
     const deleted = await Product.findByIdAndDelete(req.params.id);
-    if (!deleted)
-      return res.status(404).json({ error: "Producto no encontrado" });
-    res.json({ message: "Producto eliminado correctamente" });
+    if (!deleted) return res.status(404).json({ error: "Producto no encontrado" });
+    return res.json({ message: "Producto eliminado correctamente" });
   } catch (err) {
-    res.status(500).json({ error: "Error al eliminar producto" });
+    return res.status(500).json({ error: "Error al eliminar producto" });
   }
 };
 
+/** ===================== HISTORY (auditoría general ya existente) ===================== */
 exports.getProductHistory = async (req, res) => {
   try {
     const audits = await ProductAudit.find({ product: req.params.id })
       .populate("user", "name email")
       .sort({ timestamp: -1 });
-    res.json(audits);
+    return res.json(audits);
   } catch (err) {
-    res.status(500).json({ error: "Error al obtener historial del producto" });
+    return res.status(500).json({ error: "Error al obtener historial del producto" });
   }
 };
 
@@ -319,9 +449,117 @@ exports.getProductEntryHistory = async (req, res) => {
       .populate("variants.size", "label")
       .populate("variants.color", "name")
       .sort({ createdAt: -1 });
-    res.json(history);
+    return res.json(history);
   } catch (err) {
     console.error("Error al obtener historial:", err);
-    res.status(500).json({ error: "Error al obtener historial de productos" });
+    return res.status(500).json({ error: "Error al obtener historial de productos" });
+  }
+};
+
+/** ===================== LEDGER por producto ===================== */
+exports.getVariantLedgerByProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    const { variantKey, status, from, to, limit = 200 } = req.query;
+
+    const q = { productId: id };
+    if (variantKey) q.variantKey = String(variantKey);
+    if (status && ["ACTIVE", "DELETED"].includes(status)) q.status = status;
+
+    if (from || to) {
+      q.createdAt = {};
+      if (from) q.createdAt.$gte = new Date(from);
+      if (to) q.createdAt.$lte = new Date(to);
+    }
+
+    const rows = await ProductVariantLedger.find(q)
+      .sort({ createdAt: -1 })
+      .limit(Math.min(Number(limit) || 200, 1000))
+      .lean();
+
+    return res.json(rows);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "Error al obtener ledger de variantes" });
+  }
+};
+
+/** ===================== Ventas por producto (adjust si tu modelo difiere) ===================== */
+exports.getProductSalesHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { from, to, limit = 500 } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    const productObjectId = new mongoose.Types.ObjectId(id);
+
+    const match = { "items.product": productObjectId };
+    if (from || to) {
+      match.createdAt = {};
+      if (from) match.createdAt.$gte = new Date(from);
+      if (to)   match.createdAt.$lte = new Date(to);
+    }
+
+    const rows = await Order.aggregate([
+      { $match: match },
+      { $unwind: "$items" },
+      { $match: { "items.product": productObjectId } },
+
+      // Fallback de precio si la orden antigua no tiene items.unitPrice
+      { $lookup: { from: "products", localField: "items.product", foreignField: "_id", as: "productDoc" } },
+      { $unwind: { path: "$productDoc", preserveNullAndEmptyArrays: true } },
+
+      { $lookup: { from: "sizes", localField: "items.size", foreignField: "_id", as: "sizeDoc" } },
+      { $unwind: { path: "$sizeDoc", preserveNullAndEmptyArrays: true } },
+
+      { $lookup: { from: "colors", localField: "items.color", foreignField: "_id", as: "colorDoc" } },
+      { $unwind: { path: "$colorDoc", preserveNullAndEmptyArrays: true } },
+
+      {
+        $addFields: {
+          unitPriceRaw: { $ifNull: ["$items.unitPrice", "$productDoc.price"] },
+          quantityRaw:  { $ifNull: ["$items.quantity", 0] }
+        }
+      },
+      {
+        $addFields: {
+          unitPrice: {
+            $cond: [
+              { $and: [{ $ne: ["$unitPriceRaw", null] }, { $ne: ["$unitPriceRaw", ""] }] },
+              { $toDouble: "$unitPriceRaw" },
+              0
+            ]
+          },
+          quantity: { $toInt: "$quantityRaw" }
+        }
+      },
+      {
+        $addFields: { total: { $multiply: ["$unitPrice", "$quantity"] } }
+      },
+      {
+        $project: {
+          _id: 0,
+          orderId: "$_id",
+          date: "$createdAt",
+          sizeLabel:  { $ifNull: ["$sizeDoc.label", "Desconocido"] },
+          colorName:  { $ifNull: ["$colorDoc.name",  "Desconocido"] },
+          unitPrice:  1,
+          quantity:   1,
+          total:      1
+        }
+      },
+      { $sort: { date: -1 } },
+      { $limit: Math.min(Number(limit) || 500, 2000) }
+    ]);
+
+    return res.json(rows || []);
+  } catch (e) {
+    console.error("Error en getProductSalesHistory:", e);
+    return res.status(500).json({ error: "Error al obtener historial de ventas" });
   }
 };

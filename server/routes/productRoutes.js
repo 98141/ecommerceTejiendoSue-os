@@ -10,7 +10,9 @@ const {
   updateProduct,
   deleteProduct,
   getProductHistory,
-  getProductEntryHistory
+  getProductEntryHistory,
+  getVariantLedgerByProduct,
+  getProductSalesHistory,
 } = require("../controllers/productController");
 
 const { verifyToken, isAdmin } = require("../middleware/auth");
@@ -33,25 +35,31 @@ const createUpdateValidators = [
   body("price").optional().isFloat({ min: 0 }),
 
   // single category
-  body("categories").optional().custom(v => {
-    if (!isObjectId(v)) throw new Error("Categoría inválida.");
-    return true;
-  }),
+  body("categories")
+    .optional()
+    .custom((v) => {
+      if (!isObjectId(v)) throw new Error("Categoría inválida.");
+      return true;
+    }),
 
   // variants llegará en JSON string
-  body("variants").optional().custom((raw) => {
-    try {
-      const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
-      if (!Array.isArray(arr)) throw new Error();
-      for (const v of arr) {
-        if (!isObjectId(v.size) || !isObjectId(v.color)) throw new Error("Variante inválida (size/color).");
-        if (!(Number(v.stock) >= 0)) throw new Error("Variante inválida (stock).");
+  body("variants")
+    .optional()
+    .custom((raw) => {
+      try {
+        const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (!Array.isArray(arr)) throw new Error();
+        for (const v of arr) {
+          if (!isObjectId(v.size) || !isObjectId(v.color))
+            throw new Error("Variante inválida (size/color).");
+          if (!(Number(v.stock) >= 0))
+            throw new Error("Variante inválida (stock).");
+        }
+        return true;
+      } catch {
+        throw new Error("Formato de variantes inválido.");
       }
-      return true;
-    } catch {
-      throw new Error("Formato de variantes inválido.");
-    }
-  }),
+    }),
 
   // descuento si llega con campos planos (si llega JSON en req.body.discount, se valida en el controller)
   body("discount[enabled]").optional().isIn(["true", "false"]),
@@ -89,5 +97,23 @@ router.delete("/:id", verifyToken, isAdmin, deleteProduct);
 
 router.get("/:id/history", verifyToken, isAdmin, getProductHistory);
 router.get("/history/all", verifyToken, isAdmin, getProductEntryHistory);
+
+// Ledger por producto
+router.get(
+  "/:id/ledger",
+  productLimiter,
+  verifyToken,
+  isAdmin,
+  getVariantLedgerByProduct
+);
+
+// Ventas por producto
+router.get(
+  "/:id/sales-history",
+  productLimiter,
+  verifyToken,
+  isAdmin,
+  getProductSalesHistory
+);
 
 module.exports = router;
