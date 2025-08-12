@@ -38,7 +38,7 @@ const DiscountPreview = ({ price, discount }) => {
   const effective = useMemo(() => {
     if (!has) return price || 0;
     let eff = price;
-    if (type === "PERCENT") eff = price - (price * Number(value) / 100);
+    if (type === "PERCENT") eff = price - (price * Number(value)) / 100;
     else eff = price - Number(value);
     return Math.max(0, Number(eff.toFixed(2)));
   }, [has, price, type, value]);
@@ -49,11 +49,13 @@ const DiscountPreview = ({ price, discount }) => {
     <div className="discount-preview">
       {has ? (
         <p>
-          Precio actual: <b>${Number(price).toFixed(2)}</b> —{" "}
-          Precio con promo: <b>${effective.toFixed(2)}</b>
+          Precio actual: <b>${Number(price).toFixed(2)}</b> — Precio con promo:{" "}
+          <b>${effective.toFixed(2)}</b>
         </p>
       ) : (
-        <p>Precio actual: <b>${Number(price).toFixed(2)}</b></p>
+        <p>
+          Precio actual: <b>${Number(price).toFixed(2)}</b>
+        </p>
       )}
     </div>
   );
@@ -95,6 +97,9 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
   const originalVariantsRef = useRef("[]");
   const originalDiscountRef = useRef("{}");
 
+  // Evita doble submit
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     fetchInitialData();
     return () => {
@@ -105,21 +110,28 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
 
   const fetchInitialData = async () => {
     try {
-      const [productRes, categoriesRes, sizesRes, colorsRes] = await Promise.all([
-        axios.get(`http://localhost:5000/api/products/${productId}`),
-        axios.get("http://localhost:5000/api/categories"),
-        axios.get("http://localhost:5000/api/sizes"),
-        axios.get("http://localhost:5000/api/colors"),
-      ]);
+      const [productRes, categoriesRes, sizesRes, colorsRes] =
+        await Promise.all([
+          axios.get(`http://localhost:5000/api/products/${productId}`),
+          axios.get("http://localhost:5000/api/categories"),
+          axios.get("http://localhost:5000/api/sizes"),
+          axios.get("http://localhost:5000/api/colors"),
+        ]);
 
       const p = productRes.data;
       const {
-        name, description, price, images, variants,
-        categories: catField, discount
+        name,
+        description,
+        price,
+        images,
+        variants,
+        categories: catField,
+        discount,
       } = p;
 
       // catField puede venir como objeto populado o como id
-      const catId = typeof catField === "string" ? catField : catField?._id || "";
+      const catId =
+        typeof catField === "string" ? catField : catField?._id || "";
 
       setForm({
         name: name || "",
@@ -128,7 +140,9 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
         discountEnabled: !!discount?.enabled,
         discountType: discount?.type || "PERCENT",
         discountValue: discount?.value ?? "",
-        discountStartAt: discount?.startAt ? toDatetimeLocal(discount.startAt) : "",
+        discountStartAt: discount?.startAt
+          ? toDatetimeLocal(discount.startAt)
+          : "",
         discountEndAt: discount?.endAt ? toDatetimeLocal(discount.endAt) : "",
       });
       setSelectedCategory(catId);
@@ -136,7 +150,9 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
       setVariants(variants || []);
 
       // Guardamos versiones originales normalizadas para comparar
-      originalVariantsRef.current = JSON.stringify(normalizeVariantsForSubmit(variants || []));
+      originalVariantsRef.current = JSON.stringify(
+        normalizeVariantsForSubmit(variants || [])
+      );
       originalDiscountRef.current = JSON.stringify({
         enabled: !!discount?.enabled,
         type: discount?.type || "PERCENT",
@@ -167,8 +183,17 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    const urls = files.map((file) => URL.createObjectURL(file));
-    setImages((prev) => [...prev, ...files]);
+    // Seguridad básica: limitar tipos mime comunes de imagen
+    const safeFiles = files.filter((f) => /^image\//.test(f.type));
+    if (safeFiles.length !== files.length) {
+      showToast(
+        "Algunas imágenes fueron rechazadas por tipo no permitido",
+        "warning"
+      );
+    }
+
+    const urls = safeFiles.map((file) => URL.createObjectURL(file));
+    setImages((prev) => [...prev, ...safeFiles]);
     setPreview((prev) => [...prev, ...urls]);
     e.target.value = "";
   };
@@ -190,7 +215,8 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
 
     // Evita duplicados comparando por IDs aunque el estado tenga objetos
     const exists = (variants || []).some(
-      (v) => getIdVal(v.size) === selectedSize && getIdVal(v.color) === selectedColor
+      (v) =>
+        getIdVal(v.size) === selectedSize && getIdVal(v.color) === selectedColor
     );
     if (exists) return;
 
@@ -220,7 +246,10 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
       }
     } else {
       if (!(v > 0 && v < priceNum)) {
-        showToast("Descuento fijo debe ser mayor a 0 y menor al precio", "error");
+        showToast(
+          "Descuento fijo debe ser mayor a 0 y menor al precio",
+          "error"
+        );
         return false;
       }
     }
@@ -243,12 +272,19 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
     }
     if (!validateDiscount()) return;
 
+    if (!token) {
+      showToast("Sesión inválida. Vuelve a iniciar sesión.", "error");
+      return;
+    }
+
     try {
+      setSaving(true);
+
       const formData = new FormData();
-      formData.append("name", form.name);
-      formData.append("description", form.description);
-      formData.append("price", form.price);
-      formData.append("categories", selectedCategory);
+      formData.append("name", String(form.name || "").trim());
+      formData.append("description", String(form.description || "").trim());
+      formData.append("price", String(form.price));
+      formData.append("categories", String(selectedCategory));
 
       // Variantes: solo enviamos si CAMBIARON respecto al original
       const normalized = normalizeVariantsForSubmit(variants);
@@ -259,15 +295,17 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
       }
 
       // Mantener imágenes existentes (las no eliminadas)
-      existingImages.forEach((img) => formData.append("existingImages", img));
+      (existingImages || []).forEach((img) =>
+        formData.append("existingImages", img)
+      );
 
       // Adjuntar nuevas
-      images.forEach((file) => formData.append("images", file));
+      (images || []).forEach((file) => formData.append("images", file));
 
       // Adjuntar descuento solo si cambió
       const discountPayload = {
-        enabled: form.discountEnabled,
-        type: form.discountType,
+        enabled: !!form.discountEnabled,
+        type: form.discountType === "FIXED" ? "FIXED" : "PERCENT",
         value: Number(form.discountValue) || 0,
         startAt: form.discountStartAt || null,
         endAt: form.discountEndAt || null,
@@ -276,7 +314,8 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
       const changedDiscount =
         originalDiscount.enabled !== discountPayload.enabled ||
         originalDiscount.type !== discountPayload.type ||
-        Number(originalDiscount.value || 0) !== Number(discountPayload.value || 0) ||
+        Number(originalDiscount.value || 0) !==
+          Number(discountPayload.value || 0) ||
         (originalDiscount.startAt || "") !== (form.discountStartAt || "") ||
         (originalDiscount.endAt || "") !== (form.discountEndAt || "");
 
@@ -284,7 +323,7 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
         formData.append("discount", JSON.stringify(discountPayload));
       }
 
-      await axios.put(
+      const { data } = await axios.put(
         `http://localhost:5000/api/products/${productId}`,
         formData,
         {
@@ -295,12 +334,18 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
         }
       );
 
+      // ⬇️ usar el id de historial para abrir modal en la lista
+      const openId =
+        data?.historyEvents?.variants || data?.historyEvents?.price || null;
+
       showToast("Producto actualizado correctamente", "success");
-      onSuccess();
+      if (typeof onSuccess === "function") onSuccess(openId);
     } catch (err) {
       console.error("API error:", err?.response?.data || err);
       const msg = err?.response?.data?.error || "Error al actualizar producto";
       showToast(msg, "error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -323,7 +368,11 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
   return (
     <div className="form-container">
       <h2>Editar Producto</h2>
-      <form onSubmit={handleSubmit} className="product-form" encType="multipart/form-data">
+      <form
+        onSubmit={handleSubmit}
+        className="product-form"
+        encType="multipart/form-data"
+      >
         <input
           type="text"
           name="name"
@@ -377,7 +426,11 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
                 <input
                   type="number"
                   name="discountValue"
-                  placeholder={form.discountType === "PERCENT" ? "% descuento" : "Valor descontado"}
+                  placeholder={
+                    form.discountType === "PERCENT"
+                      ? "% descuento"
+                      : "Valor descontado"
+                  }
                   value={form.discountValue}
                   min="1"
                   step="0.01"
@@ -434,7 +487,10 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
 
         {/* Variantes */}
         <div className="variant-selector">
-          <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)}>
+          <select
+            value={selectedSize}
+            onChange={(e) => setSelectedSize(e.target.value)}
+          >
             <option value="">Talla</option>
             {sizes.map((s) => (
               <option key={s._id} value={s._id}>
@@ -443,7 +499,10 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
             ))}
           </select>
 
-          <select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)}>
+          <select
+            value={selectedColor}
+            onChange={(e) => setSelectedColor(e.target.value)}
+          >
             <option value="">Color</option>
             {colors.map((c) => (
               <option key={c._id} value={c._id}>
@@ -460,7 +519,11 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
             min="1"
           />
 
-          <button type="button" className="btn-variant" onClick={handleAddVariant}>
+          <button
+            type="button"
+            className="btn-variant"
+            onClick={handleAddVariant}
+          >
             + Añadir Variante
           </button>
         </div>
@@ -469,8 +532,11 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
           <ul className="variant-list">
             {variants.map((v, i) => (
               <li key={i}>
-                Talla: {getSizeLabel(v)} | Color: {getColorName(v)} | Stock: {v.stock}
-                <button type="button" onClick={() => handleRemoveVariant(i)}>✖</button>
+                Talla: {getSizeLabel(v)} | Color: {getColorName(v)} | Stock:{" "}
+                {v.stock}
+                <button type="button" onClick={() => handleRemoveVariant(i)}>
+                  ✖
+                </button>
               </li>
             ))}
           </ul>
@@ -482,34 +548,47 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
           {existingImages.map((img, index) => (
             <div key={`ex-${index}`} className="preview-box">
               <img src={`http://localhost:5000${img}`} alt="" />
-              <button type="button" onClick={() => handleRemoveExistingImage(index)}>🗑</button>
+              <button
+                type="button"
+                onClick={() => handleRemoveExistingImage(index)}
+              >
+                🗑
+              </button>
             </div>
           ))}
         </div>
 
         {/* Agregar nuevas imágenes */}
         <label>Agregar nuevas imágenes:</label>
-        <input type="file" accept="image/*" multiple onChange={handleFileChange} />
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileChange}
+        />
 
         <div className="image-preview">
           {preview.map((src, i) => (
             <div key={`new-${i}`} className="preview-box">
               <img src={src} alt="preview" />
-              <button type="button" onClick={() => handleRemoveNewImage(i)}>🗑</button>
+              <button type="button" onClick={() => handleRemoveNewImage(i)}>
+                🗑
+              </button>
             </div>
           ))}
         </div>
 
         <div className="button__option">
-          <button type="submit" className="btn-save">
+          <button type="submit" className="btn-save" disabled={saving}>
             <FaPlusCircle style={{ marginRight: 6 }} />
-            Guardar cambios
+            {saving ? "Guardando..." : "Guardar cambios"}
           </button>
           <button
-            onClick={handleCancel}
+            onClick={() => navigate("/admin/products")}
             type="button"
             title="Cancelar cambios y volver"
             className="btn-cancel"
+            disabled={saving}
           >
             <FaTimesCircle style={{ marginRight: 6 }} />
             Cancelar
@@ -521,3 +600,4 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
 };
 
 export default AdminEditProductForm;
+

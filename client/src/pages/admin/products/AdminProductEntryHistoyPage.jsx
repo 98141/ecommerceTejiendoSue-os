@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useContext } from "react";
+import React, { useMemo, useState, useContext, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useProductEntryHistory } from "../../../hooks/useProductEntryHistory";
 import HistoryDetailModal from "../../../components/HistoryDetailModal";
 import { AuthContext } from "../../../contexts/AuthContext";
@@ -9,18 +10,25 @@ const canExport = (role) => role === "admin";
 
 const eventLabel = (kind) => {
   switch (kind) {
-    case "CREATE": return "Creación";
-    case "UPDATE_VARIANTS": return "Nuevas variantes";
-    case "UPDATE_PRICE": return "Cambio de precio";
-    case "UPDATE_INFO": return "Actualización";
-    default: return kind || "—";
+    case "CREATE":
+      return "Creación";
+    case "UPDATE_VARIANTS":
+      return "Nuevas variantes";
+    case "UPDATE_PRICE":
+      return "Cambio de precio";
+    case "UPDATE_INFO":
+      return "Actualización";
+    default:
+      return kind || "—";
   }
 };
 
 export default function AdminProductEntryHistoryPage() {
   const { user } = useContext(AuthContext);
-  const { data, total, loading, error, query, setQuery } = useProductEntryHistory({ limit: 10 });
+  const { data, total, loading, error, query, setQuery } =
+    useProductEntryHistory({ limit: 10 });
   const [openId, setOpenId] = useState(null);
+  const location = useLocation();
 
   const totalPages = useMemo(
     () => Math.ceil((total || 0) / (Number(query.limit) || 10)),
@@ -33,16 +41,48 @@ export default function AdminProductEntryHistoryPage() {
   };
   const handlePage = (p) => setQuery((q) => ({ ...q, page: p }));
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const idToOpen = params.get("open");
+    if (idToOpen) setOpenId(idToOpen);
+  }, [location.search]);
+
   return (
     <div className="history-container">
-      <div className="head-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+      <div
+        className="head-row"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "1rem",
+        }}
+      >
         <h2>Historial de productos ingresados</h2>
         {canExport(user?.role) && <ExportMenu query={query} />}
       </div>
 
-      <div className="filters" style={{ display: "flex", flexWrap: "wrap", gap: ".5rem", marginBottom: "1rem" }}>
-        <input name="search" value={query.search} onChange={handleChange} placeholder="Buscar (nombre, descripción)"/>
-        <input type="date" name="from" value={query.from} onChange={handleChange} />
+      <div
+        className="filters"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: ".5rem",
+          marginBottom: "1rem",
+        }}
+      >
+        <input
+          name="search"
+          value={query.search}
+          onChange={handleChange}
+          placeholder="Buscar (nombre, descripción)"
+        />
+        <input
+          type="date"
+          name="from"
+          value={query.from}
+          onChange={handleChange}
+        />
         <input type="date" name="to" value={query.to} onChange={handleChange} />
         <select name="limit" value={query.limit} onChange={handleChange}>
           <option value={10}>10</option>
@@ -58,7 +98,10 @@ export default function AdminProductEntryHistoryPage() {
       </div>
 
       <div className="table-wrap" style={{ overflow: "auto" }}>
-        <table className="history-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+        <table
+          className="history-table"
+          style={{ width: "100%", borderCollapse: "collapse" }}
+        >
           <thead>
             <tr>
               <th>Fecha</th>
@@ -70,37 +113,85 @@ export default function AdminProductEntryHistoryPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={6}>Cargando…</td></tr>}
-            {!loading && error && <tr><td colSpan={6} className="error">{error}</td></tr>}
-            {!loading && !error && data.length === 0 && <tr><td colSpan={6}>Sin resultados</td></tr>}
-            {!loading && !error && data.map((row) => (
-              <tr key={row._id}>
-                <td>{new Date(row.createdAt).toLocaleString()}</td>
-                <td>{eventLabel(row.kind)}</td>
-                <td>{row.name}</td>
-                <td>{formatCOP(row.price)}</td>
-                <td>{row.variants?.length || 0}</td>
-                <td><button onClick={() => setOpenId(row._id)}>Ver</button></td>
+            {loading && (
+              <tr>
+                <td colSpan={6}>Cargando…</td>
               </tr>
-            ))}
+            )}
+            {!loading && error && (
+              <tr>
+                <td colSpan={6} className="error">
+                  {error}
+                </td>
+              </tr>
+            )}
+            {!loading && !error && data.length === 0 && (
+              <tr>
+                <td colSpan={6}>Sin resultados</td>
+              </tr>
+            )}
+            {!loading &&
+              !error &&
+              data.map((row) => (
+                <tr key={row._id}>
+                  <td>{new Date(row.createdAt).toLocaleString()}</td>
+                  <td>{eventLabel(row.kind)}</td>
+                  <td>{row.name}</td>
+                  <td>{formatCOP(row.price)}</td>
+                  <td>{row.variants?.length || 0}</td>
+                  <td>
+                    <button onClick={() => setOpenId(row._id)}>Ver</button>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
 
       {totalPages > 1 && (
-        <div className="pagination" style={{ display: "flex", gap: ".5rem", justifyContent: "center", marginTop: "1rem" }}>
-          <button disabled={query.page <= 1} onClick={() => handlePage(query.page - 1)}>Anterior</button>
+        <div
+          className="pagination"
+          style={{
+            display: "flex",
+            gap: ".5rem",
+            justifyContent: "center",
+            marginTop: "1rem",
+          }}
+        >
+          <button
+            disabled={query.page <= 1}
+            onClick={() => handlePage(query.page - 1)}
+          >
+            Anterior
+          </button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <button key={p} className={p === query.page ? "active" : ""} onClick={() => handlePage(p)}
-              style={p === query.page ? { fontWeight: "bold", textDecoration: "underline" } : undefined}
-            >{p}</button>
+            <button
+              key={p}
+              className={p === query.page ? "active" : ""}
+              onClick={() => handlePage(p)}
+              style={
+                p === query.page
+                  ? { fontWeight: "bold", textDecoration: "underline" }
+                  : undefined
+              }
+            >
+              {p}
+            </button>
           ))}
-          <button disabled={query.page >= totalPages} onClick={() => handlePage(query.page + 1)}>Siguiente</button>
+          <button
+            disabled={query.page >= totalPages}
+            onClick={() => handlePage(query.page + 1)}
+          >
+            Siguiente
+          </button>
         </div>
       )}
 
-      <HistoryDetailModal id={openId} open={!!openId} onClose={() => setOpenId(null)} />
+      <HistoryDetailModal
+        id={openId}
+        open={!!openId}
+        onClose={() => setOpenId(null)}
+      />
     </div>
   );
 }
-
