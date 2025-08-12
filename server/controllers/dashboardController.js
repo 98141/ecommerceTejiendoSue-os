@@ -1,112 +1,212 @@
-const Order = require("../models/Order");
-const Product = require("../models/Product");
 const mongoose = require("mongoose");
+const Order = require("../models/Order");
 
-exports.getDashboardSummary = async (req, res) => {
+// Parse helpers
+function parseBool(v, def = true) {
+  if (v === undefined || v === null) return def;
+  if (typeof v === "boolean") return v;
+  const s = String(v).toLowerCase();
+  return s === "true" || s === "1" || s === "yes";
+}
+function parseDateOrNull(s) {
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * GET /api/dashboard/summary
+ * Query:
+ *  - startDate, endDate (YYYY-MM-DD)
+ *  - category (ObjectId opcional)
+ *  - groupByMonth (true|false)
+ *
+ * Respuesta:
+ *  {
+ *    totalSales, totalOrders, totalItemsSold, totalUsers, aov, itemsPerOrder,
+ *    monthlySales: [{ period, total, orders, items }],
+ *    ordersByStatus: [{ status, count }],
+ *    topProducts: [{ productId, name, quantity, revenue }]
+ *  }
+ */
+exports.getSummary = async (req, res) => {
   try {
-    const { startDate, endDate, category, groupByMonth } = req.query;
-    const filters = {};
+    const { startDate, endDate, category } = req.query;
+    const groupByMonth = parseBool(req.query.groupByMonth, true);
 
-    if (startDate || endDate) {
-      filters.createdAt = {};
-      if (startDate) filters.createdAt.$gte = new Date(startDate);
-      if (endDate) filters.createdAt.$lte = new Date(endDate);
+    const from = parseDateOrNull(startDate);
+    const to = parseDateOrNull(endDate);
+    const matchOrder = {};
+    if (from || to) {
+      matchOrder.createdAt = {};
+      if (from) matchOrder.createdAt.$gte = from;
+      if (to) {
+        // incluir todo el día fin
+        const end = new Date(to);
+        end.setHours(23, 59, 59, 999);
+        matchOrder.createdAt.$lte = end;
+      }
     }
 
-    if (category) {
-      filters["items.category"] = new mongoose.Types.ObjectId(category);
-    }
+    const categoryFilter =
+      category && mongoose.Types.ObjectId.isValid(category)
+        ? new mongoose.Types.ObjectId(category)
+        : null;
 
-    const matchStage = { $match: filters };
-
-    // Total ventas, pedidos y productos vendidos
-    const totalStats = await Order.aggregate([
-      matchStage,
-      {
-        $group: {
-          _id: null,
-          totalSales: { $sum: "$total" },
-          totalOrders: { $sum: 1 },
-          totalItemsSold: { $sum: { $sum: "$items.quantity" } },
-        },
-      },
-    ]);
-
-    const summary = totalStats[0] || {
-      totalSales: 0,
-      totalOrders: 0,
-      totalItemsSold: 0,
-    };
-
-    summary.totalUsers = await mongoose.model("User").countDocuments();
-
-    // Ventas por mes
-    const monthlySales = await Order.aggregate([
-      matchStage,
-      {
-        $group: {
-          _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
-          },
-          total: { $sum: "$total" },
-        },
-      },
-      { $sort: { "_id.year": 1, "_id.month": 1 } },
-      {
-        $project: {
-          month: {
-            $concat: [
-              { $toString: "$_id.month" },
-              "-",
-              { $toString: "$_id.year" },
-            ],
-          },
-          total: 1,
-        },
-      },
-    ]);
-
-    // Pedidos por estado
-    const ordersByStatus = await Order.aggregate([
-      matchStage,
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-      { $project: { status: "$_id", count: 1, _id: 0 } },
-    ]);
-
-    // Productos más vendidos
-    const topProducts = await Order.aggregate([
-      matchStage,
+    // Base pipeline: órdenes en rango -> items -> join product (para filtrar categoría)
+    const pipeline = [
+      { $match: matchOrder },
       { $unwind: "$items" },
-      {
-        $group: {
-          _id: "$items.product",
-          quantity: { $sum: "$items.quantity" },
-        },
-      },
-      { $sort: { quantity: -1 } },
-      { $limit: 5 },
       {
         $lookup: {
           from: "products",
-          localField: "_id",
+          localField: "items.product",
           foreignField: "_id",
-          as: "product",
+          as: "productDoc",
         },
       },
-      { $unwind: "$product" },
-      { $project: { name: "$product.name", quantity: 1 } },
-    ]);
+      { $unwind: { path: "$productDoc", preserveNullAndEmptyArrays: true } },
+    ];
 
-    res.json({
-      ...summary,
-      monthlySales,
-      ordersByStatus,
-      topProducts,
+    if (categoryFilter) {
+      pipeline.push({ $match: { "productDoc.categories": categoryFilter } });
+    }
+
+    // Agrupación (ventas ignoran cancelados; pedidos totales y por estado no)
+    const periodFormat = groupByMonth ? "%Y-%m" : "%Y-%m-%d";
+
+    pipeline.push({
+      $facet: {
+        totals: [
+          { $match: { status: { $ne: "cancelado" } } },
+          {
+            $group: {
+              _id: null,
+              totalSales: {
+                $sum: { $multiply: ["$items.unitPrice", "$items.quantity"] },
+              },
+              totalItemsSold: { $sum: "$items.quantity" },
+              ordersSet: { $addToSet: "$_id" },
+              usersSet: { $addToSet: "$user" },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              totalSales: { $ifNull: ["$totalSales", 0] },
+              totalItemsSold: { $ifNull: ["$totalItemsSold", 0] },
+              totalOrders: { $size: "$ordersSet" },
+              totalUsers: { $size: "$usersSet" },
+            },
+          },
+        ],
+
+        monthlySales: [
+          { $match: { status: { $ne: "cancelado" } } },
+          {
+            $group: {
+              _id: {
+                period: {
+                  $dateToString: { format: periodFormat, date: "$createdAt" },
+                },
+              },
+              total: {
+                $sum: { $multiply: ["$items.unitPrice", "$items.quantity"] },
+              },
+              orders: { $addToSet: "$_id" },
+              items: { $sum: "$items.quantity" },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              period: "$_id.period",
+              total: 1,
+              orders: { $size: "$orders" },
+              items: 1,
+            },
+          },
+          { $sort: { period: 1 } },
+        ],
+
+        ordersByStatus: [
+          {
+            $group: {
+              _id: "$_id",
+              status: { $first: "$status" },
+            },
+          },
+          {
+            $group: {
+              _id: "$status",
+              count: { $sum: 1 },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              status: "$_id",
+              count: 1,
+            },
+          },
+          { $sort: { status: 1 } },
+        ],
+
+        topProducts: [
+          { $match: { status: { $ne: "cancelado" } } },
+          {
+            $group: {
+              _id: { id: "$productDoc._id", name: "$productDoc.name" },
+              quantity: { $sum: "$items.quantity" },
+              revenue: {
+                $sum: { $multiply: ["$items.unitPrice", "$items.quantity"] },
+              },
+            },
+          },
+          { $sort: { quantity: -1 } },
+          { $limit: 10 },
+          {
+            $project: {
+              _id: 0,
+              productId: "$_id.id",
+              name: "$_id.name",
+              quantity: 1,
+              revenue: 1,
+            },
+          },
+        ],
+      },
+    });
+
+    const [resAgg] = await Order.aggregate(pipeline);
+    const totals = (resAgg?.totals && resAgg.totals[0]) || {
+      totalSales: 0,
+      totalItemsSold: 0,
+      totalOrders: 0,
+      totalUsers: 0,
+    };
+
+    // KPIs derivados
+    const aov =
+      totals.totalOrders > 0 ? totals.totalSales / totals.totalOrders : 0;
+    const itemsPerOrder =
+      totals.totalOrders > 0 ? totals.totalItemsSold / totals.totalOrders : 0;
+
+    return res.json({
+      totalSales: Number(totals.totalSales.toFixed(2)),
+      totalOrders: totals.totalOrders,
+      totalItemsSold: totals.totalItemsSold,
+      totalUsers: totals.totalUsers,
+      aov: Number(aov.toFixed(2)),
+      itemsPerOrder: Number(itemsPerOrder.toFixed(2)),
+      monthlySales: resAgg?.monthlySales || [],
+      ordersByStatus: resAgg?.ordersByStatus || [],
+      topProducts: resAgg?.topProducts || [],
+      // tip: podrías devolver también currency y timezone si quieres formatear en front
+      currency: "USD",
     });
   } catch (err) {
-    console.error("Error en resumen del dashboard:", err);
-    res.status(500).json({ error: "Error al generar estadísticas" });
+    console.error("Error getSummary:", err);
+    return res.status(500).json({ error: "Error al obtener dashboard" });
   }
 };
-

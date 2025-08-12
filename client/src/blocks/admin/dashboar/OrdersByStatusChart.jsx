@@ -1,4 +1,12 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
 const OrdersByStatusChart = ({ data }) => {
   return (
@@ -8,9 +16,9 @@ const OrdersByStatusChart = ({ data }) => {
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="status" />
-          <YAxis />
+          <YAxis allowDecimals={false} />
           <Tooltip />
-          <Bar dataKey="count" fill="#10b981" />
+          <Bar dataKey="count" fill="#10b981" name="Pedidos" />
         </BarChart>
       </ResponsiveContainer>
     </div>

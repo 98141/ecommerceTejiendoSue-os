@@ -1,27 +1,61 @@
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
-const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7f50", "#00c49f"];
+const COLORS = [
+  "#6366f1",
+  "#22c55e",
+  "#f59e0b",
+  "#ef4444",
+  "#06b6d4",
+  "#84cc16",
+  "#a855f7",
+  "#10b981",
+  "#3b82f6",
+  "#f97316",
+];
 
-const TopProductsChart = ({ data }) => {
+const TopProductsChart = ({ data, currency = "USD" }) => {
+  const fmtMoney = (v) =>
+    new Intl.NumberFormat("es-CO", { style: "currency", currency }).format(
+      Number(v || 0)
+    );
+
+  const pieData = (data || []).map((d) => ({
+    name: d.name,
+    quantity: d.quantity,
+    revenue: d.revenue,
+    value: d.quantity, // se grafica por unidades
+  }));
+
   return (
     <div className="chart-block">
-      <h2>Productos Más Vendidos</h2>
+      <h2>Productos Más Vendidos (unidades)</h2>
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie
-            dataKey="quantity"
-            data={data}
+            dataKey="value"
+            data={pieData}
             cx="50%"
             cy="50%"
-            outerRadius={100}
-            fill="#8884d8"
-            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+            outerRadius={110}
+            label={({ name, value }) => `${name} (${value})`}
           >
-            {data.map((_, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            {pieData.map((_, i) => (
+              <Cell key={i} fill={COLORS[i % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip />
+          <Tooltip
+            formatter={(v, n, ctx) => {
+              const d = ctx?.payload;
+              return [`${v} uds · ${fmtMoney(d?.revenue || 0)}`, "Detalle"];
+            }}
+          />
           <Legend />
         </PieChart>
       </ResponsiveContainer>
