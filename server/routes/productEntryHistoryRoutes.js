@@ -6,8 +6,6 @@ const { verifyToken, isAdmin } = require("../middleware/auth");
 // Export (CSV/PDF)
 router.get("/history/export", verifyToken, isAdmin, ctrl.exportHistory);
 
-// Export (CSV/PDF)
-router.get("/history/export", verifyToken, isAdmin, ctrl.exportHistory);
 // Lista paginada + filtros
 router.get("/history", verifyToken, isAdmin, ctrl.listHistory);
 

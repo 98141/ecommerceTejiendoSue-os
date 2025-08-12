@@ -15,11 +15,22 @@ const ProductEntryHistorySchema = new mongoose.Schema({
   price: { type: Number, required: true, min: 0, index: true },
   images: { type: [String], default: [] },
 
-  // En tu proyecto hay UNA categoría por producto
+  // En tu proyecto se maneja UNA categoría por producto
   categories: { type: mongoose.Schema.Types.ObjectId, ref: "Category", index: true },
 
-  // Variantes (talla/color) con stock inicial
-  variants: { type: [VariantSnapshotSchema], default: [] }
+  // Variantes registradas en el evento
+  variants: { type: [VariantSnapshotSchema], default: [] },
+
+  // Tipo de evento
+  kind: {
+    type: String,
+    enum: ["CREATE", "UPDATE_VARIANTS", "UPDATE_PRICE", "UPDATE_INFO"],
+    default: "CREATE",
+    index: true
+  },
+
+  // Nota opcional
+  note: { type: String, default: "" }
 }, { timestamps: true });
 
 ProductEntryHistorySchema.index({ createdAt: -1 });

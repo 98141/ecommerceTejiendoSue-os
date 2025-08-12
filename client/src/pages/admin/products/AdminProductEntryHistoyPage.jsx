@@ -7,6 +7,16 @@ import ExportMenu from "../../../components/ExportMenu";
 
 const canExport = (role) => role === "admin";
 
+const eventLabel = (kind) => {
+  switch (kind) {
+    case "CREATE": return "Creación";
+    case "UPDATE_VARIANTS": return "Nuevas variantes";
+    case "UPDATE_PRICE": return "Cambio de precio";
+    case "UPDATE_INFO": return "Actualización";
+    default: return kind || "—";
+  }
+};
+
 export default function AdminProductEntryHistoryPage() {
   const { user } = useContext(AuthContext);
   const { data, total, loading, error, query, setQuery } = useProductEntryHistory({ limit: 10 });
@@ -52,6 +62,7 @@ export default function AdminProductEntryHistoryPage() {
           <thead>
             <tr>
               <th>Fecha</th>
+              <th>Evento</th>
               <th>Nombre</th>
               <th>Precio</th>
               <th># Variantes</th>
@@ -59,12 +70,13 @@ export default function AdminProductEntryHistoryPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={5}>Cargando…</td></tr>}
-            {!loading && error && <tr><td colSpan={5} className="error">{error}</td></tr>}
-            {!loading && !error && data.length === 0 && <tr><td colSpan={5}>Sin resultados</td></tr>}
+            {loading && <tr><td colSpan={6}>Cargando…</td></tr>}
+            {!loading && error && <tr><td colSpan={6} className="error">{error}</td></tr>}
+            {!loading && !error && data.length === 0 && <tr><td colSpan={6}>Sin resultados</td></tr>}
             {!loading && !error && data.map((row) => (
               <tr key={row._id}>
                 <td>{new Date(row.createdAt).toLocaleString()}</td>
+                <td>{eventLabel(row.kind)}</td>
                 <td>{row.name}</td>
                 <td>{formatCOP(row.price)}</td>
                 <td>{row.variants?.length || 0}</td>
@@ -91,3 +103,4 @@ export default function AdminProductEntryHistoryPage() {
     </div>
   );
 }
+

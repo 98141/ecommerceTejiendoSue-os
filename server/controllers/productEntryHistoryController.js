@@ -1,4 +1,3 @@
-// controllers/productEntryHistoryController.js
 const mongoose = require("mongoose");
 const PDFDocument = require("pdfkit");
 const ProductEntryHistory = require("../models/ProductEntryHistory");
@@ -43,13 +42,23 @@ function formatDate(d) {
   try { return new Date(d).toLocaleString("es-CO"); } catch { return ""; }
 }
 
+function kindLabel(kind) {
+  switch (kind) {
+    case "CREATE": return "Creación";
+    case "UPDATE_VARIANTS": return "Nuevas variantes";
+    case "UPDATE_PRICE": return "Cambio de precio";
+    case "UPDATE_INFO": return "Actualización";
+    default: return kind || "—";
+  }
+}
+
 // ----------------- Listado paginado -----------------
 exports.listHistory = async (req, res) => {
   try {
     const { page, limit, sort } = parsePaginationAndSort(req.query);
     const filter = buildFilter(req.query);
 
-    const selectList = "name price categories createdAt variants";
+    const selectList = "name price categories createdAt variants kind note";
     const [items, total] = await Promise.all([
       ProductEntryHistory.find(filter)
         .select(selectList)
@@ -77,6 +86,7 @@ exports.getHistoryById = async (req, res) => {
     if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "ID inválido" });
 
     const item = await ProductEntryHistory.findById(id)
+      .select("name price categories createdAt variants kind note")
       .populate("categories", "name")
       .populate("variants.size", "label")
       .populate("variants.color", "name")
@@ -90,21 +100,20 @@ exports.getHistoryById = async (req, res) => {
   }
 };
 
-// ----------------- Exportar CSV / PDF (con variantes) -----------------
+// ----------------- Exportar CSV / PDF (con variantes + Evento) -----------------
 exports.exportHistory = async (req, res) => {
   try {
     const filter = buildFilter(req.query);
     const sort = { createdAt: -1 };
 
     const items = await ProductEntryHistory.find(filter)
-      .select("name price categories createdAt variants")
+      .select("name price categories createdAt variants kind note")
       .populate("categories", "name")
       .populate("variants.size", "label")
       .populate("variants.color", "name")
       .sort(sort)
       .lean();
 
-    // Límite por filas reales (una por variante; si no tiene variantes, 1 fila)
     const rowCount = items.reduce((acc, it) => acc + Math.max(1, (it.variants || []).length), 0);
     const MAX_ROWS = 20000;
     if (rowCount > MAX_ROWS) {
@@ -115,7 +124,7 @@ exports.exportHistory = async (req, res) => {
 
     const format = String(req.query.format || "csv").toLowerCase();
 
-    // ----------------- PDF -----------------
+    // -------- PDF --------
     if (format === "pdf") {
       const now = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
       res.setHeader("Content-Type", "application/pdf");
@@ -132,7 +141,7 @@ exports.exportHistory = async (req, res) => {
       doc.fillColor("#000");
       doc.moveDown(0.8);
 
-      // Columnas de la tabla de variantes
+      // Columnas variantes
       const COL1_X = MARGIN;        // Talla
       const COL2_X = MARGIN + 220;  // Color
       const COL3_X = MARGIN + 400;  // Stock
@@ -141,29 +150,27 @@ exports.exportHistory = async (req, res) => {
       const ensurePageSpace = (rowsNeeded = 1) => {
         const needed = rowsNeeded * (doc.currentLineHeight() + LINE_GAP) + 12;
         const available = doc.page.height - MARGIN - doc.y;
-        if (available < needed) {
-          doc.addPage();
-        }
+        if (available < needed) doc.addPage();
       };
 
       items.forEach((it, idx) => {
         const catName = it.categories?.name || (typeof it.categories === "string" ? it.categories : "—");
         const vars = Array.isArray(it.variants) ? it.variants : [];
+        const evt = kindLabel(it.kind);
+        const note = it.note ? ` | Nota: ${it.note}` : "";
 
         // Encabezado del producto
-        ensurePageSpace(3);
+        ensurePageSpace(4);
         doc.font("Helvetica-Bold").fontSize(11).text(`${formatDate(it.createdAt)} — ${it.name}`);
         doc.font("Helvetica").fontSize(10)
-          .text(`Precio: ${it.price}`, { continued: true })
-          .text(`   |   Categoría: ${catName}`, { continued: true })
-          .text(`   |   # Variantes: ${vars.length}`);
+          .text(`Evento: ${evt}${note}`)
+          .text(`Precio: ${it.price}   |   Categoría: ${catName}   |   # Variantes: ${vars.length}`);
         doc.moveDown(0.4);
 
         // Tabla de variantes
-        // Si no tiene variantes, imprimimos fila vacía (—, —, 0)
         const rows = vars.length > 0 ? vars : [{ size: null, color: null, initialStock: 0 }];
 
-        // Header de tabla
+        // Header tabla
         ensurePageSpace(2);
         const startY = doc.y;
         doc.font("Helvetica-Bold");
@@ -185,7 +192,6 @@ exports.exportHistory = async (req, res) => {
 
           if (y + doc.currentLineHeight() + LINE_GAP > doc.page.height - MARGIN) {
             doc.addPage();
-            // Repetir header
             const newStartY = MARGIN;
             doc.font("Helvetica-Bold");
             doc.text("Talla", COL1_X, newStartY);
@@ -208,7 +214,7 @@ exports.exportHistory = async (req, res) => {
         doc.y = y;
         doc.moveDown(0.4);
 
-        // Separador entre productos
+        // Separador
         if (idx < items.length - 1) {
           ensurePageSpace(1);
           const ySep = doc.y;
@@ -222,37 +228,41 @@ exports.exportHistory = async (req, res) => {
       return;
     }
 
-    // ----------------- CSV (una fila por variante) -----------------
+    // -------- CSV (una fila por variante + Evento) --------
     const now = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="historial_${now}.csv"`);
 
-    // Encabezados
     const headers = [
       "Fecha",
       "Nombre",
       "Precio",
       "Categoría",
+      "Evento",
       "Talla",
       "Color",
       "Stock inicial",
+      "Nota",
     ];
     let csv = headers.map(csvEscape).join(",") + "\n";
 
     for (const it of items) {
       const catName = it.categories?.name || (typeof it.categories === "string" ? it.categories : "—");
       const vars = Array.isArray(it.variants) ? it.variants : [];
+      const evt = kindLabel(it.kind);
+      const note = it.note || "";
 
       if (vars.length === 0) {
-        // Fila única sin variantes
         const row = [
           formatDate(it.createdAt),
           it.name,
           it.price,
           catName,
+          evt,
           "—",
           "—",
           0,
+          note,
         ];
         csv += row.map(csvEscape).join(",") + "\n";
         continue;
@@ -264,9 +274,11 @@ exports.exportHistory = async (req, res) => {
           it.name,
           it.price,
           catName,
+          evt,
           v.size?.label || "—",
           v.color?.name || "—",
           v.initialStock ?? 0,
+          note,
         ];
         csv += row.map(csvEscape).join(",") + "\n";
       }
