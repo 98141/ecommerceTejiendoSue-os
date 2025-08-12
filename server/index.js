@@ -14,6 +14,7 @@ const sizeRoutes = require("./routes/sizeRoutes");
 const colorRoutes = require("./routes/colorRoutes");
 const visitRoutes = require("./routes/visitRouter");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const productEntryHistoryRoutes = require("./routes/productEntryHistoryRoutes");
 
 const ensureUploadsFolderExists = require("./utils/products");
 
@@ -36,11 +37,11 @@ io.on("connection", (socket) => {
 
 const corsOptions = {
   // origen frontend exacto
-  origin: "http://localhost:5173", 
+  origin: "http://localhost:5173",
   // permite envío de cookies
-  credentials: true, 
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
-  allowedHeaders: ["Content-Type", "Authorization"], 
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
@@ -52,6 +53,7 @@ ensureUploadsFolderExists();
 app.use("/uploads/products", express.static("uploads/products"));
 
 app.use("/api/users", userRoutes);
+app.use("/api/productsHistory", productEntryHistoryRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/messages", messageRoutes);
