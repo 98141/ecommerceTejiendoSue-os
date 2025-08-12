@@ -1,4 +1,7 @@
-const express = require('express');
+const express = require("express");
+const rateLimit = require("express-rate-limit");
+const { verifyToken, isAdmin } = require("../middleware/auth");
+
 const {
   createOrder,
   getMyOrders,
@@ -7,21 +10,31 @@ const {
   getOrderById,
   updateOrder,
   cancelOrder,
-  getAllOrderIds
-
-} = require('../controllers/orderController');
-const { verifyToken, isAdmin } = require('../middleware/auth');
+  getAllOrderIds,
+  getGlobalSalesHistory,
+} = require("../controllers/orderController");
 
 const router = express.Router();
 
-router.post('/', verifyToken, createOrder); // Crear pedido
-router.get('/my', verifyToken, getMyOrders); // Ver mis pedidos
-router.get('/', verifyToken, isAdmin, getAllOrders); // Admin: ver todos
-router.put("/orders/:id", verifyToken, isAdmin, updateOrder); // Admin: actualizar pedido
-router.put('/:id', verifyToken, isAdmin, updateOrderStatus); // Admin: cambiar estado
-router.get("/:id", verifyToken, isAdmin, getOrderById); // Admin: ver detalle de pedido por ID
+const orderLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 80,
+  message: "Demasiadas solicitudes, intenta más tarde.",
+});
 
-router.put("/cancel/:id", verifyToken, isAdmin, cancelOrder); // Admin: cancelar pedido
-router.get("/ids/all", verifyToken, isAdmin, getAllOrderIds);
+// Listado admin y reportes
+router.get("/", verifyToken, isAdmin, getAllOrders);
+router.get("/sales-history", orderLimiter, verifyToken, isAdmin, getGlobalSalesHistory);
+router.get("/ids", verifyToken, isAdmin, getAllOrderIds);
+
+// Usuario autenticado
+router.get("/my", verifyToken, getMyOrders);
+
+// CRUD/acciones sobre una orden
+router.get("/:id", verifyToken, isAdmin, getOrderById);
+router.post("/", orderLimiter, verifyToken, createOrder);
+router.put("/:id", orderLimiter, verifyToken, isAdmin, updateOrder);
+router.patch("/:id/status", verifyToken, isAdmin, updateOrderStatus);
+router.post("/:id/cancel", verifyToken, isAdmin, cancelOrder);
 
 module.exports = router;

@@ -1,15 +1,16 @@
+// pages/admin/products/AdminProductHistoryPage.jsx
 import React, { useEffect, useState, useContext, useMemo } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../../contexts/AuthContext";
 import { useToast } from "../../../contexts/ToastContext";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable"; // 👈 Importar la función (NO como side-effect)
 import * as XLSX from "xlsx";
 
 const API = "http://localhost:5000/api";
 
-const ProductHistoryPage = () => {
+const AdminProductHistoryPage = () => {
   const { id } = useParams();
   const { token } = useContext(AuthContext);
   const { showToast } = useToast();
@@ -19,18 +20,19 @@ const ProductHistoryPage = () => {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Filtros simples
+  // Filtros
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [status, setStatus] = useState(""); // ACTIVE | DELETED | ""
   const [variantKey, setVariantKey] = useState("");
 
-  const authHeaders = useMemo(() => ({
-    headers: { Authorization: `Bearer ${token}` }
-  }), [token]);
+  const authHeaders = useMemo(
+    () => ({ headers: { Authorization: `Bearer ${token}` } }),
+    [token]
+  );
 
   useEffect(() => {
-    void loadData();
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -44,11 +46,17 @@ const ProductHistoryPage = () => {
       if (opts.variantKey) params.append("variantKey", opts.variantKey);
 
       const [leg, sal] = await Promise.all([
-        axios.get(`${API}/products/${id}/ledger?${params.toString()}`, authHeaders),
-        axios.get(`${API}/products/${id}/sales-history?${params.toString()}`, authHeaders),
+        axios.get(
+          `${API}/products/${id}/ledger?${params.toString()}`,
+          authHeaders
+        ),
+        axios.get(
+          `${API}/products/${id}/sales-history?${params.toString()}`,
+          authHeaders
+        ),
       ]);
-      setLedger(leg.data || []);
-      setSales(sal.data || []);
+      setLedger(Array.isArray(leg.data) ? leg.data : []);
+      setSales(Array.isArray(sal.data) ? sal.data : []);
     } catch (e) {
       showToast("Error al obtener historiales", "error");
     } finally {
@@ -60,96 +68,154 @@ const ProductHistoryPage = () => {
     loadData({ from, to, status, variantKey });
   };
 
-  const toLocal = (d) => new Date(d).toLocaleString();
+  const toLocal = (d) => (d ? new Date(d).toLocaleString() : "");
 
-  // ===== Exportaciones =====
+  // ===================== EXPORTS =====================
   const exportLedgerPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Historial por Variante (Libro Mayor)", 14, 14);
-    const rows = ledger.map(r => ([
-      toLocal(r.createdAt),
-      r.eventType,
-      `${r.sizeLabelSnapshot} / ${r.colorNameSnapshot}`,
-      r.prevStock ?? "",
-      r.newStock ?? "",
-      r.status,
-      r.priceSnapshot ?? "",
-      r.note || ""
-    ]));
-    doc.autoTable({
-      startY: 20,
-      head: [["Fecha","Evento","Variante","Stock previo","Stock nuevo","Estado","Precio (snap)","Nota"]],
-      body: rows
-    });
-    doc.save("historial_variantes.pdf");
+    try {
+      const doc = new jsPDF();
+      doc.text("Historial por Variante (Libro Mayor)", 14, 14);
+
+      const head = [
+        [
+          "Fecha",
+          "Evento",
+          "Variante",
+          "Stock previo",
+          "Stock nuevo",
+          "Estado",
+          "Precio (snap)",
+          "Nota",
+        ],
+      ];
+      const body = (ledger || []).map((r) => [
+        toLocal(r.createdAt),
+        r.eventType || "",
+        `${r.sizeLabelSnapshot || "?"} / ${r.colorNameSnapshot || "?"}`,
+        r.prevStock ?? "",
+        r.newStock ?? "",
+        r.status || "",
+        typeof r.priceSnapshot === "number"
+          ? r.priceSnapshot
+          : r.priceSnapshot || "",
+        r.note || "",
+      ]);
+
+      autoTable(doc, {
+        startY: 20,
+        head,
+        body,
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [240, 240, 240] },
+        didDrawPage: (data) => {
+          // puedes agregar número de página, fecha, etc.
+        },
+      });
+
+      doc.save(`historial_variantes_${id}.pdf`);
+    } catch (e) {
+      console.error(e);
+      showToast("No se pudo exportar el PDF de variantes", "error");
+    }
   };
 
   const exportSalesPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Historial de Ventas del Producto", 14, 14);
-    const rows = sales.map(s => ([
-      toLocal(s.date),
-      `${s.sizeLabel} / ${s.colorName}`,
-      s.unitPrice,
-      s.quantity,
-      s.total
-    ]));
-    doc.autoTable({
-      startY: 20,
-      head: [["Fecha","Variante","Precio unit.","Cantidad","Total"]],
-      body: rows
-    });
-    doc.save("historial_ventas.pdf");
+    try {
+      const doc = new jsPDF();
+      doc.text("Historial de Ventas del Producto", 14, 14);
+
+      const head = [["Fecha", "Variante", "Precio unit.", "Cantidad", "Total"]];
+      const body = (sales || []).map((s) => [
+        toLocal(s.date),
+        `${s.sizeLabel || "?"} / ${s.colorName || "?"}`,
+        typeof s.unitPrice === "number" ? s.unitPrice : s.unitPrice || 0,
+        s.quantity ?? 0,
+        typeof s.total === "number" ? s.total : s.total || 0,
+      ]);
+
+      autoTable(doc, {
+        startY: 20,
+        head,
+        body,
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [240, 240, 240] },
+      });
+
+      doc.save(`historial_ventas_${id}.pdf`);
+    } catch (e) {
+      console.error(e);
+      showToast("No se pudo exportar el PDF de ventas", "error");
+    }
   };
 
   const exportLedgerCSV = () => {
-    const ws = XLSX.utils.json_to_sheet(ledger.map(r => ({
+    const rows = (ledger || []).map((r) => ({
       fecha: toLocal(r.createdAt),
-      evento: r.eventType,
-      variante: `${r.sizeLabelSnapshot} / ${r.colorNameSnapshot}`,
+      evento: r.eventType || "",
+      variante: `${r.sizeLabelSnapshot || "?"} / ${r.colorNameSnapshot || "?"}`,
       stock_prev: r.prevStock ?? "",
       stock_nuevo: r.newStock ?? "",
-      estado: r.status,
-      precio_snapshot: r.priceSnapshot ?? "",
-      nota: r.note || ""
-    })));
+      estado: r.status || "",
+      precio_snapshot:
+        typeof r.priceSnapshot === "number"
+          ? r.priceSnapshot
+          : r.priceSnapshot || "",
+      nota: r.note || "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ledger");
-    XLSX.writeFile(wb, "historial_variantes.csv");
+    XLSX.writeFile(wb, `historial_variantes_${id}.csv`);
   };
 
   const exportSalesCSV = () => {
-    const ws = XLSX.utils.json_to_sheet(sales.map(s => ({
+    const rows = (sales || []).map((s) => ({
       fecha: toLocal(s.date),
-      variante: `${s.sizeLabel} / ${s.colorName}`,
-      precio_unitario: s.unitPrice,
-      cantidad: s.quantity,
-      total: s.total
-    })));
+      variante: `${s.sizeLabel || "?"} / ${s.colorName || "?"}`,
+      precio_unitario:
+        typeof s.unitPrice === "number" ? s.unitPrice : s.unitPrice || 0,
+      cantidad: s.quantity ?? 0,
+      total: typeof s.total === "number" ? s.total : s.total || 0,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ventas");
-    XLSX.writeFile(wb, "historial_ventas.csv");
+    XLSX.writeFile(wb, `historial_ventas_${id}.csv`);
   };
 
+  // ===================== UI =====================
   return (
     <div className="history-container">
       <div className="header-row">
         <h2>Historial del producto</h2>
-        <button className="btn-back" onClick={() => navigate("/admin/products")}>← Volver</button>
+        <button
+          className="btn-back"
+          onClick={() => navigate("/admin/products")}
+        >
+          ← Volver
+        </button>
       </div>
 
       <div className="filters">
         <label>
           Desde:
-          <input type="date" value={from} onChange={e => setFrom(e.target.value)} />
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+          />
         </label>
         <label>
           Hasta:
-          <input type="date" value={to} onChange={e => setTo(e.target.value)} />
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+          />
         </label>
         <label>
           Estado:
-          <select value={status} onChange={e => setStatus(e.target.value)}>
+          <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Todos</option>
             <option value="ACTIVE">Activo</option>
             <option value="DELETED">Eliminado</option>
@@ -157,19 +223,31 @@ const ProductHistoryPage = () => {
         </label>
         <label>
           Variante (key):
-          <input placeholder="sizeId::colorId" value={variantKey} onChange={e => setVariantKey(e.target.value)} />
+          <input
+            placeholder="sizeId::colorId"
+            value={variantKey}
+            onChange={(e) => setVariantKey(e.target.value)}
+          />
         </label>
-        <button className="btn" onClick={onApplyFilters}>Aplicar filtros</button>
+        <button className="btn" onClick={onApplyFilters}>
+          Aplicar filtros
+        </button>
       </div>
 
-      {loading ? <p>Cargando...</p> : (
+      {loading ? (
+        <p>Cargando...</p>
+      ) : (
         <>
           <section className="card">
             <div className="card-header">
               <h3>Historial por Variante (stock/estado)</h3>
               <div className="actions">
-                <button onClick={exportLedgerPDF} className="btn">Exportar PDF</button>
-                <button onClick={exportLedgerCSV} className="btn">Exportar CSV</button>
+                <button onClick={exportLedgerPDF} className="btn">
+                  Exportar PDF
+                </button>
+                <button onClick={exportLedgerCSV} className="btn">
+                  Exportar CSV
+                </button>
               </div>
             </div>
             <table className="history-table">
@@ -187,19 +265,31 @@ const ProductHistoryPage = () => {
               </thead>
               <tbody>
                 {ledger.length === 0 ? (
-                  <tr><td colSpan="8">Sin registros.</td></tr>
-                ) : ledger.map((r) => (
-                  <tr key={r._id}>
-                    <td>{toLocal(r.createdAt)}</td>
-                    <td>{r.eventType}</td>
-                    <td>{r.sizeLabelSnapshot} / {r.colorNameSnapshot}</td>
-                    <td>{r.prevStock ?? ""}</td>
-                    <td>{r.newStock ?? ""}</td>
-                    <td>{r.status}</td>
-                    <td>{r.priceSnapshot ?? ""}</td>
-                    <td>{r.note || ""}</td>
+                  <tr>
+                    <td colSpan="8">Sin registros.</td>
                   </tr>
-                ))}
+                ) : (
+                  ledger.map((r) => (
+                    <tr key={r._id}>
+                      <td>{toLocal(r.createdAt)}</td>
+                      <td>{r.eventType}</td>
+                      <td>
+                        {(r.sizeLabelSnapshot || "?") +
+                          " / " +
+                          (r.colorNameSnapshot || "?")}
+                      </td>
+                      <td>{r.prevStock ?? ""}</td>
+                      <td>{r.newStock ?? ""}</td>
+                      <td>{r.status}</td>
+                      <td>
+                        {typeof r.priceSnapshot === "number"
+                          ? r.priceSnapshot
+                          : r.priceSnapshot || ""}
+                      </td>
+                      <td>{r.note || ""}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </section>
@@ -208,8 +298,12 @@ const ProductHistoryPage = () => {
             <div className="card-header">
               <h3>Historial de Ventas</h3>
               <div className="actions">
-                <button onClick={exportSalesPDF} className="btn">Exportar PDF</button>
-                <button onClick={exportSalesCSV} className="btn">Exportar CSV</button>
+                <button onClick={exportSalesPDF} className="btn">
+                  Exportar PDF
+                </button>
+                <button onClick={exportSalesCSV} className="btn">
+                  Exportar CSV
+                </button>
               </div>
             </div>
             <table className="history-table">
@@ -224,16 +318,28 @@ const ProductHistoryPage = () => {
               </thead>
               <tbody>
                 {sales.length === 0 ? (
-                  <tr><td colSpan="5">Sin ventas registradas.</td></tr>
-                ) : sales.map((s, idx) => (
-                  <tr key={idx}>
-                    <td>{toLocal(s.date)}</td>
-                    <td>{s.sizeLabel} / {s.colorName}</td>
-                    <td>{s.unitPrice}</td>
-                    <td>{s.quantity}</td>
-                    <td>{s.total}</td>
+                  <tr>
+                    <td colSpan="5">Sin ventas registradas.</td>
                   </tr>
-                ))}
+                ) : (
+                  sales.map((s, idx) => (
+                    <tr key={idx}>
+                      <td>{toLocal(s.date)}</td>
+                      <td>
+                        {(s.sizeLabel || "?") + " / " + (s.colorName || "?")}
+                      </td>
+                      <td>
+                        {typeof s.unitPrice === "number"
+                          ? s.unitPrice
+                          : s.unitPrice || 0}
+                      </td>
+                      <td>{s.quantity ?? 0}</td>
+                      <td>
+                        {typeof s.total === "number" ? s.total : s.total || 0}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </section>
@@ -243,4 +349,4 @@ const ProductHistoryPage = () => {
   );
 };
 
-export default ProductHistoryPage;
+export default AdminProductHistoryPage;
