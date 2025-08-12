@@ -6,18 +6,38 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  Legend,
 } from "recharts";
 
-const MonthlySalesChart = ({ data, currency = "USD" }) => {
+function alignSeries(current = [], previous = []) {
+  const mapCurr = new Map(current.map((d) => [d.period, d.total]));
+  const mapPrev = new Map(previous.map((d) => [d.period, d.total]));
+  const keys = new Set([...mapCurr.keys(), ...mapPrev.keys()]);
+  const arr = [...keys].sort().map((k) => ({
+    period: k,
+    current: Number(mapCurr.get(k) || 0),
+    previous: Number(mapPrev.get(k) || 0),
+  }));
+  return arr;
+}
+
+const MonthlySalesChart = ({
+  current,
+  previous,
+  currency = "USD",
+  groupByMonth,
+}) => {
+  const data = alignSeries(current, previous);
   const fmtMoney = (v) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency }).format(
       Number(v || 0)
     );
+  const label = groupByMonth ? "Ventas por mes" : "Ventas por día";
 
   return (
     <div className="chart-block">
-      <h2>Ventas por período</h2>
-      <ResponsiveContainer width="100%" height={300}>
+      <h2>{label}</h2>
+      <ResponsiveContainer width="100%" height={320}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="period" />
@@ -26,7 +46,9 @@ const MonthlySalesChart = ({ data, currency = "USD" }) => {
             formatter={(v) => fmtMoney(v)}
             labelFormatter={(l) => `Período: ${l}`}
           />
-          <Bar dataKey="total" fill="#3b82f6" name="Ventas" />
+          <Legend />
+          <Bar dataKey="current" name="Actual" fill="#3b82f6" />
+          <Bar dataKey="previous" name="Anterior" fill="#94a3b8" />
         </BarChart>
       </ResponsiveContainer>
     </div>

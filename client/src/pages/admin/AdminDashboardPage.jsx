@@ -52,7 +52,12 @@ const AdminDashboardPage = () => {
       <DashboardHeaderBlock />
       <DashboardFilters onFilterChange={setFilters} />
       <SummaryCardsBlock summary={stats} />
-      <MonthlySalesChart data={stats.monthlySales || []} currency={stats.currency || "USD"} />
+      <MonthlySalesChart
+        current={stats.monthlySales || []}
+        previous={(stats.prev && stats.prev.monthlySales) || []}
+        currency={stats.currency || "USD"}
+        groupByMonth={stats.range?.groupByMonth}
+      />
       <TopProductsChart data={stats.topProducts || []} currency={stats.currency || "USD"} />
       <OrdersByStatusChart data={stats.ordersByStatus || []} />
     </div>

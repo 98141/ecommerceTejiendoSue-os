@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
+const { clearDashboardCache } = require("./dashboardController");
 
 // Clave lógica de ítem (para comparar por variante)
 const itemKey = (i) =>
@@ -110,6 +111,9 @@ exports.createOrder = async (req, res) => {
         { session }
       );
 
+      // 🔄 Invalida caché del dashboard (nuevos datos)
+      clearDashboardCache();
+
       res.status(201).json(order);
     });
   } catch (err) {
@@ -166,6 +170,10 @@ exports.updateOrderStatus = async (req, res) => {
       { new: true }
     );
     if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
+
+    // 🔄 Invalida caché del dashboard (cambio de estado)
+    clearDashboardCache();
+
     res.json(order);
   } catch (err) {
     console.error("Error updateOrderStatus:", err);
@@ -366,6 +374,10 @@ exports.updateOrder = async (req, res) => {
       order.total = Number(newTotal.toFixed(2));
 
       await order.save({ session });
+
+      // 🔄 Invalida caché del dashboard (edición de orden)
+      clearDashboardCache();
+
       res.json({ message: "Pedido actualizado con control de stock", order });
     });
   } catch (error) {
@@ -411,6 +423,10 @@ exports.cancelOrder = async (req, res) => {
 
       order.status = "cancelado";
       await order.save({ session });
+
+      // 🔄 Invalida caché del dashboard (cancelación)
+      clearDashboardCache();
+
       res.json({ message: "Pedido cancelado y stock restablecido", order });
     });
   } catch (err) {
