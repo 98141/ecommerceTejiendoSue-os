@@ -119,11 +119,12 @@ const AdminOrderDetailPage = () => {
 
   const exportSingleOrderToPDF = () => {
     const doc = new jsPDF();
-    doc.text(`Factura de Pedido`, 14, 14);
+    doc.text(`Factura de Pedido`, 50, 14);
     doc.text(`ID del pedido: ${order._id}`, 14, 24);
-    doc.text(`Usuario: ${order.user?.email || "N/A"}`, 14, 32);
-    doc.text(`Fecha: ${new Date(order.createdAt).toLocaleString()}`, 14, 40);
-    doc.text(`Estado: ${order.status}`, 14, 48);
+    doc.text(`Usuario Nombre: ${order.user?.name || "N/A"}`, 14, 32);
+    doc.text(`Usuario Correo: ${order.user?.email || "N/A"}`, 14, 40);
+    doc.text(`Fecha: ${new Date(order.createdAt).toLocaleString()}`, 14, 48);
+    doc.text(`Estado: ${order.status}`, 14, 56);
 
     if (order.trackingNumber) {
       doc.text(`Guía: ${order.trackingNumber}`, 14, 56);
@@ -175,9 +176,15 @@ const AdminOrderDetailPage = () => {
         </h3>
         <p>
           <strong>
-            <FaUser /> Usuario:
+            <FaUser /> Usuario Email:
           </strong>{" "}
           {order.user?.email}
+        </p>
+        <p>
+          <strong>
+            Usuario Nombre:
+          </strong>{" "}
+          {order.user?.name}
         </p>
         <p>
           <strong>Estado actual:</strong> {order.status}

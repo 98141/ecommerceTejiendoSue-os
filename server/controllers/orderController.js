@@ -19,19 +19,18 @@ function effectivePrice(product) {
   }
 }
 
-/** ========================== CREATE ========================== */
+/** ========================== CREATE (sin transacciones) ========================== */
 exports.createOrder = async (req, res) => {
-  const session = await mongoose.startSession();
+  // NOTA: sin sesiones/transacciones; usamos updates atómicos + compensación
+  const compensations = []; // para revertir en caso de error
   try {
-    const { items } = req.body;
+    const { items, shippingInfo } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
-      return res
-        .status(400)
-        .json({ error: "Debes incluir al menos un producto" });
+      return res.status(400).json({ error: "Debes incluir al menos un producto" });
     }
 
-    // Normaliza payload
+    // Normaliza/valida payload
     const normalizedItems = [];
     for (const item of items) {
       const productId = item.product;
@@ -40,87 +39,115 @@ exports.createOrder = async (req, res) => {
       const qty = Number(item.quantity) || 0;
 
       if (!productId || !sizeId || !colorId || qty <= 0) {
-        return res
-          .status(400)
-          .json({ error: "Datos incompletos o inválidos en uno de los ítems" });
+        return res.status(400).json({ error: "Datos inválidos en uno de los ítems" });
       }
-      normalizedItems.push({
-        product: productId,
-        size: sizeId,
-        color: colorId,
-        quantity: qty,
+      normalizedItems.push({ product: productId, size: sizeId, color: colorId, quantity: qty });
+    }
+
+    // Prepara snapshots y descuentos atómicos por variante
+    let total = 0;
+    const itemsToSave = [];
+
+    for (const it of normalizedItems) {
+      // Trae SOLO la variante coincidente para conocer stock actual y nombre/precio
+      const prodDoc = await Product.findOne(
+        { _id: it.product, "variants.size": it.size, "variants.color": it.color },
+        { name: 1, price: 1, "variants.$": 1 } // proyecta solo variante
+      );
+
+      if (!prodDoc || !prodDoc.variants || !prodDoc.variants[0]) {
+        throw new Error("Variante no disponible para el producto seleccionado");
+      }
+
+      const variant = prodDoc.variants[0];
+      const stockBefore = Number(variant.stock) || 0;
+      if (stockBefore < it.quantity) {
+        throw new Error(`Stock insuficiente para ${prodDoc.name}. Disponible: ${stockBefore}`);
+      }
+
+      // Descuento atómico de stock (protege contra carreras)
+      const dec = await Product.updateOne(
+        {
+          _id: it.product,
+          variants: {
+            $elemMatch: {
+              size: it.size,
+              color: it.color,
+              stock: { $gte: it.quantity }, // asegura stock suficiente en el mismo paso
+            },
+          },
+        },
+        { $inc: { "variants.$.stock": -it.quantity } }
+      );
+
+      if (!dec.modifiedCount) {
+        // Otra operación consumió el stock en medio → abortar
+        throw new Error(`Stock insuficiente (carrera) para ${prodDoc.name}.`);
+      }
+
+      // Registra compensación por si hay que revertir más adelante
+      compensations.push({
+        product: it.product,
+        size: it.size,
+        color: it.color,
+        qty: it.quantity,
+      });
+
+      const unitPrice = effectivePrice(prodDoc);
+      const stockAfter = stockBefore - it.quantity;
+
+      total += unitPrice * it.quantity;
+      itemsToSave.push({
+        product: it.product,
+        size: it.size,
+        color: it.color,
+        quantity: it.quantity,
+        unitPrice,
+        stockBeforePurchase: stockBefore,
+        stockAtPurchase: stockAfter,
       });
     }
 
-    await session.withTransaction(async () => {
-      let total = 0;
-      const itemsToSave = [];
-
-      for (const it of normalizedItems) {
-        const product = await Product.findById(it.product).session(session);
-        if (!product)
-          throw new Error(`Producto con ID ${it.product} no encontrado`);
-
-        // Variante exacta
-        const vIndex = product.variants.findIndex(
-          (v) =>
-            String(v.size) === String(it.size) &&
-            String(v.color) === String(it.color)
-        );
-        if (vIndex === -1)
-          throw new Error(
-            `Variante no disponible para el producto: ${product.name}`
-          );
-
-        // Stock
-        const stockBefore = Number(product.variants[vIndex].stock) || 0;
-        if (stockBefore < it.quantity) {
-          throw new Error(
-            `Stock insuficiente para ${product.name}. Disponible: ${stockBefore}`
-          );
-        }
-
-        const stockAfter = stockBefore - it.quantity;
-        product.variants[vIndex].stock = stockAfter;
-        await product.save({ session });
-
-        // Precio efectivo (snapshot)
-        const unitPrice = effectivePrice(product);
-
-        total += unitPrice * it.quantity;
-        itemsToSave.push({
-          product: it.product,
-          size: it.size,
-          color: it.color,
-          quantity: it.quantity,
-          unitPrice,
-          stockBeforePurchase: stockBefore,
-          stockAtPurchase: stockAfter, // snapshot fijo
-        });
-      }
-
-      const [order] = await Order.create(
-        [
-          {
-            user: req.user.id,
-            items: itemsToSave,
-            total,
-            status: "pendiente",
-          },
-        ],
-        { session }
-      );
-
-      // 🔄 Invalida caché del dashboard (nuevos datos)
-      clearDashboardCache();
-
-      res.status(201).json(order);
+    // Crea la orden (sin sesión)
+    const order = await Order.create({
+      user: req.user.id,
+      items: itemsToSave,
+      total: Number(total.toFixed(2)),
+      status: "pendiente",
+      // Campos de envío opcionales:
+      shippingInfo: shippingInfo && {
+        fullName: String(shippingInfo.fullName || ""),
+        phone: String(shippingInfo.phone || ""),
+        address: String(shippingInfo.address || ""),
+        city: String(shippingInfo.city || ""),
+        notes: String(shippingInfo.notes || ""),
+      },
     });
+
+    clearDashboardCache();
+
+    // Puedes construir el texto para WhatsApp del lado del cliente con "order" devuelto
+    return res.status(201).json({ orderId: order._id, order });
   } catch (err) {
+    // COMPENSACIÓN: si falló algo, regreso el stock ya disminuido
+    for (const c of compensations) {
+      try {
+        await Product.updateOne(
+          {
+            _id: c.product,
+            variants: {
+              $elemMatch: { size: c.size, color: c.color },
+            },
+          },
+          { $inc: { "variants.$.stock": c.qty } }
+        );
+      } catch (_) {
+        // si esto fallara, lo registras; en práctica es muy raro si _id/variante existen
+      }
+    }
+
     console.error("Error en createOrder:", err);
-    res.status(400).json({ error: err.message || "Error al procesar pedido" });
-  } finally {
-    session.endSession();
+    return res.status(400).json({ error: err.message || "Error al procesar pedido" });
   }
 };
 
