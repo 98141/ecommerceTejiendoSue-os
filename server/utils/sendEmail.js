@@ -18,9 +18,9 @@ exports.sendVerificationEmail = async (to, token) => {
     await transporter.sendMail({
       from: process.env.EMAIL_FROM,
       to,
-      subject: "Verifica tu cuenta - Tejiendo Sueños",
+      subject: "Verifica tu cuenta - Tejiendo Raices",
       html: `
-        <h3>Bienvenido a Tejiendo Sueños</h3>
+        <h3>Bienvenido a Tejiendo Raices</h3>
         <p>Para activar tu cuenta, haz clic en el siguiente enlace:</p>
         <a href="${link}" target="_blank" style="color: #3b82f6; text-decoration: none;">Verificar correo</a>
         <p>Si no creaste esta cuenta, ignora este correo.</p>
@@ -35,7 +35,7 @@ exports.sendVerificationEmail = async (to, token) => {
 exports.sendResetEmail = async (to, token) => {
   const link = `${process.env.CLIENT_URL}/reset-password/${token}`;
   await transporter.sendMail({
-    from: `"Tejiendo Sueños" <${process.env.EMAIL_USER}>`,
+    from: `"Tejiendo Raices" <${process.env.EMAIL_USER}>`,
     to,
     subject: "Restablecer contraseña",
     html: `
