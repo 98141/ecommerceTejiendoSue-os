@@ -1,48 +1,55 @@
-const nodemailer = require("nodemailer");
+// utils/sendEmail.js
+const { Resend } = require('resend');
+const resend = new Resend((process.env.RESEND_API_KEY || '').trim());
+const isProd = process.env.NODE_ENV === 'production';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+async function sendEmail({ to, subject, html, from }) {
+  const fromAddress = from || process.env.EMAIL_FROM || 'Tejiendo Sueños <onboarding@resend.dev>';
+  const effectiveTo = isProd ? to : (process.env.TEST_RECIPIENT || 'tejiendos128@gmail.com');
 
-/**
- * Envía un correo de verificación al usuario.
- */
+  const { data, error } = await resend.emails.send({
+    from: fromAddress,
+    to: effectiveTo,
+    subject,
+    html,
+  });
+
+  if (error) {
+    console.error('❌ Resend error:', error);
+    throw new Error(error.message || 'Error enviando email con Resend');
+  }
+  console.log('📧 Email enviado (Resend id):', data?.id, '→', effectiveTo);
+  return data;
+}
+
 exports.sendVerificationEmail = async (to, token) => {
   const link = `${process.env.CLIENT_URL}/verify-email/${token}`;
-  try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to,
-      subject: "Verifica tu cuenta - Tejiendo Raices",
-      html: `
-        <h3>Bienvenido a Tejiendo Raices</h3>
-        <p>Para activar tu cuenta, haz clic en el siguiente enlace:</p>
-        <a href="${link}" target="_blank" style="color: #3b82f6; text-decoration: none;">Verificar correo</a>
+  await sendEmail({
+    to,
+    subject: 'Verifica tu cuenta - Tejiendo Sueños',
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height:1.6;">
+        <h3>Bienvenido a Tejiendo Sueños</h3>
+        <p>Para activar tu cuenta, haz clic en:</p>
+        <p><a href="${link}" target="_blank" style="color:#3b82f6; text-decoration:none; font-weight:bold;">Verificar correo</a></p>
         <p>Si no creaste esta cuenta, ignora este correo.</p>
-      `,
-    });
-    console.log(`📧 Correo de verificación enviado a ${to}`);
-  } catch (err) {
-    console.error(`❌ Error al enviar correo a ${to}:`, err.message);
-  }
+      </div>
+    `,
+  });
 };
 
 exports.sendResetEmail = async (to, token) => {
   const link = `${process.env.CLIENT_URL}/reset-password/${token}`;
-  await transporter.sendMail({
-    from: `"Tejiendo Raices" <${process.env.EMAIL_USER}>`,
+  await sendEmail({
     to,
-    subject: "Restablecer contraseña",
+    subject: 'Restablecer contraseña - Tejiendo Sueños',
     html: `
-      <h3>¿Olvidaste tu contraseña?</h3>
-      <p>Haz clic en el siguiente enlace para establecer una nueva:</p>
-      <a href="${link}">Restablecer contraseña</a>
-      <p>Este enlace expirará en 15 minutos.</p>
+      <div style="font-family: Arial, sans-serif; line-height:1.6;">
+        <h3>¿Olvidaste tu contraseña?</h3>
+        <p>Haz clic para establecer una nueva:</p>
+        <p><a href="${link}" target="_blank" style="color:#3b82f6; text-decoration:none; font-weight:bold;">Restablecer contraseña</a></p>
+        <p>Este enlace expirará en 15 minutos.</p>
+      </div>
     `,
   });
 };
