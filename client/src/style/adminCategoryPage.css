@@ -115,3 +115,139 @@
     font-size: 0.9rem;
   }
 }
+
+
+/*Estilos de card*/
+.order-card {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #fff;
+}
+
+.order-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.order-card__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.order-card__badge {
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.order-card__badge--pendiente { background: #f39c12; } /* naranja */
+.order-card__badge--enviado   { background: #2980b9; } /* azul */
+.order-card__badge--entregado { background: #27ae60; } /* verde */
+.order-card__badge--cancelado { background: #7f8c8d; } /* gris */
+
+.order-card__meta {
+  margin: 6px 0;
+  color: #34495e;
+  font-size: 0.95rem;
+}
+
+.order-card__status-block {
+  margin: 10px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.order-card__label {
+  font-weight: 600;
+}
+
+.order-card__select {
+  min-width: 180px;
+  padding: 6px 10px;
+  border: 1px solid #dfe3e6;
+  border-radius: 8px;
+  background: #fff;
+  color: #2c3e50;
+}
+
+.order-card__select:focus {
+  outline: none;
+  border-color: #2d6cdf;
+  box-shadow: 0 0 0 3px rgba(45, 108, 223, 0.15);
+}
+
+.order-card__no-changes {
+  color: #7f8c8d;
+}
+
+.order-card__items {
+  list-style: none;
+  padding-left: 0;
+  margin: 8px 0 0;
+}
+
+.order-card__item {
+  padding-left: 18px;
+  position: relative;
+  margin: 4px 0;
+  color: #2c3e50;
+}
+
+.order-card__item::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  top: -1px;
+  color: #95a5a6;
+}
+
+.order-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+/* Botones base */
+.btn {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s ease-in-out, transform 0.02s ease-in-out;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn--danger {
+  background-color: crimson;
+  color: #fff;
+}
+
+.btn--danger:hover {
+  background-color: #b8132a;
+}
+
+.btn--dark {
+  background-color: #2c3e50;
+  color: #fff;
+}
+
+.btn--dark:hover {
+  background-color: #22313f;
+}

@@ -1,52 +1,137 @@
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ConfirmModal from "../ConfirmModalBlock";
 
 const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
   const navigate = useNavigate();
 
-  const getStatusColor = (status) => {
-    switch (status) {
+  // Estado para el modal de confirmación
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmMode, setConfirmMode] = useState(null); // "status" | "cancel"
+  const [pendingStatus, setPendingStatus] = useState("");
+
+  // Opciones de estado válidas según el estado actual (igual a tu lógica)
+  const nextStatusOptions = useMemo(() => {
+    switch (order.status) {
       case "pendiente":
-        return "orange";
+        return ["enviado"];
       case "enviado":
-        return "blue";
+        return ["entregado"];
       case "entregado":
-        return "green";
+      case "cancelado":
       default:
-        return "gray";
+        return [];
+    }
+  }, [order.status]);
+
+  const handleSelectChange = (e) => {
+    const next = e.target.value;
+    if (!next || next === order.status) return;
+
+    setPendingStatus(next);
+    setConfirmMode("status");
+    setConfirmTitle("Confirmar cambio de estado");
+    setConfirmMessage(
+      next === "enviado"
+        ? "¿Marcar el pedido como ENVIADO?"
+        : "¿Marcar el pedido como ENTREGADO?"
+    );
+    setConfirmOpen(true);
+  };
+
+  const openCancelModal = () => {
+    setConfirmMode("cancel");
+    setConfirmTitle("Cancelar pedido");
+    setConfirmMessage(
+      "¿Deseas cancelar este pedido? Se restablecerá el stock."
+    );
+    setConfirmOpen(true);
+  };
+
+  const handleConfirm = async () => {
+    try {
+      if (confirmMode === "status") {
+        await onStatusChange(order._id, pendingStatus);
+      } else if (confirmMode === "cancel") {
+        await onCancel(order._id);
+      }
+    } finally {
+      // Cerrar y limpiar
+      setConfirmOpen(false);
+      setConfirmMode(null);
+      setPendingStatus("");
+      setConfirmTitle("");
+      setConfirmMessage("");
     }
   };
 
+  const handleCancelModal = () => {
+    setConfirmOpen(false);
+    setConfirmMode(null);
+    setPendingStatus("");
+    setConfirmTitle("");
+    setConfirmMessage("");
+  };
+
+  const badgeClass = `order-card__badge order-card__badge--${order.status}`;
+
   return (
     <div className="order-card">
-      <p>
+      <div className="order-card__header">
+        <h4 className="order-card__title">Pedido #{order._id}</h4>
+        <span
+          className={badgeClass}
+          aria-label={`Estado: ${order.status}`}
+          title={`Estado: ${order.status}`}
+        >
+          {order.status}
+        </span>
+      </div>
+
+      <p className="order-card__meta">
         <strong>Nombre de usuario:</strong> {order.user?.name || "N/A"}
       </p>
-      <p>
+      <p className="order-card__meta">
         <strong>Usuario:</strong> {order.user?.email || "N/A"}
       </p>
-      <p>
+      <p className="order-card__meta">
         <strong>Fecha:</strong> {new Date(order.createdAt).toLocaleString()}
       </p>
-      <p>
+      <p className="order-card__meta">
         <strong>Total:</strong> ${order.total}
       </p>
 
-      <label>
-        <strong>Estado:</strong>{" "}
-        <select
-          value={order.status}
-          onChange={(e) => onStatusChange(order._id, e.target.value)}
-          style={{ color: getStatusColor(order.status) }}
-        >
-          <option value="pendiente">pendiente</option>
-          <option value="enviado">enviado</option>
-          <option value="entregado">entregado</option>
-        </select>
-      </label>
+      <div className="order-card__status-block">
+        <label htmlFor={`status-${order._id}`} className="order-card__label">
+          Cambiar estado:
+        </label>
 
-      <ul className="order-items-list">
+        {nextStatusOptions.length > 0 ? (
+          <select
+            id={`status-${order._id}`}
+            onChange={handleSelectChange}
+            defaultValue=""
+            className="order-card__select"
+          >
+            <option value="" disabled>
+              Selecciona nuevo estado…
+            </option>
+            {nextStatusOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <em className="order-card__no-changes">No hay cambios disponibles</em>
+        )}
+      </div>
+
+      <ul className="order-card__items">
         {order.items.map((item, i) => (
-          <li key={i}>
+          <li key={i} className="order-card__item">
             {item.product ? (
               <>
                 {item.quantity} x {item.product.name} (${item.product.price}{" "}
@@ -60,25 +145,33 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
           </li>
         ))}
       </ul>
-      {order.status === "pendiente" && (
-        <button
-          style={{
-            backgroundColor: "crimson",
-            color: "white",
-            marginTop: "10px",
-          }}
-          onClick={() => onCancel(order._id)}
-        >
-          Cancelar pedido
-        </button>
-      )}
 
-      <button
-        className="btn-detail"
-        onClick={() => navigate(`/admin/orders/${order._id}`)}
-      >
-        Ver detalle
-      </button>
+      <div className="order-card__actions">
+        {order.status === "pendiente" && (
+          <button
+            className="btn btn--danger"
+            onClick={openCancelModal}
+            title="Cancelar pedido (restaura stock)"
+          >
+            Cancelar pedido
+          </button>
+        )}
+        <button
+          className="btn btn--dark"
+          onClick={() => navigate(`/admin/orders/${order._id}`)}
+        >
+          Ver detalle
+        </button>
+      </div>
+
+      {confirmOpen && (
+        <ConfirmModal
+          title={confirmTitle}
+          message={confirmMessage}
+          onConfirm={handleConfirm}
+          onCancel={handleCancelModal}
+        />
+      )}
     </div>
   );
 };

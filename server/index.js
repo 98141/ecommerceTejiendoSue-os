@@ -40,7 +40,7 @@ const corsOptions = {
   origin: "http://localhost:5173",
   // permite envío de cookies
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 

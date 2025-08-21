@@ -6,20 +6,24 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import dayjs from "dayjs";
 import { AuthContext } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import FilterExportControls from "../blocks/admin/FilterExportControls";
 import OrderCardBlock from "../blocks/admin/OrderCardBlock";
 import logo from "../assets/PPFINAL.png";
 
 const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
   const { token } = useContext(AuthContext);
+  const { showToast } = useToast();
+
   const [orders, setOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState(statusFilterProp);
   const [searchFilter, setSearchFilter] = useState("");
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
-  const [dateError, setDateError] = useState(""); // ✅ mensaje de error
+  const [dateError, setDateError] = useState("");
 
   useEffect(() => {
     fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchOrders = () => {
@@ -31,20 +35,61 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
       .catch((err) => console.error("Error al obtener pedidos:", err));
   };
 
+  // ⬇️ Cambios importantes: retorna promesa + toasts
   const handleStatusChange = (id, status) => {
-    axios
-      .put(
-        `http://localhost:5000/api/orders/${id}`,
+    return axios
+      .patch(
+        `http://localhost:5000/api/orders/${id}/status`,
         { status },
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         }
       )
-      .then(() => fetchOrders())
-      .catch(() => alert("Error al actualizar estado"));
+      .then(() => {
+        fetchOrders();
+        showToast(`Estado actualizado a “${status}”`, "success");
+      })
+      .catch((err) => {
+        console.error(
+          "Error al actualizar estado:",
+          err?.response?.data || err.message
+        );
+        showToast("No se pudo actualizar el estado", "error");
+        throw err; // importa para que OrderCardBlock pueda revertir si quiere
+      });
   };
 
-  // ✅ Validar fechas sin causar re-render
+  // ⬇️ Cancelación sin confirm nativa (el Card abrirá tu ConfirmModal)
+  const handleCancel = (id) => {
+    return axios
+      .post(
+        `http://localhost:5000/api/orders/${id}/cancel`,
+        {},
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+      .then(() => {
+        fetchOrders();
+        showToast("Pedido cancelado y stock restablecido", "info");
+      })
+      .catch((err) => {
+        console.error(
+          "Error al cancelar pedido:",
+          err?.response?.data || err.message
+        );
+        showToast("No se pudo cancelar el pedido", "error");
+        throw err;
+      });
+  };
+
+  // ✅ Validar fechas
   const validateDateRange = (from, to) => {
     if (from && !to) return "Seleccione también una fecha de fin (Hasta).";
     if (!from && to) return "Seleccione también una fecha de inicio (Desde).";
@@ -129,11 +174,7 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
         ],
       ],
       body: rows,
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-        overflow: "linebreak",
-      },
+      styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
       headStyles: {
         fillColor: [41, 128, 185],
         textColor: 255,
@@ -192,21 +233,6 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
     const friendlyName = searchFilter || statusFilter || "todos";
     const today = dayjs().format("YYYY-MM-DD");
     saveAs(data, `pedidos_${friendlyName}_${today}.xlsx`);
-  };
-
-  const handleCancel = (id) => {
-    if (window.confirm("¿Estás seguro de cancelar este pedido?")) {
-      axios
-        .put(
-          `http://localhost:5000/api/orders/cancel/${id}`,
-          {},
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        )
-        .then(() => fetchOrders())
-        .catch(() => alert("Error al cancelar el pedido"));
-    }
   };
 
   return (

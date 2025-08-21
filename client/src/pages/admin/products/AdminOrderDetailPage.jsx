@@ -2,7 +2,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import { AuthContext } from "../../../contexts/AuthContext";
-import OrderItemEditor from "../../../blocks/admin/OrderItemEditorBlocks";
 import AdminOrderCommentBlock from "../../../blocks/admin/AdminOrderCommentBlock";
 import { toast } from "react-toastify";
 
@@ -20,11 +19,9 @@ import {
 const AdminOrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-
   const { token } = useContext(AuthContext);
 
   const [order, setOrder] = useState(null);
-  const [items, setItems] = useState([]);
   const [fields, setFields] = useState({
     trackingNumber: "",
     shippingCompany: "",
@@ -36,77 +33,82 @@ const AdminOrderDetailPage = () => {
   const [currentIndex, setCurrentIndex] = useState(-1);
 
   useEffect(() => {
-    axios
-      .get(`http://localhost:5000/api/orders/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
+    const fetchOrder = async () => {
+      try {
+        const res = await axios.get(`http://localhost:5000/api/orders/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setOrder(res.data);
-        setItems(res.data.items);
         setFields({
           trackingNumber: res.data.trackingNumber || "",
           shippingCompany: res.data.shippingCompany || "",
           adminComment: res.data.adminComment || "",
         });
-      });
+      } catch (err) {
+        console.error(
+          "Error cargando pedido:",
+          err?.response?.data || err.message
+        );
+        toast.error("No se pudo cargar el pedido");
+      }
+    };
+    fetchOrder();
   }, [id, token]);
 
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/api/orders/ids/all", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        const ids = res.data;
+    const fetchIds = async () => {
+      try {
+        const res = await axios.get("http://localhost:5000/api/orders/ids", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const ids = res.data || [];
         setOrderIds(ids);
         const index = ids.findIndex((oid) => oid === id);
         setCurrentIndex(index);
-      });
+      } catch (err) {
+        console.error(
+          "Error cargando IDs de pedidos:",
+          err?.response?.data || err.message
+        );
+      }
+    };
+    fetchIds();
   }, [id, token]);
-
-  const handleItemChange = (index, updatedItem) => {
-    const updatedItems = [...items];
-    updatedItems[index] = updatedItem;
-    setItems(updatedItems);
-  };
 
   const handleFieldChange = (field, value) => {
     setFields((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    setIsSaving(true); // Desactiva el botón
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const payload = {
+        trackingNumber: fields.trackingNumber,
+        shippingCompany: fields.shippingCompany,
+        adminComment: fields.adminComment,
+      };
 
-    axios
-      .put(
-        `http://localhost:5000/api/orders/orders/${id}`,
-        {
-          items,
-          ...fields,
+      await axios.put(`http://localhost:5000/api/orders/${id}`, payload, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      )
-      .then(() => {
-        toast.success("Pedido actualizado con éxito");
-        setTimeout(() => {
-          navigate("/admin");
-        }, 3500);
-      })
-      .catch((err) => {
-        toast.error(
-          err.response?.data?.error || "Error al guardar los cambios"
-        );
-        setIsSaving(false); // ✅ Reactivar el botón en caso de error
       });
+
+      toast.success("Pedido actualizado con éxito");
+      setTimeout(() => navigate("/admin"), 1200);
+    } catch (err) {
+      console.error(
+        "Error al guardar los cambios:",
+        err?.response?.data || err.message
+      );
+      toast.error(err?.response?.data?.error || "Error al guardar los cambios");
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
-    // Si necesitas confirmar con el usuario:
-    // if (window.confirm("¿Estás seguro de cancelar los cambios?")) {
     navigate("/admin");
-    // }
   };
 
   const goToOrder = (offset) => {
@@ -118,6 +120,7 @@ const AdminOrderDetailPage = () => {
   };
 
   const exportSingleOrderToPDF = () => {
+    if (!order) return;
     const doc = new jsPDF();
     doc.text(`Factura de Pedido`, 50, 14);
     doc.text(`ID del pedido: ${order._id}`, 14, 24);
@@ -126,14 +129,17 @@ const AdminOrderDetailPage = () => {
     doc.text(`Fecha: ${new Date(order.createdAt).toLocaleString()}`, 14, 48);
     doc.text(`Estado: ${order.status}`, 14, 56);
 
+    let y = 64;
     if (order.trackingNumber) {
-      doc.text(`Guía: ${order.trackingNumber}`, 14, 56);
+      doc.text(`Guía: ${order.trackingNumber}`, 14, y);
+      y += 8;
     }
     if (order.shippingCompany) {
-      doc.text(`Transportadora: ${order.shippingCompany}`, 14, 64);
+      doc.text(`Transportadora: ${order.shippingCompany}`, 14, y);
+      y += 8;
     }
 
-    const itemsRows = order.items.map((item) => [
+    const itemsRows = (order.items || []).map((item) => [
       item.product?.name || "Producto eliminado",
       item.size?.label || "-",
       item.color?.name || "-",
@@ -145,11 +151,11 @@ const AdminOrderDetailPage = () => {
     autoTable(doc, {
       head: [["Producto", "Talla", "Color", "Cantidad", "Precio", "Subtotal"]],
       body: itemsRows,
-      startY: 72,
+      startY: y + 8,
     });
 
     doc.text(
-      `Total: $${order.total.toFixed(2)}`,
+      `Total: $${order.total?.toFixed(2) || "0.00"}`,
       14,
       doc.lastAutoTable.finalY + 10
     );
@@ -166,51 +172,97 @@ const AdminOrderDetailPage = () => {
     doc.save(`pedido_${order._id}.pdf`);
   };
 
-  if (!order) return <p>Cargando detalles del pedido...</p>;
+  if (!order) return <p className="loading">Cargando detalles del pedido...</p>;
+
+  const priceFmt = (n) =>
+    typeof n === "number" && !Number.isNaN(n) ? n.toFixed(2) : "-";
 
   return (
-    <div className="admin-order-detail-container">
-      <div className="admin-order-section">
-        <h3>
-          <FaClipboardList /> Información del pedido
+    <div className="admin-order-detail">
+      <div className="section">
+        <h3 className="section__title">
+          <FaClipboardList className="icon" /> Información del pedido
         </h3>
-        <p>
+        <p className="field">
           <strong>
-            <FaUser /> Usuario Email:
+            <FaUser className="icon" /> Usuario Email:
           </strong>{" "}
           {order.user?.email}
         </p>
-        <p>
-          <strong>
-            Usuario Nombre:
-          </strong>{" "}
-          {order.user?.name}
+        <p className="field">
+          <strong>Usuario Nombre:</strong> {order.user?.name}
         </p>
-        <p>
+        <p className="field">
           <strong>Estado actual:</strong> {order.status}
         </p>
       </div>
-      <div>
-        <button onClick={exportSingleOrderToPDF}>Descargar PDF</button>
+
+      <div className="actions-top">
+        <button className="btn btn--ghost" onClick={exportSingleOrderToPDF}>
+          Descargar PDF
+        </button>
       </div>
 
-      <div className="admin-order-section">
-        <h3>
-          <FaClipboardList /> Productos del pedido
+      {/* Productos del pedido: tabla solo lectura */}
+      <div className="section">
+        <h3 className="section__title">
+          <FaClipboardList className="icon" /> Productos del pedido
         </h3>
-        {items.map((item, index) => (
-          <OrderItemEditor
-            key={item._id || index}
-            item={item}
-            index={index}
-            onChange={handleItemChange}
-          />
-        ))}
+
+        <div className="table-responsive">
+          <table className="table table-order-items">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Talla</th>
+                <th>Color</th>
+                <th>Cantidad</th>
+                <th>Precio</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(order.items || []).map((item, idx) => {
+                const price = item.product?.price ?? 0;
+                const qty = Number(item.quantity) || 0;
+                const subtotal = qty * Number(price);
+                return (
+                  <tr key={item._id || idx}>
+                    <td>{item.product?.name || "Producto eliminado"}</td>
+                    <td>{item.size?.label || "-"}</td>
+                    <td>{item.color?.name || "-"}</td>
+                    <td>{qty}</td>
+                    <td>${priceFmt(price)}</td>
+                    <td>${priceFmt(subtotal)}</td>
+                  </tr>
+                );
+              })}
+              {(!order.items || order.items.length === 0) && (
+                <tr>
+                  <td colSpan={6}>
+                    <em>Sin ítems</em>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="total-label" colSpan={5}>
+                  Total
+                </td>
+                <td className="total-value">
+                  ${order.total?.toFixed(2) || "0.00"}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
 
-      <div className="admin-order-section">
-        <h3>
-          <FaTruck /> Información de envío
+      {/* Metadatos editables */}
+      <div className="section">
+        <h3 className="section__title">
+          <FaTruck className="icon" /> Información de envío
         </h3>
         <AdminOrderCommentBlock
           comment={fields.adminComment}
@@ -220,46 +272,47 @@ const AdminOrderDetailPage = () => {
         />
       </div>
 
-      <div className="admin-order-section">
-        <h3>💾 Acciones</h3>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          title="Guardar cambios en el pedido"
-          style={{
-            opacity: isSaving ? 0.6 : 1,
-            cursor: isSaving ? "not-allowed" : "pointer",
-          }}
-        >
-          <FaSave style={{ marginRight: "8px" }} />
-          {isSaving ? "Guardando..." : "Guardar cambios"}
-        </button>
+      {/* Acciones */}
+      <div className="section">
+        <h3 className="section__title">💾 Acciones</h3>
+        <div className="actions-row">
+          <button
+            onClick={handleSave}
+            className={`btn btn--primary ${isSaving ? "is-disabled" : ""}`}
+            disabled={isSaving}
+            title="Guardar cambios en el pedido"
+          >
+            <FaSave className="icon" />
+            {isSaving ? "Guardando..." : "Guardar cambios"}
+          </button>
 
-        <button
-          onClick={handleCancel}
-          title="Cancelar cambios y volver"
-          style={{ backgroundColor: "#ccc", color: "#333" }}
-        >
-          <FaTimesCircle style={{ marginRight: "6px" }} />
-          Cancelar
-        </button>
-        <div style={{ marginTop: "1rem" }}>
-          <button onClick={() => navigate("/admin")}>
+          <button
+            onClick={handleCancel}
+            className="btn btn--muted"
+            title="Cancelar cambios y volver"
+          >
+            <FaTimesCircle className="icon" />
+            Cancelar
+          </button>
+        </div>
+
+        <div className="nav-row">
+          <button className="btn btn--ghost" onClick={() => navigate("/admin")}>
             🔙 Volver al listado
           </button>
 
           <button
+            className="btn btn--ghost"
             onClick={() => goToOrder(-1)}
             disabled={currentIndex <= 0}
-            style={{ marginLeft: "1rem" }}
           >
             ⬅ Pedido anterior
           </button>
 
           <button
+            className="btn btn--ghost"
             onClick={() => goToOrder(1)}
             disabled={currentIndex >= orderIds.length - 1}
-            style={{ marginLeft: "1rem" }}
           >
             Pedido siguiente ➡
           </button>

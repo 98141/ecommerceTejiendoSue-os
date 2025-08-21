@@ -27,7 +27,9 @@ exports.createOrder = async (req, res) => {
     const { items, shippingInfo } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "Debes incluir al menos un producto" });
+      return res
+        .status(400)
+        .json({ error: "Debes incluir al menos un producto" });
     }
 
     // Normaliza/valida payload
@@ -39,9 +41,16 @@ exports.createOrder = async (req, res) => {
       const qty = Number(item.quantity) || 0;
 
       if (!productId || !sizeId || !colorId || qty <= 0) {
-        return res.status(400).json({ error: "Datos inválidos en uno de los ítems" });
+        return res
+          .status(400)
+          .json({ error: "Datos inválidos en uno de los ítems" });
       }
-      normalizedItems.push({ product: productId, size: sizeId, color: colorId, quantity: qty });
+      normalizedItems.push({
+        product: productId,
+        size: sizeId,
+        color: colorId,
+        quantity: qty,
+      });
     }
 
     // Prepara snapshots y descuentos atómicos por variante
@@ -51,7 +60,11 @@ exports.createOrder = async (req, res) => {
     for (const it of normalizedItems) {
       // Trae SOLO la variante coincidente para conocer stock actual y nombre/precio
       const prodDoc = await Product.findOne(
-        { _id: it.product, "variants.size": it.size, "variants.color": it.color },
+        {
+          _id: it.product,
+          "variants.size": it.size,
+          "variants.color": it.color,
+        },
         { name: 1, price: 1, "variants.$": 1 } // proyecta solo variante
       );
 
@@ -62,7 +75,9 @@ exports.createOrder = async (req, res) => {
       const variant = prodDoc.variants[0];
       const stockBefore = Number(variant.stock) || 0;
       if (stockBefore < it.quantity) {
-        throw new Error(`Stock insuficiente para ${prodDoc.name}. Disponible: ${stockBefore}`);
+        throw new Error(
+          `Stock insuficiente para ${prodDoc.name}. Disponible: ${stockBefore}`
+        );
       }
 
       // Descuento atómico de stock (protege contra carreras)
@@ -147,7 +162,9 @@ exports.createOrder = async (req, res) => {
     }
 
     console.error("Error en createOrder:", err);
-    return res.status(400).json({ error: err.message || "Error al procesar pedido" });
+    return res
+      .status(400)
+      .json({ error: err.message || "Error al procesar pedido" });
   }
 };
 
@@ -233,187 +250,283 @@ exports.getOrderById = async (req, res) => {
  * - Ítem existente: preserva unitPrice y snapshots.
  */
 exports.updateOrder = async (req, res) => {
-  const session = await mongoose.startSession();
+  const { id } = req.params;
+  const {
+    status,
+    items,
+    trackingNumber,
+    shippingCompany,
+    adminComment,
+    shippingInfo, // ⬅️ soportado también en el guard
+  } = req.body;
+
   try {
-    const { id } = req.params;
-    const { status, items, trackingNumber, shippingCompany, adminComment } =
-      req.body;
+    // ====== GUARD: si NO hay cambios de items y SÍ hay cambios de metadatos → update simple SIN transacción ======
+    const isItemsChange = Array.isArray(items);
+    const isMetaChange =
+      typeof status !== "undefined" ||
+      typeof trackingNumber !== "undefined" ||
+      typeof shippingCompany !== "undefined" ||
+      typeof adminComment !== "undefined" ||
+      (shippingInfo && typeof shippingInfo === "object");
 
-    const order = await Order.findById(id);
-    if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
+    if (!isItemsChange && isMetaChange) {
+      const $set = {};
 
-    await session.withTransaction(async () => {
-      const prevItems = order.items.map((i) => ({
-        product: String(i.product),
-        size: String(i.size || ""),
-        color: String(i.color || ""),
-        quantity: Number(i.quantity) || 0,
-        unitPrice: Number(i.unitPrice) || 0,
-        stockBeforePurchase:
-          typeof i.stockBeforePurchase === "number"
-            ? i.stockBeforePurchase
-            : null,
-        stockAtPurchase:
-          typeof i.stockAtPurchase === "number" ? i.stockAtPurchase : null,
-      }));
-      const prevMap = new Map(prevItems.map((i) => [itemKey(i), i]));
-
-      let nextItems = Array.isArray(items) ? items : null;
-      const normalizedNext = [];
-
-      if (nextItems) {
-        // Normaliza, valida y prepara ajuste
-        for (const it of nextItems) {
-          const productId = it.product;
-          const sizeId = it.size;
-          const colorId = it.color;
-          const qty = Number(it.quantity) || 0;
-
-          if (!productId || !sizeId || !colorId || qty <= 0) {
-            throw new Error("Datos incompletos o inválidos en los ítems");
-          }
-
-          const product = await Product.findById(productId).session(session);
-          if (!product) throw new Error("Producto no encontrado");
-
-          const vIndex = product.variants.findIndex(
-            (v) =>
-              String(v.size) === String(sizeId) &&
-              String(v.color) === String(colorId)
-          );
-          if (vIndex === -1)
-            throw new Error(
-              `Variante no disponible (producto: ${product.name})`
-            );
-
-          const key = `${String(productId)}::${String(sizeId)}::${String(
-            colorId
-          )}`;
-          const prev = prevMap.get(key);
-          const prevQty = prev ? prev.quantity : 0;
-          const diff = qty - prevQty;
-
-          const currentStock = Number(product.variants[vIndex].stock) || 0;
-          if (diff > 0 && currentStock < diff) {
-            throw new Error(
-              `Stock insuficiente para ${product.name}. Falta: ${
-                diff - currentStock
-              }`
-            );
-          }
-
-          // Snapshots sólo si es ítem nuevo o faltaban
-          let stockBeforePurchase = prev?.stockBeforePurchase ?? null;
-          let stockAtPurchase = prev?.stockAtPurchase ?? null;
-
-          if (!prev) {
-            // Ítem nuevo → snapshot en este update
-            const stockBefore = currentStock;
-            const stockAfter = currentStock - diff; // diff > 0
-            stockBeforePurchase = stockBefore;
-            stockAtPurchase = stockAfter;
-          } else if (prev && typeof stockAtPurchase !== "number") {
-            // Documento antiguo sin snapshot → completa ahora
-            const stockBefore = currentStock;
-            const stockAfter = currentStock - diff;
-            stockBeforePurchase = stockBefore;
-            stockAtPurchase = stockAfter;
-          }
-
-          normalizedNext.push({
-            productId,
-            sizeId,
-            colorId,
-            qty,
-            vIndex,
-            product,
-            prev,
-            diff,
-            currentStock,
-            computedSnapshots: { stockBeforePurchase, stockAtPurchase },
-          });
-        }
-
-        // Aplica ajuste de stock
-        for (const n of normalizedNext) {
-          if (n.diff !== 0) {
-            const nextStock = n.currentStock - n.diff; // si diff>0 disminuye; si diff<0 aumenta
-            if (nextStock < 0)
-              throw new Error(`Stock insuficiente para ${n.product.name}`);
-            n.product.variants[n.vIndex].stock = nextStock;
-            await n.product.save({ session });
-          }
-        }
-
-        // Reconstruye items preservando unitPrice/snapshots previos
-        const rebuilt = [];
-        for (const n of normalizedNext) {
-          const key = `${String(n.productId)}::${String(n.sizeId)}::${String(
-            n.colorId
-          )}`;
-          const prev = prevMap.get(key);
-
-          const unitPrice = prev
-            ? Number(prev.unitPrice)
-            : effectivePrice(n.product);
-          const stockBeforePurchase =
-            prev && typeof prev.stockBeforePurchase === "number"
-              ? prev.stockBeforePurchase
-              : n.computedSnapshots.stockBeforePurchase;
-
-          const stockAtPurchase =
-            prev && typeof prev.stockAtPurchase === "number"
-              ? prev.stockAtPurchase
-              : n.computedSnapshots.stockAtPurchase;
-
-          rebuilt.push({
-            product: n.productId,
-            size: n.sizeId,
-            color: n.colorId,
-            quantity: n.qty,
-            unitPrice,
-            stockBeforePurchase,
-            stockAtPurchase,
-          });
-        }
-
-        order.items = rebuilt;
-      }
-
-      // Campos adicionales
-      if (typeof status !== "undefined") order.status = status;
+      if (typeof status !== "undefined") $set.status = status;
       if (typeof trackingNumber !== "undefined")
-        order.trackingNumber = trackingNumber;
+        $set.trackingNumber = String(trackingNumber || "");
       if (typeof shippingCompany !== "undefined")
-        order.shippingCompany = shippingCompany;
+        $set.shippingCompany = String(shippingCompany || "");
       if (typeof adminComment !== "undefined")
-        order.adminComment = adminComment;
+        $set.adminComment = String(adminComment || "");
 
-      // Recalcula total
-      let newTotal = 0;
-      for (const it of order.items) {
-        if (typeof it.unitPrice !== "number") {
-          const prod = await Product.findById(it.product).session(session);
-          it.unitPrice = effectivePrice(prod);
-        }
-        newTotal += Number(it.unitPrice) * Number(it.quantity);
+      // Normaliza shippingInfo por campos (no pisa con undefined)
+      if (shippingInfo && typeof shippingInfo === "object") {
+        if ("fullName" in shippingInfo)
+          $set["shippingInfo.fullName"] = String(shippingInfo.fullName || "");
+        if ("phone" in shippingInfo)
+          $set["shippingInfo.phone"] = String(shippingInfo.phone || "");
+        if ("address" in shippingInfo)
+          $set["shippingInfo.address"] = String(shippingInfo.address || "");
+        if ("city" in shippingInfo)
+          $set["shippingInfo.city"] = String(shippingInfo.city || "");
+        if ("notes" in shippingInfo)
+          $set["shippingInfo.notes"] = String(shippingInfo.notes || "");
       }
-      order.total = Number(newTotal.toFixed(2));
 
-      await order.save({ session });
+      const updated = await Order.findByIdAndUpdate(
+        id,
+        { $set },
+        { new: true }
+      );
+      if (!updated)
+        return res.status(404).json({ error: "Pedido no encontrado" });
 
-      // 🔄 Invalida caché del dashboard (edición de orden)
       clearDashboardCache();
+      return res.json({ message: "Pedido actualizado", order: updated });
+    }
 
-      res.json({ message: "Pedido actualizado con control de stock", order });
-    });
+    // Si tampoco hay metadatos ni items → nada que actualizar
+    if (!isItemsChange && !isMetaChange) {
+      return res.status(400).json({ error: "No hay cambios para aplicar" });
+    }
+
+    // ====== AQUI SÍ hay cambios de ITEMS → usar transacción (requiere replica set) ======
+    const session = await mongoose.startSession();
+    try {
+      const order = await Order.findById(id);
+      if (!order)
+        return res.status(404).json({ error: "Pedido no encontrado" });
+
+      await session.withTransaction(async () => {
+        // Snapshot de items previos
+        const prevItems = order.items.map((i) => ({
+          product: String(i.product),
+          size: String(i.size || ""),
+          color: String(i.color || ""),
+          quantity: Number(i.quantity) || 0,
+          unitPrice: Number(i.unitPrice) || 0,
+          stockBeforePurchase:
+            typeof i.stockBeforePurchase === "number"
+              ? i.stockBeforePurchase
+              : null,
+          stockAtPurchase:
+            typeof i.stockAtPurchase === "number" ? i.stockAtPurchase : null,
+        }));
+        const prevMap = new Map(prevItems.map((i) => [itemKey(i), i]));
+
+        const nextItems = Array.isArray(items) ? items : null;
+        const normalizedNext = [];
+
+        if (nextItems) {
+          // Normaliza/valida y prepara ajuste
+          for (const it of nextItems) {
+            const productId = it.product;
+            const sizeId = it.size;
+            const colorId = it.color;
+            const qty = Number(it.quantity) || 0;
+
+            if (!productId || !sizeId || !colorId || qty <= 0) {
+              throw new Error("Datos incompletos o inválidos en los ítems");
+            }
+
+            const product = await Product.findById(productId).session(session);
+            if (!product) throw new Error("Producto no encontrado");
+
+            const vIndex = product.variants.findIndex(
+              (v) =>
+                String(v.size) === String(sizeId) &&
+                String(v.color) === String(colorId)
+            );
+            if (vIndex === -1)
+              throw new Error(
+                `Variante no disponible (producto: ${product.name})`
+              );
+
+            const key = `${String(productId)}::${String(sizeId)}::${String(
+              colorId
+            )}`;
+            const prev = prevMap.get(key);
+            const prevQty = prev ? prev.quantity : 0;
+            const diff = qty - prevQty;
+
+            const currentStock = Number(product.variants[vIndex].stock) || 0;
+            if (diff > 0 && currentStock < diff) {
+              throw new Error(
+                `Stock insuficiente para ${product.name}. Falta: ${
+                  diff - currentStock
+                }`
+              );
+            }
+
+            // Snapshots si es ítem nuevo o faltaban
+            let stockBeforePurchase = prev?.stockBeforePurchase ?? null;
+            let stockAtPurchase = prev?.stockAtPurchase ?? null;
+
+            if (!prev) {
+              const stockBefore = currentStock;
+              const stockAfter = currentStock - diff; // diff > 0
+              stockBeforePurchase = stockBefore;
+              stockAtPurchase = stockAfter;
+            } else if (prev && typeof stockAtPurchase !== "number") {
+              const stockBefore = currentStock;
+              const stockAfter = currentStock - diff;
+              stockBeforePurchase = stockBefore;
+              stockAtPurchase = stockAfter;
+            }
+
+            normalizedNext.push({
+              productId,
+              sizeId,
+              colorId,
+              qty,
+              vIndex,
+              product,
+              prev,
+              diff,
+              currentStock,
+              computedSnapshots: { stockBeforePurchase, stockAtPurchase },
+            });
+          }
+
+          // Aplica ajuste de stock
+          for (const n of normalizedNext) {
+            if (n.diff !== 0) {
+              const nextStock = n.currentStock - n.diff; // diff>0 disminuye; diff<0 aumenta
+              if (nextStock < 0)
+                throw new Error(`Stock insuficiente para ${n.product.name}`);
+              n.product.variants[n.vIndex].stock = nextStock;
+              await n.product.save({ session });
+            }
+          }
+
+          // Reconstruye items preservando unitPrice/snapshots previos
+          const rebuilt = [];
+          for (const n of normalizedNext) {
+            const key = `${String(n.productId)}::${String(n.sizeId)}::${String(
+              n.colorId
+            )}`;
+            const prev = prevMap.get(key);
+
+            const unitPrice = prev
+              ? Number(prev.unitPrice)
+              : effectivePrice(n.product);
+            const stockBeforePurchase =
+              prev && typeof prev.stockBeforePurchase === "number"
+                ? prev.stockBeforePurchase
+                : n.computedSnapshots.stockBeforePurchase;
+
+            const stockAtPurchase =
+              prev && typeof prev.stockAtPurchase === "number"
+                ? prev.stockAtPurchase
+                : n.computedSnapshots.stockAtPurchase;
+
+            rebuilt.push({
+              product: n.productId,
+              size: n.sizeId,
+              color: n.colorId,
+              quantity: n.qty,
+              unitPrice,
+              stockBeforePurchase,
+              stockAtPurchase,
+            });
+          }
+
+          order.items = rebuilt;
+        }
+
+        // Campos adicionales (también soporta shippingInfo dentro de transacción)
+        if (typeof status !== "undefined") order.status = status;
+        if (typeof trackingNumber !== "undefined")
+          order.trackingNumber = String(trackingNumber || "");
+        if (typeof shippingCompany !== "undefined")
+          order.shippingCompany = String(shippingCompany || "");
+        if (typeof adminComment !== "undefined")
+          order.adminComment = String(adminComment || "");
+
+        if (shippingInfo && typeof shippingInfo === "object") {
+          if ("fullName" in shippingInfo)
+            order.shippingInfo = {
+              ...(order.shippingInfo || {}),
+              fullName: String(shippingInfo.fullName || ""),
+            };
+          if ("phone" in shippingInfo)
+            order.shippingInfo = {
+              ...(order.shippingInfo || {}),
+              phone: String(shippingInfo.phone || ""),
+            };
+          if ("address" in shippingInfo)
+            order.shippingInfo = {
+              ...(order.shippingInfo || {}),
+              address: String(shippingInfo.address || ""),
+            };
+          if ("city" in shippingInfo)
+            order.shippingInfo = {
+              ...(order.shippingInfo || {}),
+              city: String(shippingInfo.city || ""),
+            };
+          if ("notes" in shippingInfo)
+            order.shippingInfo = {
+              ...(order.shippingInfo || {}),
+              notes: String(shippingInfo.notes || ""),
+            };
+        }
+
+        // Recalcula total
+        let newTotal = 0;
+        for (const it of order.items) {
+          if (typeof it.unitPrice !== "number") {
+            const prod = await Product.findById(it.product).session(session);
+            it.unitPrice = effectivePrice(prod);
+          }
+          newTotal += Number(it.unitPrice) * Number(it.quantity);
+        }
+        order.total = Number(newTotal.toFixed(2));
+
+        await order.save({ session });
+
+        clearDashboardCache();
+        res.json({ message: "Pedido actualizado con control de stock", order });
+      });
+    } catch (txErr) {
+      // Si llegas aquí sin replica set, verás el error de transacciones
+      console.error("Error actualizando pedido (transacción):", txErr);
+      return res
+        .status(400)
+        .json({ error: txErr.message || "Error al actualizar pedido" });
+    } finally {
+      // cierra la sesión si se abrió
+      // (si no se abrió porque caíste en el guard, no habrá session aquí)
+      // en este flujo, sí se abrió:
+      // eslint-disable-next-line no-unsafe-finally
+      (await mongoose.connection?.client?.startSession) ? null : null; // no-ops defensivos
+    }
   } catch (error) {
     console.error("Error actualizando pedido:", error);
-    res
+    return res
       .status(400)
       .json({ error: error.message || "Error al actualizar pedido" });
-  } finally {
-    session.endSession();
   }
 };
 
