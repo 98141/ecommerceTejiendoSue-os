@@ -4,18 +4,38 @@ const jwt = require("jsonwebtoken");
 const validator = require("validator");
 const { sendVerificationEmail, sendResetEmail } = require("../utils/sendEmail");
 
+// ====== Config por ENV (fallbacks sensatos) ======
+const ACCESS_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1d"; // ← antes 60m
+const REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
+
 // ====== Funciones para tokens ======
 const createAccessToken = (user) => {
-  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: "60m",
-  });
+  return jwt.sign(
+    { id: user._id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: ACCESS_EXPIRES_IN } // ← 1 día por defecto
+  );
 };
 
 const createRefreshToken = (user) => {
-  return jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: "7d",
-  });
+  return jwt.sign(
+    { id: user._id },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: REFRESH_EXPIRES_IN } // ← 7 días por defecto
+  );
 };
+
+// Util de cookie para refresh (dev/prod)
+function refreshCookieOptions() {
+  const isProd = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    secure: isProd, // ← false en dev (HTTP), true en prod (HTTPS)
+    sameSite: "lax", // ← evita bloqueos innecesarios; 'Strict' puede romper flujos
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+  };
+}
 
 // ====== Registro ======
 exports.register = async (req, res) => {
@@ -38,12 +58,10 @@ exports.register = async (req, res) => {
         minSymbols: 1,
       })
     ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Contraseña débil. Usa mínimo 8 caracteres, un número y un símbolo.",
-        });
+      return res.status(400).json({
+        error:
+          "Contraseña débil. Usa mínimo 8 caracteres, un número y un símbolo.",
+      });
     }
 
     const existingUser = await User.findOne({ email });
@@ -60,12 +78,7 @@ exports.register = async (req, res) => {
     user.refreshToken = refreshToken;
     await user.save();
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "Strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
-    });
+    res.cookie("refreshToken", refreshToken, refreshCookieOptions());
 
     // ====== Enviar correo de verificación ======
     if (!process.env.JWT_EMAIL_SECRET) {
@@ -123,12 +136,7 @@ exports.login = async (req, res) => {
     user.refreshToken = refreshToken;
     await user.save();
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "Strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("refreshToken", refreshToken, refreshCookieOptions());
 
     res.json({
       token: accessToken,
@@ -157,6 +165,12 @@ exports.refreshToken = async (req, res) => {
     }
 
     const newAccessToken = createAccessToken(user);
+    // (Opcional) Rotar refresh en cada uso:
+    const newRefresh = createRefreshToken(user);
+    user.refreshToken = newRefresh;
+    await user.save();
+    res.cookie("refreshToken", newRefresh, refreshCookieOptions());
+
     res.json({ token: newAccessToken });
   } catch (err) {
     console.error("Error refrescando token:", err);
@@ -180,23 +194,14 @@ exports.verifyEmail = async (req, res) => {
     user.isVerified = true;
     await user.save();
 
-    // 📩 Enviar notificación
-    await transporter.sendMail({
-      from: `"Tejiendo Sueños" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: "Cuenta verificada exitosamente",
-      html: `
-        <h3>¡Bienvenido!</h3>
-        <p>Tu correo ha sido verificado correctamente. Ya puedes iniciar sesión.</p>
-      `,
-    });
+    // 📩 Notificación (si usas transporter aquí, asegúrate de tenerlo importado)
+    // await transporter.sendMail({...});
 
     res.status(200).json({ message: "Cuenta verificada exitosamente" });
   } catch (err) {
     return res.status(400).json({ error: "Token inválido o expirado" });
   }
 };
-
 
 // ====== Reenviar verificación ======
 exports.resendVerification = async (req, res) => {
@@ -222,30 +227,33 @@ exports.resendVerification = async (req, res) => {
   }
 };
 
-//intentos limitados de login
+// ====== Logout ======
 exports.logout = async (req, res) => {
   try {
     const token = req.cookies.refreshToken;
-    if (!token) return res.status(200).json({ message: "Sesión cerrada" });
-
-    const user = await User.findOne({ refreshToken: token });
-    if (user) {
-      user.refreshToken = null;
-      await user.save();
+    if (token) {
+      const user = await User.findOne({ refreshToken: token });
+      if (user) {
+        user.refreshToken = null;
+        await user.save();
+      }
     }
 
+    const opts = refreshCookieOptions();
     res.clearCookie("refreshToken", {
       httpOnly: true,
-      sameSite: "Strict",
-      secure: true,
+      sameSite: opts.sameSite,
+      secure: opts.secure,
+      path: "/",
     });
-    res.status(200).json({ message: "Sesión cerrada correctamente" });
+
+    return res.status(200).json({ message: "Sesión cerrada correctamente" });
   } catch (err) {
-    res.status(500).json({ error: "Error al cerrar sesión" });
+    return res.status(500).json({ error: "Error al cerrar sesión" });
   }
 };
 
-//recuperacion de contraseña
+// ====== Recuperación de contraseña ======
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
 
@@ -276,17 +284,8 @@ exports.resetPassword = async (req, res) => {
     user.password = password;
     await user.save();
 
-    // 📩 Enviar correo de confirmación
-    await transporter.sendMail({
-      from: `"Tejiendo Sueños" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: "Contraseña actualizada",
-      html: `
-        <p>Hola, ${user.name}.</p>
-        <p>Se ha actualizado la contraseña de tu cuenta correctamente.</p>
-        <p>Si no realizaste esta acción, contáctanos de inmediato.</p>
-      `,
-    });
+    // 📩 Notificación (si usas transporter aquí, asegúrate de tenerlo importado)
+    // await transporter.sendMail({...});
 
     res.status(200).json({ message: "Contraseña actualizada con éxito" });
   } catch (err) {
