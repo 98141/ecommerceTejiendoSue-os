@@ -216,3 +216,44 @@ button {
 button:hover {
   background-color: #005fa3;
 }
+
+
+/*Estilos de la tabla pequeña en el historial de las variantes*/
+/* Mini-tabla dentro de la celda Variante */
+.variant-cell {
+  padding: 8px; /* mantiene coherencia con la tabla padre */
+}
+
+.variant-mini-table {
+  border-collapse: collapse;
+  border: 1px solid #e5e7eb;
+  font-size: 0.9rem;            /* un poco más compacta */
+  min-width: 200px;              /* ancho cómodo */
+  background: #fff;
+}
+
+.variant-mini-table thead th {
+  background: #f3f6fb;           /* igual que cabeceras de otras tablas */
+  color: #1f2d3d;
+  font-weight: 600;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.variant-mini-table tbody td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.variant-mini-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Responsive: colapsa ancho en pantallas pequeñas */
+@media (max-width: 640px) {
+  .variant-mini-table {
+    min-width: 160px;
+    font-size: 0.85rem;
+  }
+}

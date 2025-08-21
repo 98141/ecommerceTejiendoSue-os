@@ -58,7 +58,7 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
           err?.response?.data || err.message
         );
         showToast("No se pudo actualizar el estado", "error");
-        throw err; // importa para que OrderCardBlock pueda revertir si quiere
+        throw err; 
       });
   };
 

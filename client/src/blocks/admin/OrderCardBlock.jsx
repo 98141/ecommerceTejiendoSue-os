@@ -1,18 +1,19 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ConfirmModal from "../ConfirmModalBlock";
+import { formatCOP } from "../../utils/currency";
 
 const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
   const navigate = useNavigate();
 
-  // Estado para el modal de confirmación
+  // Estado modal
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmMode, setConfirmMode] = useState(null); // "status" | "cancel"
   const [pendingStatus, setPendingStatus] = useState("");
 
-  // Opciones de estado válidas según el estado actual (igual a tu lógica)
+  // Opciones válidas según estado actual
   const nextStatusOptions = useMemo(() => {
     switch (order.status) {
       case "pendiente":
@@ -44,9 +45,7 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
   const openCancelModal = () => {
     setConfirmMode("cancel");
     setConfirmTitle("Cancelar pedido");
-    setConfirmMessage(
-      "¿Deseas cancelar este pedido? Se restablecerá el stock."
-    );
+    setConfirmMessage("¿Deseas cancelar este pedido? Se restablecerá el stock.");
     setConfirmOpen(true);
   };
 
@@ -58,7 +57,6 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
         await onCancel(order._id);
       }
     } finally {
-      // Cerrar y limpiar
       setConfirmOpen(false);
       setConfirmMode(null);
       setPendingStatus("");
@@ -100,7 +98,7 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
         <strong>Fecha:</strong> {new Date(order.createdAt).toLocaleString()}
       </p>
       <p className="order-card__meta">
-        <strong>Total:</strong> ${order.total}
+        <strong>Total:</strong> {formatCOP(order.total)}
       </p>
 
       <div className="order-card__status-block">
@@ -129,22 +127,53 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
         )}
       </div>
 
-      <ul className="order-card__items">
-        {order.items.map((item, i) => (
-          <li key={i} className="order-card__item">
-            {item.product ? (
-              <>
-                {item.quantity} x {item.product.name} (${item.product.price}{" "}
-                c/u)
-                {item.size && ` | Talla: ${item.size.label}`}
-                {item.color && ` | Color: ${item.color.name}`}
-              </>
-            ) : (
-              <em>Producto eliminado</em>
+      {/* Tabla de ítems */}
+      <div className="table-responsive order-card__table-wrap">
+        <table className="table table-order-items">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Talla</th>
+              <th>Color</th>
+              <th>Cantidad</th>
+              <th>Precio</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(order.items || []).map((item, i) => {
+              const price = item.product?.price ?? 0;
+              const qty = Number(item.quantity) || 0;
+              const subtotal = qty * Number(price);
+              return (
+                <tr key={item._id || i}>
+                  <td>{item.product?.name || "Producto eliminado"}</td>
+                  <td>{item.size?.label || "-"}</td>
+                  <td>{item.color?.name || "-"}</td>
+                  <td>{qty}</td>
+                  <td>{formatCOP(price)}</td>
+                  <td>{formatCOP(subtotal)}</td>
+                </tr>
+              );
+            })}
+            {(!order.items || order.items.length === 0) && (
+              <tr>
+                <td colSpan={6}>
+                  <em>Sin ítems</em>
+                </td>
+              </tr>
             )}
-          </li>
-        ))}
-      </ul>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td className="total-label" colSpan={5}>
+                Total
+              </td>
+              <td className="total-value">{formatCOP(order.total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
       <div className="order-card__actions">
         {order.status === "pendiente" && (

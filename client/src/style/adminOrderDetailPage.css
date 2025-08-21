@@ -4,7 +4,8 @@
   max-width: 1100px;
   margin: 0 auto;
   color: #2c3e50;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial,
+    sans-serif;
 }
 
 .loading {
@@ -19,7 +20,7 @@
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.03);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
 .section__title {
@@ -69,7 +70,8 @@
   border: 1px solid transparent;
   font-weight: 600;
   cursor: pointer;
-  transition: background .15s ease-in-out, border-color .15s ease-in-out, opacity .15s ease-in-out, transform .02s ease-in-out;
+  transition: background 0.15s ease-in-out, border-color 0.15s ease-in-out,
+    opacity 0.15s ease-in-out, transform 0.02s ease-in-out;
   user-select: none;
 }
 
@@ -79,7 +81,7 @@
 
 .btn.is-disabled,
 .btn:disabled {
-  opacity: .6;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -89,14 +91,19 @@
   border-color: #2d6cdf;
   color: #fff;
 }
-.btn--primary:hover { background: #2559b8; border-color: #2559b8; }
+.btn--primary:hover {
+  background: #2559b8;
+  border-color: #2559b8;
+}
 
 .btn--muted {
   background: #e5e7eb;
   border-color: #e5e7eb;
   color: #333;
 }
-.btn--muted:hover { background: #d8dade; }
+.btn--muted:hover {
+  background: #d8dade;
+}
 
 .btn--ghost {
   background: #fff;
@@ -120,7 +127,7 @@
 }
 
 .table thead th {
-  background: #f3f6fb;
+  background: #fbf5f3;
   color: #1f2d3d;
   text-align: left;
   padding: 10px;
@@ -163,5 +170,247 @@
   .nav-row {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+/*otrros estilos*/
+/* Tabla principal */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  background: #fff;
+}
+
+.admin-table thead th {
+  background: #0a66c2; /* azul vivo */
+  color: #fff;
+  text-align: left;
+  padding: 10px;
+}
+
+.admin-table tbody td {
+  padding: 10px;
+  border-bottom: 1px solid #e6edf5;
+  color: #1f2d3d;
+}
+
+.admin-table tbody tr:nth-child(even) {
+  background: #f4f8fe; /* zebra suave */
+}
+
+/* Mini-tabla dentro de la celda Variante */
+.variant-cell {
+  padding: 8px;
+  vertical-align: top;
+}
+
+.variant-mini-table {
+  border-collapse: collapse;
+  border: 1px solid #d8e2ee;
+  font-size: 0.9rem;
+  min-width: 200px;
+  background: #fff;
+}
+
+.variant-mini-table thead th {
+  background: #eaf2fd;
+  color: #1f2d3d;
+  font-weight: 600;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid #d8e2ee;
+}
+
+.variant-mini-table tbody td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.variant-mini-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Inputs / botones básicos (si usas utilidades Tailwind puedes omitir) */
+.input {
+  border: 1px solid #d8e2ee;
+  border-radius: 8px;
+  padding: 6px 8px;
+  min-width: 180px;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #0a66c2;
+  box-shadow: 0 0 0 2px rgba(10, 102, 194, 0.12);
+}
+
+.btn {
+  background: #0a66c2;
+  color: #fff;
+  border: 1px solid #0a66c2;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #0958a9;
+  border-color: #0958a9;
+}
+
+/* Responsive */
+@media (max-width: 720px) {
+  .variant-mini-table {
+    min-width: 160px;
+    font-size: 0.85rem;
+  }
+}
+
+/* Tabla principal de items */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 0.95rem;
+}
+
+.table thead th {
+  background: #0a66c2; /* azul */
+  color: #fff;
+  text-align: left;
+  padding: 10px;
+}
+
+.table tbody td {
+  padding: 10px;
+  border-bottom: 1px solid #e6edf5;
+  color: #1f2d3d;
+}
+
+.table tbody tr:nth-child(even) {
+  background: #f4f8fe; /* zebra suave */
+}
+
+.table tfoot td.total-label {
+  text-align: right;
+  font-weight: 700;
+  border-top: 2px solid #e6edf5;
+  padding: 10px;
+}
+
+.table tfoot td.total-value {
+  font-weight: 700;
+  border-top: 2px solid #e6edf5;
+  padding: 10px;
+}
+
+/* Mini-tabla Variante dentro de la celda */
+.variant-cell {
+  padding: 8px;
+  vertical-align: top;
+}
+
+.variant-mini-table {
+  border-collapse: collapse;
+  border: 1px solid #d8e2ee;
+  font-size: 0.9rem;
+  min-width: 200px;
+  background: #fff;
+}
+
+.variant-mini-table thead th {
+  background: #eaf2fd;
+  color: #1f2d3d;
+  font-weight: 600;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid #d8e2ee;
+}
+
+.variant-mini-table tbody td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.variant-mini-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Botones "base" (si no usas utilidades globales) */
+.btn {
+  background: #0a66c2;
+  color: #fff;
+  border: 1px solid #0a66c2;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #0958a9;
+  border-color: #0958a9;
+}
+
+.btn--ghost {
+  background: transparent;
+  color: #0a66c2;
+  border-color: #0a66c2;
+}
+
+.btn--muted {
+  background: #e9eef5;
+  color: #1f2d3d;
+  border-color: #e9eef5;
+}
+
+.btn--primary {
+  background: #0a66c2;
+  color: #fff;
+  border-color: #0a66c2;
+}
+
+.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Helpers layout */
+.section {
+  margin-bottom: 18px;
+}
+.section__title {
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.field {
+  margin: 4px 0;
+}
+.icon {
+  margin-right: 6px;
+}
+.actions-top {
+  margin: 10px 0 6px;
+}
+.actions-row,
+.nav-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* Responsive */
+@media (max-width: 720px) {
+  .variant-mini-table {
+    min-width: 160px;
+    font-size: 0.85rem;
   }
 }

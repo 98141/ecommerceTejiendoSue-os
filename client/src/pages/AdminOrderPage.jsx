@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { AuthContext } from "../contexts/AuthContext";
+import { formatCOP } from "../utils/currency";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -39,7 +40,10 @@ const AdminSalesHistoryPage = () => {
       if (opts.colorId) params.append("colorId", opts.colorId);
       if (opts.userId) params.append("userId", opts.userId);
 
-      const res = await axios.get(`${API}/orders/sales-history?${params.toString()}`, authHeaders);
+      const res = await axios.get(
+        `${API}/orders/sales-history?${params.toString()}`,
+        authHeaders
+      );
       setRows(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       console.error(e);
@@ -62,15 +66,16 @@ const AdminSalesHistoryPage = () => {
 
   // Sumatorios
   const totals = useMemo(() => {
-    let sumTotal = 0, sumQty = 0;
+    let sumTotal = 0,
+      sumQty = 0;
     for (const r of rows) {
       sumTotal += Number(r.total) || 0;
       sumQty += Number(r.quantity) || 0;
     }
-    return { sumTotal: Number(sumTotal.toFixed(2)), sumQty };
+    return { sumTotal, sumQty };
   }, [rows]);
 
-  // ======= Export PDF =======
+  // ======= Export PDF (COP) =======
   const exportPDF = () => {
     try {
       const doc = new jsPDF();
@@ -78,24 +83,45 @@ const AdminSalesHistoryPage = () => {
 
       autoTable(doc, {
         startY: 20,
-        head: [[
-          "Fecha","Usuario","Producto","Variante",
-          "Precio unit.","Cant.","Total","Stock cierre","Estado"
-        ]],
-        body: (rows || []).map(r => ([
-          toLocal(r.date),
-          r.userName || "Desconocido",
-          r.productName || "Producto eliminado",
-          `${r.sizeLabel || "?"} / ${r.colorName || "?"}`,
-          typeof r.unitPrice === "number" ? r.unitPrice : (r.unitPrice || 0),
-          r.quantity ?? 0,
-          typeof r.total === "number" ? r.total : (r.total || 0),
-          (typeof r.stockAtPurchase === "number" ? r.stockAtPurchase : (r.stockAtPurchase ?? "-")),
-          r.status || ""
-        ])),
+        head: [
+          [
+            "Fecha",
+            "Usuario",
+            "Producto",
+            "Variante",
+            "Precio unit.",
+            "Cant.",
+            "Total",
+            "Stock cierre",
+            "Estado",
+          ],
+        ],
+        body: (rows || []).map((r) => {
+          const unitPriceNum =
+            typeof r.unitPrice === "number" ? r.unitPrice : Number(r.unitPrice || 0);
+          const totalNum =
+            typeof r.total === "number" ? r.total : Number(r.total || 0);
+          return [
+            toLocal(r.date),
+            r.userName || "Desconocido",
+            r.productName || "Producto eliminado",
+            // Para PDF dejamos el texto compactado (si quieres, se puede hacer multilínea "Talla: X\nColor: Y")
+            `${r.sizeLabel || "?"} / ${r.colorName || "?"}`,
+            formatCOP(unitPriceNum),
+            r.quantity ?? 0,
+            formatCOP(totalNum),
+            typeof r.stockAtPurchase === "number"
+              ? r.stockAtPurchase
+              : r.stockAtPurchase ?? "-",
+            r.status || "",
+          ];
+        }),
         styles: { fontSize: 9, cellPadding: 2 },
         headStyles: { fillColor: [240, 240, 240] },
       });
+
+      const endY = doc.lastAutoTable?.finalY ?? 20;
+      doc.text(`Total vendido: ${formatCOP(totals.sumTotal)}`, 14, endY + 10);
 
       doc.save("historial_general_ventas.pdf");
     } catch (e) {
@@ -104,22 +130,33 @@ const AdminSalesHistoryPage = () => {
     }
   };
 
-  // ======= Export CSV =======
+  // ======= Export CSV (COP) =======
   const exportCSV = () => {
-    const data = (rows || []).map(r => ({
-      fecha: toLocal(r.date),
-      usuario: r.userName || "Desconocido",
-      producto: r.productName || "Producto eliminado",
-      variante: `${r.sizeLabel || "?"} / ${r.colorName || "?"}`,
-      precio_unitario: typeof r.unitPrice === "number" ? r.unitPrice : (r.unitPrice || 0),
-      cantidad: r.quantity ?? 0,
-      total: typeof r.total === "number" ? r.total : (r.total || 0),
-      stock_cierre: (typeof r.stockAtPurchase === "number" ? r.stockAtPurchase : (r.stockAtPurchase ?? "")),
-      estado: r.status || "",
-      orderId: r.orderId,
-      productId: r.productId,
-      userId: r.userId,
-    }));
+    const data = (rows || []).map((r) => {
+      const unitPriceNum =
+        typeof r.unitPrice === "number" ? r.unitPrice : Number(r.unitPrice || 0);
+      const totalNum =
+        typeof r.total === "number" ? r.total : Number(r.total || 0);
+
+      return {
+        fecha: toLocal(r.date),
+        usuario: r.userName || "Desconocido",
+        producto: r.productName || "Producto eliminado",
+        variante: `${r.sizeLabel || "?"} / ${r.colorName || "?"}`,
+        precio_unitario: formatCOP(unitPriceNum),
+        cantidad: r.quantity ?? 0,
+        total: formatCOP(totalNum),
+        stock_cierre:
+          typeof r.stockAtPurchase === "number"
+            ? r.stockAtPurchase
+            : r.stockAtPurchase ?? "",
+        estado: r.status || "",
+        orderId: r.orderId,
+        productId: r.productId,
+        userId: r.userId,
+      };
+    });
+
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Historial");
@@ -133,15 +170,29 @@ const AdminSalesHistoryPage = () => {
       <div className="mb-4 flex flex-wrap gap-3 items-end">
         <div>
           <label className="block text-sm">Desde</label>
-          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="input" />
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="input"
+          />
         </div>
         <div>
           <label className="block text-sm">Hasta</label>
-          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="input" />
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="input"
+          />
         </div>
         <div>
           <label className="block text-sm">Estado</label>
-          <select value={status} onChange={e => setStatus(e.target.value)} className="input">
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="input"
+          >
             <option value="">Todos</option>
             <option value="pendiente">pendiente</option>
             <option value="enviado">enviado</option>
@@ -151,28 +202,54 @@ const AdminSalesHistoryPage = () => {
         </div>
         <div>
           <label className="block text-sm">Producto ID</label>
-          <input value={productId} onChange={e => setProductId(e.target.value)} placeholder="ObjectId" className="input" />
+          <input
+            value={productId}
+            onChange={(e) => setProductId(e.target.value)}
+            placeholder="ObjectId"
+            className="input"
+          />
         </div>
         <div>
           <label className="block text-sm">Talla ID</label>
-          <input value={sizeId} onChange={e => setSizeId(e.target.value)} placeholder="ObjectId" className="input" />
+          <input
+            value={sizeId}
+            onChange={(e) => setSizeId(e.target.value)}
+            placeholder="ObjectId"
+            className="input"
+          />
         </div>
         <div>
           <label className="block text-sm">Color ID</label>
-          <input value={colorId} onChange={e => setColorId(e.target.value)} placeholder="ObjectId" className="input" />
+          <input
+            value={colorId}
+            onChange={(e) => setColorId(e.target.value)}
+            placeholder="ObjectId"
+            className="input"
+          />
         </div>
         <div>
           <label className="block text-sm">Usuario ID</label>
-          <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="ObjectId" className="input" />
+          <input
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+            placeholder="ObjectId"
+            className="input"
+          />
         </div>
-        <button className="btn" onClick={onApplyFilters}>Aplicar filtros</button>
-        <button className="btn" onClick={exportPDF}>Exportar PDF</button>
-        <button className="btn" onClick={exportCSV}>Exportar CSV</button>
+        <button className="btn" onClick={onApplyFilters}>
+          Aplicar filtros
+        </button>
+        <button className="btn" onClick={exportPDF}>
+          Exportar PDF
+        </button>
+        <button className="btn" onClick={exportCSV}>
+          Exportar CSV
+        </button>
       </div>
 
       <div className="mb-2">
         <strong>Resumen:</strong>{" "}
-        <span>Total vendido: ${totals.sumTotal}</span>{" "}
+        <span>Total vendido: {formatCOP(totals.sumTotal)}</span>{" "}
         <span className="ml-4">Unidades: {totals.sumQty}</span>
       </div>
 
@@ -195,20 +272,55 @@ const AdminSalesHistoryPage = () => {
           </thead>
           <tbody>
             {(rows || []).length === 0 ? (
-              <tr><td colSpan="9">Sin registros.</td></tr>
-            ) : rows.map((r, idx) => (
-              <tr key={`${r.orderId}-${idx}`}>
-                <td>{toLocal(r.date)}</td>
-                <td>{r.userName || "Desconocido"}</td>
-                <td>{r.productName || "Producto eliminado"}</td>
-                <td>{(r.sizeLabel || "?") + " / " + (r.colorName || "?")}</td>
-                <td>{typeof r.unitPrice === "number" ? r.unitPrice : (r.unitPrice || 0)}</td>
-                <td>{r.quantity ?? 0}</td>
-                <td>{typeof r.total === "number" ? r.total : (r.total || 0)}</td>
-                <td>{typeof r.stockAtPurchase === "number" ? r.stockAtPurchase : (r.stockAtPurchase ?? "-")}</td>
-                <td>{r.status || ""}</td>
+              <tr>
+                <td colSpan="9">Sin registros.</td>
               </tr>
-            ))}
+            ) : (
+              rows.map((r, idx) => {
+                const unitPriceNum =
+                  typeof r.unitPrice === "number"
+                    ? r.unitPrice
+                    : Number(r.unitPrice || 0);
+                const totalNum =
+                  typeof r.total === "number" ? r.total : Number(r.total || 0);
+
+                return (
+                  <tr key={`${r.orderId}-${idx}`}>
+                    <td>{toLocal(r.date)}</td>
+                    <td>{r.userName || "Desconocido"}</td>
+                    <td>{r.productName || "Producto eliminado"}</td>
+
+                    {/* === Variante como mini-tabla dentro de la celda === */}
+                    <td className="variant-cell">
+                      <table className="variant-mini-table">
+                        <thead>
+                          <tr>
+                            <th>Talla</th>
+                            <th>Color</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>{r.sizeLabel || "?"}</td>
+                            <td>{r.colorName || "?"}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </td>
+
+                    <td>{formatCOP(unitPriceNum)}</td>
+                    <td>{r.quantity ?? 0}</td>
+                    <td>{formatCOP(totalNum)}</td>
+                    <td>
+                      {typeof r.stockAtPurchase === "number"
+                        ? r.stockAtPurchase
+                        : r.stockAtPurchase ?? "-"}
+                    </td>
+                    <td>{r.status || ""}</td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       )}
