@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import { formatCOP } from "../../../utils/currency"; // ✅ usamos tu helper
 
 function alignSeries(current = [], previous = []) {
   const mapCurr = new Map(current.map((d) => [d.period, d.total]));
@@ -21,17 +22,8 @@ function alignSeries(current = [], previous = []) {
   return arr;
 }
 
-const MonthlySalesChart = ({
-  current,
-  previous,
-  currency = "USD",
-  groupByMonth,
-}) => {
+const MonthlySalesChart = ({ current, previous, groupByMonth }) => {
   const data = alignSeries(current, previous);
-  const fmtMoney = (v) =>
-    new Intl.NumberFormat("es-CO", { style: "currency", currency }).format(
-      Number(v || 0)
-    );
   const label = groupByMonth ? "Ventas por mes" : "Ventas por día";
 
   return (
@@ -41,9 +33,10 @@ const MonthlySalesChart = ({
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="period" />
-          <YAxis tickFormatter={(v) => fmtMoney(v)} width={100} />
+          {/* ✅ Mostrar en pesos colombianos */}
+          <YAxis tickFormatter={(v) => formatCOP(v)} width={120} />
           <Tooltip
-            formatter={(v) => fmtMoney(v)}
+            formatter={(v) => formatCOP(v)}
             labelFormatter={(l) => `Período: ${l}`}
           />
           <Legend />

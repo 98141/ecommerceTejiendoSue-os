@@ -1,8 +1,11 @@
 import React, { useEffect, useState, useContext, useRef } from "react";
 import axios from "axios";
+
 import { AuthContext } from "../../../contexts/AuthContext";
 import ConfirmModal from "../../../blocks/ConfirmModalBlock";
 import { useToast } from "../../../contexts/ToastContext";
+import { formatCOP } from "../../../utils/currency";
+
 import { useNavigate } from "react-router-dom";
 
 const SERVER_BASE = "http://localhost:5000";
@@ -44,11 +47,11 @@ const PriceCell = ({ price, effectivePrice }) => {
     <div className="price-cell">
       {hasDiscount ? (
         <>
-          <span className="price-original">${p.toFixed(2)}</span>
-          <span className="price-effective">${e.toFixed(2)}</span>
+          <span className="price-original">{formatCOP(p)}</span>
+          <span className="price-effective">{formatCOP(e)}</span>
         </>
       ) : (
-        <span className="price-regular">${p.toFixed(2)}</span>
+        <span className="price-regular">{formatCOP(p)}</span>
       )}
     </div>
   );
@@ -62,7 +65,7 @@ const PromoCell = ({ discount }) => {
   const isPercent = d.type === "PERCENT";
   const valueLabel =
     typeof d.value === "number" || typeof d.value === "string"
-      ? (isPercent ? `${Number(d.value)}%` : `$${Number(d.value).toFixed(2)}`)
+      ? (isPercent ? `${Number(d.value)}%` : formatCOP(d.value))
       : "—";
 
   const fmt = (iso) => {

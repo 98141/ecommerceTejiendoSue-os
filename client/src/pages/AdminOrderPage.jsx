@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { AuthContext } from "../contexts/AuthContext";
 import { formatCOP } from "../utils/currency";
@@ -18,16 +18,58 @@ const AdminSalesHistoryPage = () => {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [status, setStatus] = useState("");
-  const [productId, setProductId] = useState("");
-  const [sizeId, setSizeId] = useState("");
-  const [colorId, setColorId] = useState("");
-  const [userId, setUserId] = useState("");
+  const [month, setMonth] = useState(""); // YYYY-MM
+
+  // Error de fechas para rango manual
+  const [dateError, setDateError] = useState("");
+
+  // Ref para debounce (fechas)
+  const debounceRef = useRef(null);
 
   const authHeaders = useMemo(
     () => ({ headers: { Authorization: `Bearer ${token}` } }),
     [token]
   );
 
+  // --- Helpers de fecha ---
+  const validateDateRange = (fromStr, toStr) => {
+    if (!fromStr || !toStr) return ""; // solo valida si ambas están
+    const fromDate = new Date(fromStr);
+    const toDate = new Date(toStr);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      return "Fechas inválidas.";
+    }
+    if (toDate < fromDate) {
+      return "La fecha 'Hasta' no puede ser anterior a la fecha 'Desde'.";
+    }
+    return "";
+  };
+
+  // Inclusivo: envía día siguiente al backend
+  const normalizeToInclusive = (toStr) => {
+    if (!toStr) return "";
+    const d = new Date(`${toStr}T00:00:00`);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  };
+
+  // Convierte "YYYY-MM" a inicio/fin de mes
+  const monthToRange = (mStr) => {
+    if (!mStr) return { from: "", toDisplay: "", toForApi: "" };
+    const [yStr, mmStr] = mStr.split("-");
+    const y = Number(yStr);
+    const m = Number(mmStr); // 1..12
+    if (!y || !m) return { from: "", toDisplay: "", toForApi: "" };
+
+    const monthStart = `${yStr}-${mmStr}-01`;
+    const lastDay = new Date(y, m, 0).getDate(); // último día del mes
+    const monthEnd = `${yStr}-${mmStr}-${String(lastDay).padStart(2, "0")}`;
+    const toForApi = normalizeToInclusive(monthEnd);
+
+    return { from: monthStart, toDisplay: monthEnd, toForApi };
+  };
+
+  // --- Carga desde API ---
   const fetchData = async (opts = {}) => {
     setLoading(true);
     try {
@@ -35,10 +77,6 @@ const AdminSalesHistoryPage = () => {
       if (opts.from) params.append("from", opts.from);
       if (opts.to) params.append("to", opts.to);
       if (opts.status) params.append("status", opts.status);
-      if (opts.productId) params.append("productId", opts.productId);
-      if (opts.sizeId) params.append("sizeId", opts.sizeId);
-      if (opts.colorId) params.append("colorId", opts.colorId);
-      if (opts.userId) params.append("userId", opts.userId);
 
       const res = await axios.get(
         `${API}/orders/sales-history?${params.toString()}`,
@@ -53,13 +91,75 @@ const AdminSalesHistoryPage = () => {
     }
   };
 
+  // Carga inicial
   useEffect(() => {
     fetchData({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onApplyFilters = () => {
-    fetchData({ from, to, status, productId, sizeId, colorId, userId });
+  // Validación de fechas (si NO hay mes seleccionado)
+  useEffect(() => {
+    if (month) {
+      setDateError("");
+      return;
+    }
+    setDateError(validateDateRange(from, to));
+  }, [from, to, month]);
+
+  // Aplica filtros ahora (prioridad mes > rango manual)
+  const applyFiltersNow = (overrides = {}) => {
+    const effMonth = overrides.month ?? month;
+
+    if (effMonth) {
+      const { from: mFrom, toForApi: mTo } = monthToRange(effMonth);
+      fetchData({
+        from: mFrom || "",
+        to: mTo || "",
+        status: overrides.status ?? status,
+      });
+      return;
+    }
+
+    const f = overrides.from ?? from;
+    const t = overrides.to ?? to;
+    const err = validateDateRange(f, t);
+    setDateError(err);
+    if (err) return;
+
+    const toForApi = t ? normalizeToInclusive(t) : "";
+    fetchData({
+      from: f || "",
+      to: toForApi || "",
+      status: overrides.status ?? status,
+    });
+  };
+
+  // Debounce para onChange de fechas
+  const applyFiltersDebounced = (overrides = {}) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      applyFiltersNow(overrides);
+    }, 400);
+  };
+
+  // Enter = aplicar inmediatamente
+  const handleKeyDownApply = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      applyFiltersNow({});
+    }
+  };
+
+  // Reset filtros
+  const handleClearFilters = () => {
+    setFrom("");
+    setTo("");
+    setStatus("");
+    setMonth("");
+    setDateError("");
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    fetchData({});
   };
 
   const toLocal = (d) => (d ? new Date(d).toLocaleString() : "");
@@ -77,50 +177,165 @@ const AdminSalesHistoryPage = () => {
 
   // ======= Export PDF (COP) =======
   const exportPDF = () => {
+    if (!month && dateError) {
+      alert(dateError);
+      return;
+    }
     try {
-      const doc = new jsPDF();
-      doc.text("Historial general de ventas", 14, 14);
+      const HEAD_BG = [10, 102, 194];
+      const HEAD_TX = [255, 255, 255];
+      const GRID = [220, 226, 235];
+      const ZEBRA = [244, 248, 254];
 
-      autoTable(doc, {
-        startY: 20,
-        head: [
-          [
-            "Fecha",
-            "Usuario",
-            "Producto",
-            "Variante",
-            "Precio unit.",
-            "Cant.",
-            "Total",
-            "Stock cierre",
-            "Estado",
-          ],
-        ],
-        body: (rows || []).map((r) => {
-          const unitPriceNum =
-            typeof r.unitPrice === "number" ? r.unitPrice : Number(r.unitPrice || 0);
-          const totalNum =
-            typeof r.total === "number" ? r.total : Number(r.total || 0);
-          return [
-            toLocal(r.date),
-            r.userName || "Desconocido",
-            r.productName || "Producto eliminado",
-            // Para PDF dejamos el texto compactado (si quieres, se puede hacer multilínea "Talla: X\nColor: Y")
-            `${r.sizeLabel || "?"} / ${r.colorName || "?"}`,
-            formatCOP(unitPriceNum),
-            r.quantity ?? 0,
-            formatCOP(totalNum),
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(14);
+      doc.text("Historial general de ventas", 14, 12);
+
+      const columns = [
+        { header: "Fecha", dataKey: "date" },
+        { header: "Usuario", dataKey: "user" },
+        { header: "Producto", dataKey: "product" },
+        { header: "Variante", dataKey: "variant" },
+        { header: "Precio unit.", dataKey: "unitPrice" },
+        { header: "Cant.", dataKey: "qty" },
+        { header: "Total", dataKey: "total" },
+        { header: "Stock cierre", dataKey: "stock" },
+        { header: "Estado", dataKey: "status" },
+      ];
+
+      const body = (rows || []).map((r) => {
+        const unitPriceNum = Number(
+          typeof r.unitPrice === "number" ? r.unitPrice : r.unitPrice || 0
+        );
+        const totalNum = Number(
+          typeof r.total === "number" ? r.total : r.total || 0
+        );
+        return {
+          date: toLocal(r.date),
+          user: r.userName || "Desconocido",
+          product: r.productName || "Producto eliminado",
+          variant: { size: r.sizeLabel || "?", color: r.colorName || "?" },
+          unitPrice: formatCOP(unitPriceNum),
+          qty: r.quantity ?? 0,
+          total: formatCOP(totalNum),
+          stock:
             typeof r.stockAtPurchase === "number"
               ? r.stockAtPurchase
               : r.stockAtPurchase ?? "-",
-            r.status || "",
-          ];
-        }),
-        styles: { fontSize: 9, cellPadding: 2 },
-        headStyles: { fillColor: [240, 240, 240] },
+          status: r.status || "",
+        };
       });
 
-      const endY = doc.lastAutoTable?.finalY ?? 20;
+      const MARGINS = { left: 8, right: 8, top: 18 };
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const availableWidth = pageWidth - MARGINS.left - MARGINS.right;
+
+      const base = {
+        date: 36,
+        user: 40,
+        product: 60,
+        variant: 48,
+        unitPrice: 28,
+        qty: 18,
+        total: 30,
+        stock: 24,
+        status: 28,
+      };
+      const sumBase = Object.values(base).reduce((a, b) => a + b, 0);
+      const scale = Math.min(1, availableWidth / sumBase);
+      const W = Object.fromEntries(
+        Object.entries(base).map(([k, v]) => [k, Math.floor(v * scale)])
+      );
+      const tableFontSize = scale < 0.92 ? 8 : 9;
+      const cellPadding = scale < 0.92 ? 2 : 2.5;
+
+      autoTable(doc, {
+        startY: MARGINS.top,
+        columns,
+        body,
+        theme: "grid",
+        margin: { left: MARGINS.left, right: MARGINS.right, top: MARGINS.top },
+        styles: {
+          fontSize: tableFontSize,
+          cellPadding,
+          lineColor: GRID,
+          lineWidth: 0.2,
+          valign: "middle",
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: HEAD_BG,
+          textColor: HEAD_TX,
+          lineWidth: 0,
+        },
+        alternateRowStyles: { fillColor: ZEBRA },
+        columnStyles: {
+          date: { cellWidth: W.date },
+          user: { cellWidth: W.user },
+          product: { cellWidth: W.product },
+          variant: { cellWidth: W.variant },
+          unitPrice: { cellWidth: W.unitPrice, halign: "right" },
+          qty: { cellWidth: W.qty, halign: "right" },
+          total: { cellWidth: W.total, halign: "right" },
+          stock: { cellWidth: W.stock, halign: "right" },
+          status: { cellWidth: W.status },
+        },
+        didParseCell: (d) => {
+          if (d.section === "body" && d.column.dataKey === "variant") {
+            d.cell.text = [];
+          }
+        },
+        didDrawCell: (d) => {
+          if (d.section !== "body" || d.column.dataKey !== "variant") return;
+
+          const Doc = d.doc;
+          const { x, y, width, height } = d.cell;
+          const pad = 1.5;
+          const ix = x + pad,
+            iy = y + pad,
+            iw = width - pad * 2,
+            ih = height - pad * 2;
+          const headerH = Math.min(6, ih * 0.35);
+          const midX = ix + iw / 2;
+
+          Doc.setDrawColor(220, 226, 235);
+          Doc.setLineWidth(0.2);
+          Doc.rect(ix, iy, iw, ih);
+
+          Doc.setFillColor(235, 240, 248);
+          Doc.rect(ix, iy, iw, headerH, "F");
+          Doc.setDrawColor(220, 226, 235);
+          Doc.line(midX, iy, midX, iy + ih);
+
+          Doc.setTextColor(31, 45, 61);
+          Doc.setFontSize(tableFontSize - 0.5);
+          Doc.text("Talla", ix + 2, iy + headerH - 2);
+          Doc.text("Color", midX + 2, iy + headerH - 2);
+
+          const val = d.cell.raw || {};
+          const valueY = iy + headerH + 4.5;
+          Doc.setTextColor(55, 65, 81);
+          Doc.setFontSize(tableFontSize);
+          Doc.text(String(val.size ?? "?"), ix + 2, valueY);
+          Doc.text(String(val.color ?? "?"), midX + 2, valueY);
+        },
+        didDrawPage: (data) => {
+          const str = `Página ${
+            data.pageNumber
+          } de ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(9);
+          doc.setTextColor(100);
+          doc.text(
+            str,
+            data.settings.margin.left,
+            doc.internal.pageSize.getHeight() - 6
+          );
+        },
+      });
+
+      const endY = doc.lastAutoTable?.finalY ?? MARGINS.top;
+      doc.setFontSize(11);
       doc.text(`Total vendido: ${formatCOP(totals.sumTotal)}`, 14, endY + 10);
 
       doc.save("historial_general_ventas.pdf");
@@ -132,9 +347,15 @@ const AdminSalesHistoryPage = () => {
 
   // ======= Export CSV (COP) =======
   const exportCSV = () => {
+    if (!month && dateError) {
+      alert(dateError);
+      return;
+    }
     const data = (rows || []).map((r) => {
       const unitPriceNum =
-        typeof r.unitPrice === "number" ? r.unitPrice : Number(r.unitPrice || 0);
+        typeof r.unitPrice === "number"
+          ? r.unitPrice
+          : Number(r.unitPrice || 0);
       const totalNum =
         typeof r.total === "number" ? r.total : Number(r.total || 0);
 
@@ -167,30 +388,75 @@ const AdminSalesHistoryPage = () => {
     <div className="p-4">
       <h2 className="text-xl font-bold mb-3">Historial general de ventas</h2>
 
+      {/* Filtros (aplican solos) */}
       <div className="mb-4 flex flex-wrap gap-3 items-end">
+        {/* Mes (sincroniza Desde/Hasta) */}
+        <div>
+          <label className="block text-sm">Mes</label>
+          <input
+            type="month"
+            value={month}
+            onChange={(e) => {
+              const m = e.target.value; // YYYY-MM
+              setMonth(m);
+
+              // Sincroniza visualmente 'Desde' y 'Hasta' con el mes
+              const { from: mFrom, toDisplay: mToDisplay } = monthToRange(m);
+              setFrom(mFrom);
+              setTo(mToDisplay);
+
+              // Limpia error de rango manual (no aplica con mes)
+              setDateError("");
+
+              // Aplica filtros con prioridad mes
+              applyFiltersNow({ month: m });
+            }}
+            className="input"
+          />
+        </div>
+
         <div>
           <label className="block text-sm">Desde</label>
           <input
             type="date"
             value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={(e) => {
+              setFrom(e.target.value);
+              setMonth(""); // usar rango manual => desactiva mes
+              applyFiltersDebounced({});
+            }}
+            onBlur={() => applyFiltersNow({})}
+            onKeyDown={handleKeyDownApply}
             className="input"
+            max={to || undefined}
           />
         </div>
+
         <div>
           <label className="block text-sm">Hasta</label>
           <input
             type="date"
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={(e) => {
+              setTo(e.target.value);
+              setMonth(""); // usar rango manual => desactiva mes
+              applyFiltersDebounced({});
+            }}
+            onBlur={() => applyFiltersNow({})}
+            onKeyDown={handleKeyDownApply}
             className="input"
+            min={from || undefined}
           />
         </div>
+
         <div>
           <label className="block text-sm">Estado</label>
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              applyFiltersNow({ status: e.target.value });
+            }}
             className="input"
           >
             <option value="">Todos</option>
@@ -200,52 +466,30 @@ const AdminSalesHistoryPage = () => {
             <option value="cancelado">cancelado</option>
           </select>
         </div>
-        <div>
-          <label className="block text-sm">Producto ID</label>
-          <input
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            placeholder="ObjectId"
-            className="input"
-          />
-        </div>
-        <div>
-          <label className="block text-sm">Talla ID</label>
-          <input
-            value={sizeId}
-            onChange={(e) => setSizeId(e.target.value)}
-            placeholder="ObjectId"
-            className="input"
-          />
-        </div>
-        <div>
-          <label className="block text-sm">Color ID</label>
-          <input
-            value={colorId}
-            onChange={(e) => setColorId(e.target.value)}
-            placeholder="ObjectId"
-            className="input"
-          />
-        </div>
-        <div>
-          <label className="block text-sm">Usuario ID</label>
-          <input
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            placeholder="ObjectId"
-            className="input"
-          />
-        </div>
-        <button className="btn" onClick={onApplyFilters}>
-          Aplicar filtros
-        </button>
-        <button className="btn" onClick={exportPDF}>
+
+        <button
+          className="btn"
+          onClick={exportPDF}
+          disabled={!month && !!dateError}
+        >
           Exportar PDF
         </button>
-        <button className="btn" onClick={exportCSV}>
+        <button
+          className="btn"
+          onClick={exportCSV}
+          disabled={!month && !!dateError}
+        >
           Exportar CSV
         </button>
+
+        {/* Eliminar filtros */}
+        <button className="btn" onClick={handleClearFilters}>
+          Eliminar filtros
+        </button>
       </div>
+
+      {/* Error fechas (sólo cuando se usa rango manual) */}
+      {!month && dateError && <div role="alert">{dateError}</div>}
 
       <div className="mb-2">
         <strong>Resumen:</strong>{" "}
@@ -290,7 +534,7 @@ const AdminSalesHistoryPage = () => {
                     <td>{r.userName || "Desconocido"}</td>
                     <td>{r.productName || "Producto eliminado"}</td>
 
-                    {/* === Variante como mini-tabla dentro de la celda === */}
+                    {/* Variante como mini-tabla dentro de la celda */}
                     <td className="variant-cell">
                       <table className="variant-mini-table">
                         <thead>

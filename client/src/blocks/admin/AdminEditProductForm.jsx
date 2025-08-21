@@ -3,6 +3,8 @@ import axios from "axios";
 import { FaTimesCircle, FaPlusCircle } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
+import { formatCOP } from "../../utils/currency"; 
+
 /** Util: convierte fecha ISO a valor compatible con <input type="datetime-local"> */
 const toDatetimeLocal = (iso) => {
   if (!iso) return "";
@@ -49,12 +51,12 @@ const DiscountPreview = ({ price, discount }) => {
     <div className="discount-preview">
       {has ? (
         <p>
-          Precio actual: <b>${Number(price).toFixed(2)}</b> — Precio con promo:{" "}
-          <b>${effective.toFixed(2)}</b>
+          Precio actual: <b>{formatCOP(price)}</b> — Precio con promo:{" "}
+          <b>{formatCOP(effective)}</b>
         </p>
       ) : (
         <p>
-          Precio actual: <b>${Number(price).toFixed(2)}</b>
+          Precio actual: <b>{formatCOP(price)}</b>
         </p>
       )}
     </div>
@@ -348,8 +350,6 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
       setSaving(false);
     }
   };
-
-  const handleCancel = () => navigate("/admin/products");
 
   // Helpers de visualización para variantes (funcionan con id u objeto)
   const getSizeLabel = (v) => {

@@ -5,10 +5,13 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import dayjs from "dayjs";
+
 import { AuthContext } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import FilterExportControls from "../blocks/admin/FilterExportControls";
 import OrderCardBlock from "../blocks/admin/OrderCardBlock";
+import { formatCOP } from "../utils/currency";
+
 import logo from "../assets/PPFINAL.png";
 
 const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
@@ -58,7 +61,7 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
           err?.response?.data || err.message
         );
         showToast("No se pudo actualizar el estado", "error");
-        throw err; 
+        throw err;
       });
   };
 
@@ -151,8 +154,8 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
         item.size?.label || "-",
         item.color?.name || "-",
         item.quantity,
-        item.product?.price?.toFixed(2) || "-",
-        order.total?.toFixed(2) || "-",
+        item.product?.price ? formatCOP(item.product.price) : "-",
+        order.total ? formatCOP(order.total) : "-",
         order.status,
       ])
     );

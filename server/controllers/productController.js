@@ -58,6 +58,85 @@ async function getVariantSnapshots(sizeId, colorId) {
   return { sizeLabel, colorName };
 }
 
+/** ---- Helpers de descuento ---- */
+function parseDiscountFromBody(body) {
+  // Caso 1: todo el descuento viene en un único campo JSON (FormData)
+  if (body.discount != null) {
+    try {
+      const raw =
+        typeof body.discount === "string"
+          ? JSON.parse(body.discount)
+          : body.discount;
+      return {
+        enabled: !!raw.enabled,
+        type: raw.type === "FIXED" ? "FIXED" : "PERCENT",
+        value: Number(raw.value) || 0,
+        startAt: raw.startAt ? new Date(raw.startAt) : null,
+        endAt: raw.endAt ? new Date(raw.endAt) : null,
+        _source: "json",
+      };
+    } catch {
+      return { _error: "Formato JSON inválido en discount" };
+    }
+  }
+
+  // Caso 2: campos planos (discount[enabled], etc.) — validados por express-validator en rutas
+  const hasAnyFlat =
+    body["discount[enabled]"] != null ||
+    body["discount[type]"] != null ||
+    body["discount[value]"] != null ||
+    body["discount[startAt]"] != null ||
+    body["discount[endAt]"] != null;
+
+  if (hasAnyFlat) {
+    const enabled = String(body["discount[enabled]"]).trim() === "true";
+    const type = body["discount[type]"] === "FIXED" ? "FIXED" : "PERCENT";
+    const value = Number(body["discount[value]"]) || 0;
+    const startAt = body["discount[startAt]"]
+      ? new Date(body["discount[startAt]"])
+      : null;
+    const endAt = body["discount[endAt]"]
+      ? new Date(body["discount[endAt]"])
+      : null;
+    return { enabled, type, value, startAt, endAt, _source: "flat" };
+  }
+
+  return null; // No se envió descuento en el request
+}
+
+function validateDiscountPayload(priceNumber, d) {
+  if (!d || !d.enabled) {
+    // Si viene null o disabled, normalizamos a disabled
+    return {
+      ok: true,
+      value: {
+        enabled: false,
+        type: "PERCENT",
+        value: 0,
+        startAt: null,
+        endAt: null,
+      },
+    };
+  }
+  if (d.type === "PERCENT") {
+    if (!(d.value > 0 && d.value <= 90)) {
+      return { ok: false, error: "Porcentaje inválido (1–90%)." };
+    }
+  } else {
+    const p = Number(priceNumber) || 0;
+    if (!(d.value > 0 && d.value < p)) {
+      return {
+        ok: false,
+        error: "Monto fijo inválido (debe ser > 0 y < precio).",
+      };
+    }
+  }
+  if (d.startAt && d.endAt && d.endAt <= d.startAt) {
+    return { ok: false, error: "La fecha fin debe ser posterior al inicio." };
+  }
+  return { ok: true, value: d };
+}
+
 /** ===================== CREATE ===================== */
 exports.createProduct = async (req, res) => {
   try {
@@ -66,13 +145,17 @@ exports.createProduct = async (req, res) => {
     const validVariants = parseVariants(req.body.variants);
 
     if (!name || typeof price === "undefined") {
-      return res.status(400).json({ error: "Faltan campos obligatorios (name, price)." });
+      return res
+        .status(400)
+        .json({ error: "Faltan campos obligatorios (name, price)." });
     }
     if (!categoryId) {
       return res.status(400).json({ error: "Categoría inválida o ausente." });
     }
     if (!validVariants.length) {
-      return res.status(400).json({ error: "Debes incluir al menos una variante válida" });
+      return res
+        .status(400)
+        .json({ error: "Debes incluir al menos una variante válida" });
     }
 
     const imagePaths = (req.files || []).map(
@@ -88,12 +171,29 @@ exports.createProduct = async (req, res) => {
       variants: validVariants,
     });
 
+    // ← Nuevo: aceptar descuento en creación si se envía
+    const discountFromReq = parseDiscountFromBody(req.body);
+    if (discountFromReq && discountFromReq._error) {
+      return res.status(400).json({ error: discountFromReq._error });
+    }
+    if (discountFromReq) {
+      const { ok, error, value } = validateDiscountPayload(
+        Number(price),
+        discountFromReq
+      );
+      if (!ok) return res.status(400).json({ error });
+      newProduct.discount = value;
+    }
+
     await newProduct.save();
 
     // Ledger — creación de variantes con snapshot
     const ledgerInserts = [];
     for (const v of newProduct.variants) {
-      const { sizeLabel, colorName } = await getVariantSnapshots(v.size, v.color);
+      const { sizeLabel, colorName } = await getVariantSnapshots(
+        v.size,
+        v.color
+      );
       ledgerInserts.push({
         productId: newProduct._id,
         size: v.size,
@@ -157,7 +257,8 @@ exports.getProductById = async (req, res) => {
       .populate("categories", "name")
       .populate("variants.size", "label")
       .populate("variants.color", "name");
-    if (!product) return res.status(404).json({ error: "Producto no encontrado" });
+    if (!product)
+      return res.status(404).json({ error: "Producto no encontrado" });
     return res.json(product);
   } catch (err) {
     return res.status(500).json({ error: "Error al buscar producto" });
@@ -171,7 +272,8 @@ exports.updateProduct = async (req, res) => {
     const userId = req.user?.id;
 
     const product = await Product.findById(productId);
-    if (!product) return res.status(404).json({ error: "Producto no encontrado" });
+    if (!product)
+      return res.status(404).json({ error: "Producto no encontrado" });
 
     const {
       name,
@@ -228,13 +330,18 @@ exports.updateProduct = async (req, res) => {
           ? product.price
           : Number(product.price) || 0;
 
-      const nextKeys = new Set(validVariants.map((v) => keyOf(v.size, v.color)));
+      const nextKeys = new Set(
+        validVariants.map((v) => keyOf(v.size, v.color))
+      );
 
       // Añadidas
       for (const v of validVariants) {
         const k = keyOf(v.size, v.color);
         if (!prevVariantsSet.has(k)) {
-          const { sizeLabel, colorName } = await getVariantSnapshots(v.size, v.color);
+          const { sizeLabel, colorName } = await getVariantSnapshots(
+            v.size,
+            v.color
+          );
           await ProductVariantLedger.create({
             productId,
             size: v.size,
@@ -259,7 +366,10 @@ exports.updateProduct = async (req, res) => {
         const k = keyOf(v.size, v.color);
         const prev = prevByKey.get(k);
         if (prev && Number(prev.stock) !== Number(v.stock)) {
-          const { sizeLabel, colorName } = await getVariantSnapshots(v.size, v.color);
+          const { sizeLabel, colorName } = await getVariantSnapshots(
+            v.size,
+            v.color
+          );
           await ProductVariantLedger.create({
             productId,
             size: v.size,
@@ -281,7 +391,10 @@ exports.updateProduct = async (req, res) => {
       // Eliminadas (marcar como DELETED)
       for (const [k, prev] of prevByKey.entries()) {
         if (!nextKeys.has(k)) {
-          const { sizeLabel, colorName } = await getVariantSnapshots(prev.size, prev.color);
+          const { sizeLabel, colorName } = await getVariantSnapshots(
+            prev.size,
+            prev.color
+          );
           await ProductVariantLedger.create({
             productId,
             size: prev.size,
@@ -331,6 +444,38 @@ exports.updateProduct = async (req, res) => {
       if (newCat && String(newCat) !== String(product.categories)) {
         changes.categories = { old: product.categories, new: newCat };
         product.categories = newCat;
+      }
+    }
+
+    // --- Descuento (si se envía) ---
+    let discountFromReq = parseDiscountFromBody(req.body);
+    if (discountFromReq && discountFromReq._error) {
+      return res.status(400).json({ error: discountFromReq._error });
+    }
+    if (discountFromReq) {
+      // Determinar el precio que usaremos para validar el descuento
+      const priceToValidate =
+        typeof price !== "undefined" ? Number(price) : Number(product.price);
+
+      const { ok, error, value } = validateDiscountPayload(
+        priceToValidate,
+        discountFromReq
+      );
+      if (!ok) return res.status(400).json({ error });
+
+      const prev = product.discount || {};
+      const changedDiscount =
+        !!value.enabled !== !!prev.enabled ||
+        String(value.type) !== String(prev.type) ||
+        Number(value.value || 0) !== Number(prev.value || 0) ||
+        (prev.startAt ? prev.startAt.getTime() : null) !==
+          (value.startAt ? value.startAt.getTime() : null) ||
+        (prev.endAt ? prev.endAt.getTime() : null) !==
+          (value.endAt ? value.endAt.getTime() : null);
+
+      if (changedDiscount) {
+        product.discount = value;
+        product.markModified("discount");
       }
     }
 
@@ -385,7 +530,10 @@ exports.updateProduct = async (req, res) => {
     }
 
     // Cambio de precio
-    if (typeof changes.price !== "undefined" && changes.price.new !== changes.price.old) {
+    if (
+      typeof changes.price !== "undefined" &&
+      changes.price.new !== changes.price.old
+    ) {
       const doc = await ProductEntryHistory.create({
         productId: product._id,
         name: product.name,
@@ -401,7 +549,9 @@ exports.updateProduct = async (req, res) => {
 
       const io = req.app.get("io");
       if (io) {
-        const populated = await doc.populate([{ path: "categories", select: "name" }]);
+        const populated = await doc.populate([
+          { path: "categories", select: "name" },
+        ]);
         io.emit("productHistory:new", populated);
       }
     }
@@ -423,7 +573,8 @@ exports.updateProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
   try {
     const deleted = await Product.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: "Producto no encontrado" });
+    if (!deleted)
+      return res.status(404).json({ error: "Producto no encontrado" });
     return res.json({ message: "Producto eliminado correctamente" });
   } catch (err) {
     return res.status(500).json({ error: "Error al eliminar producto" });
@@ -438,7 +589,9 @@ exports.getProductHistory = async (req, res) => {
       .sort({ timestamp: -1 });
     return res.json(audits);
   } catch (err) {
-    return res.status(500).json({ error: "Error al obtener historial del producto" });
+    return res
+      .status(500)
+      .json({ error: "Error al obtener historial del producto" });
   }
 };
 
@@ -452,7 +605,9 @@ exports.getProductEntryHistory = async (req, res) => {
     return res.json(history);
   } catch (err) {
     console.error("Error al obtener historial:", err);
-    return res.status(500).json({ error: "Error al obtener historial de productos" });
+    return res
+      .status(500)
+      .json({ error: "Error al obtener historial de productos" });
   }
 };
 
@@ -483,7 +638,9 @@ exports.getVariantLedgerByProduct = async (req, res) => {
     return res.json(rows);
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: "Error al obtener ledger de variantes" });
+    return res
+      .status(500)
+      .json({ error: "Error al obtener ledger de variantes" });
   }
 };
 
@@ -502,7 +659,7 @@ exports.getProductSalesHistory = async (req, res) => {
     if (from || to) {
       match.createdAt = {};
       if (from) match.createdAt.$gte = new Date(from);
-      if (to)   match.createdAt.$lte = new Date(to);
+      if (to) match.createdAt.$lte = new Date(to);
     }
 
     const rows = await Order.aggregate([
@@ -511,55 +668,83 @@ exports.getProductSalesHistory = async (req, res) => {
       { $match: { "items.product": productObjectId } },
 
       // Fallback de precio si la orden antigua no tiene items.unitPrice
-      { $lookup: { from: "products", localField: "items.product", foreignField: "_id", as: "productDoc" } },
+      {
+        $lookup: {
+          from: "products",
+          localField: "items.product",
+          foreignField: "_id",
+          as: "productDoc",
+        },
+      },
       { $unwind: { path: "$productDoc", preserveNullAndEmptyArrays: true } },
 
-      { $lookup: { from: "sizes", localField: "items.size", foreignField: "_id", as: "sizeDoc" } },
+      {
+        $lookup: {
+          from: "sizes",
+          localField: "items.size",
+          foreignField: "_id",
+          as: "sizeDoc",
+        },
+      },
       { $unwind: { path: "$sizeDoc", preserveNullAndEmptyArrays: true } },
 
-      { $lookup: { from: "colors", localField: "items.color", foreignField: "_id", as: "colorDoc" } },
+      {
+        $lookup: {
+          from: "colors",
+          localField: "items.color",
+          foreignField: "_id",
+          as: "colorDoc",
+        },
+      },
       { $unwind: { path: "$colorDoc", preserveNullAndEmptyArrays: true } },
 
       {
         $addFields: {
           unitPriceRaw: { $ifNull: ["$items.unitPrice", "$productDoc.price"] },
-          quantityRaw:  { $ifNull: ["$items.quantity", 0] }
-        }
+          quantityRaw: { $ifNull: ["$items.quantity", 0] },
+        },
       },
       {
         $addFields: {
           unitPrice: {
             $cond: [
-              { $and: [{ $ne: ["$unitPriceRaw", null] }, { $ne: ["$unitPriceRaw", ""] }] },
+              {
+                $and: [
+                  { $ne: ["$unitPriceRaw", null] },
+                  { $ne: ["$unitPriceRaw", ""] },
+                ],
+              },
               { $toDouble: "$unitPriceRaw" },
-              0
-            ]
+              0,
+            ],
           },
-          quantity: { $toInt: "$quantityRaw" }
-        }
+          quantity: { $toInt: "$quantityRaw" },
+        },
       },
       {
-        $addFields: { total: { $multiply: ["$unitPrice", "$quantity"] } }
+        $addFields: { total: { $multiply: ["$unitPrice", "$quantity"] } },
       },
       {
         $project: {
           _id: 0,
           orderId: "$_id",
           date: "$createdAt",
-          sizeLabel:  { $ifNull: ["$sizeDoc.label", "Desconocido"] },
-          colorName:  { $ifNull: ["$colorDoc.name",  "Desconocido"] },
-          unitPrice:  1,
-          quantity:   1,
-          total:      1
-        }
+          sizeLabel: { $ifNull: ["$sizeDoc.label", "Desconocido"] },
+          colorName: { $ifNull: ["$colorDoc.name", "Desconocido"] },
+          unitPrice: 1,
+          quantity: 1,
+          total: 1,
+        },
       },
       { $sort: { date: -1 } },
-      { $limit: Math.min(Number(limit) || 500, 2000) }
+      { $limit: Math.min(Number(limit) || 500, 2000) },
     ]);
 
     return res.json(rows || []);
   } catch (e) {
     console.error("Error en getProductSalesHistory:", e);
-    return res.status(500).json({ error: "Error al obtener historial de ventas" });
+    return res
+      .status(500)
+      .json({ error: "Error al obtener historial de ventas" });
   }
 };

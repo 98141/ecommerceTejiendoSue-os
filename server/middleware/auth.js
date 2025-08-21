@@ -25,10 +25,12 @@ const isAdmin = (req, res, next) => {
   }
 };
 
-// Limita a 5 intentos cada 15 minutos
+// Limita a 5 intentos cada 5 minutos
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
-  max: 5, // máximo de intentos
+  // 5 min
+  windowMs: 5 * 60 * 1000, 
+  // máximo de intentos
+  max: 5, 
   message: { error: "Demasiados intentos fallidos. Intenta nuevamente en unos minutos." },
   standardHeaders: true,
   legacyHeaders: false,

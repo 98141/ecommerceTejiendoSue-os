@@ -1,8 +1,6 @@
+import { formatCOP } from "../../../utils/currency";
+
 const nf = (n) => Number(n || 0).toLocaleString("es-CO");
-const money = (n, currency = "USD") =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency }).format(
-    Number(n || 0)
-  );
 
 function Delta({ pct }) {
   const v = Number(pct || 0);
@@ -14,7 +12,6 @@ function Delta({ pct }) {
 }
 
 const SummaryCardsBlock = ({ summary = {} }) => {
-  const currency = summary.currency || "USD";
   const change = summary.change || {};
   return (
     <div
@@ -29,8 +26,7 @@ const SummaryCardsBlock = ({ summary = {} }) => {
       <div className="card-summary">
         <h3>Ventas Totales</h3>
         <p>
-          {money(summary.totalSales, currency)}{" "}
-          <Delta pct={change.totalSalesPct} />
+          {formatCOP(summary.totalSales)} <Delta pct={change.totalSalesPct} />
         </p>
       </div>
       <div className="card-summary">
@@ -52,14 +48,9 @@ const SummaryCardsBlock = ({ summary = {} }) => {
       <div className="card-summary">
         <h3>AOV</h3>
         <p>
-          {money(summary.aov, currency)} <Delta pct={change.aovPct} />
+          {formatCOP(summary.aov)} <Delta pct={change.aovPct} />
         </p>
       </div>
-      {/* Si quieres mostrar items por pedido:
-      <div className="card-summary">
-        <h3>Items por Pedido</h3>
-        <p>{Number(summary.itemsPerOrder || 0).toFixed(2)} <Delta pct={change.itemsPerOrderPct} /></p>
-      </div> */}
     </div>
   );
 };
