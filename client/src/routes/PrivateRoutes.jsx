@@ -1,21 +1,52 @@
-import { useContext } from "react";
+import { useContext, useEffect, useRef } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 
-const PrivateRoute = ({ allowedRoles }) => {
-  const { user } = useContext(AuthContext);
+const PrivateRoute = ({ allowedRoles = [] }) => {
+  // Si tu AuthContext no expone 'loading', el default es false
+  const { user, loading = false } = useContext(AuthContext);
   const { showToast } = useToast();
   const location = useLocation();
 
-  if (!user) {
-    showToast("Debes iniciar sesión para acceder", "warning");
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  // Evitar toasts repetidos (React StrictMode monta/ejecuta efectos 2 veces en dev)
+  const didToastRef = useRef(false);
+
+  const notLogged = !loading && !user;
+  const unauthorized =
+    !loading &&
+    user &&
+    Array.isArray(allowedRoles) &&
+    allowedRoles.length > 0 &&
+    !allowedRoles.includes(user.role);
+
+  useEffect(() => {
+    if (didToastRef.current) return;
+
+    if (notLogged) {
+      didToastRef.current = true;
+      showToast("Debes iniciar sesión para acceder", "warning");
+    } else if (unauthorized) {
+      didToastRef.current = true;
+      showToast("Acceso no autorizado", "error");
+    }
+  }, [notLogged, unauthorized, showToast]);
+
+  // Mientras se determina el estado de auth (opcional)
+  if (loading) return null;
+
+  if (notLogged) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location, reason: "auth" }}
+      />
+    );
   }
 
-  if (!allowedRoles.includes(user.role)) {
-    showToast("Acceso no autorizado", "error");
-    return <Navigate to="/" replace />;
+  if (unauthorized) {
+    return <Navigate to="/" replace state={{ reason: "unauthorized" }} />;
   }
 
   return <Outlet />;
