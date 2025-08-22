@@ -168,10 +168,13 @@ const Footer = () => {
 
         {/* Barra inferior */}
         <div className="sf__bottom">
+          <div className="sf__visits" title="Visitas totales">
           <p className="sf__copy">
             © {year} Artesanías Paja Toquilla. Todos los derechos reservados.
           </p>
-          <div className="sf__visits" title="Visitas totales">
+          <p className="sf__copy">
+            Diseño y desarrollo. Armando Mora.
+          </p>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 5c5 0 9.27 3.11 11 7-1.73 3.89-6 7-11 7S2.73 15.89 1 12c1.73-3.89 6-7 11-7Zm0 2c-3.73 0-7.07 2.13-8.71 5 1.64 2.87 4.98 5 8.71 5s7.07-2.13 8.71-5C19.07 9.13 15.73 7 12 7Zm0 2.5A2.5 2.5 0 1 1 9.5 12 2.5 2.5 0 0 1 12 9.5Z" />
             </svg>

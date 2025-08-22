@@ -1,27 +1,47 @@
-// pages/CartPage.jsx
 import { useContext, useMemo, useState } from "react";
 import { CartContext } from "../contexts/CartContext";
 import { AuthContext } from "../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import CartItem from "../blocks/users/CartItem";
 import CheckoutModal from "../blocks/users/CheckoutModal";
+import { useToast } from "../contexts/ToastContext";
 
-const ADMIN_WHATSAPP = "573147788069"; 
+const ADMIN_WHATSAPP = "573147788069";
+
+/** Formatea a COP sin decimales */
+const fmtCOP = (n) =>
+  Number(n || 0).toLocaleString("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  });
+
+/** Devuelve el precio unitario que se debe cobrar (effectivePrice o price) */
+const unitPrice = (product) =>
+  typeof product?.effectivePrice !== "undefined"
+    ? Number(product.effectivePrice)
+    : Number(product?.price || 0);
 
 const CartPage = () => {
-  const { cart, updateItem, removeFromCart, clearCart } =
-    useContext(CartContext);
+  const { cart, updateItem, removeFromCart, clearCart } = useContext(CartContext);
   const { token, user } = useContext(AuthContext);
+  const { showToast } = useToast();
   const navigate = useNavigate();
+
   const [openModal, setOpenModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const total = useMemo(
-    () =>
-      cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+  /** Subtotal (sumatoria líneas) */
+  const subtotal = useMemo(
+    () => cart.reduce((sum, it) => sum + unitPrice(it.product) * it.quantity, 0),
     [cart]
   );
+
+  /** En un futuro aquí podrías calcular envío, impuestos, cupones, etc. */
+  const shipping = 0;
+  const taxes = 0;
+  const total = subtotal + shipping + taxes;
 
   const toOrderItems = () =>
     cart.map((item) => ({
@@ -33,11 +53,11 @@ const CartPage = () => {
 
   const startCheckout = () => {
     if (!token) {
-      alert("Debes iniciar sesión para realizar el pedido.");
+      showToast("Debes iniciar sesión para realizar el pedido.", "warning");
       return navigate("/login");
     }
     if (cart.length === 0) {
-      alert("Tu carrito está vacío.");
+      showToast("Tu carrito está vacío.", "info");
       return;
     }
     setOpenModal(true);
@@ -49,9 +69,7 @@ const CartPage = () => {
     lines.push(`ID: ${order._id}`);
     lines.push(`Cliente: ${user?.name || "N/A"} (${user?.email || ""})`);
     if (shippingInfo) {
-      lines.push(
-        `Envío: ${shippingInfo.fullName} | Tel: ${shippingInfo.phone}`
-      );
+      lines.push(`Envío: ${shippingInfo.fullName} | Tel: ${shippingInfo.phone}`);
       lines.push(`${shippingInfo.address}, ${shippingInfo.city}`);
       if (shippingInfo.notes) lines.push(`Notas: ${shippingInfo.notes}`);
     }
@@ -62,14 +80,13 @@ const CartPage = () => {
       const size = it?.size?.label ? ` / Talla: ${it.size.label}` : "";
       const color = it?.color?.name ? ` / Color: ${it.color.name}` : "";
       lines.push(
-        `- ${name}${size}${color} x${it.quantity} = $${(
+        `- ${name}${size}${color} x${it.quantity} = ${fmtCOP(
           it.unitPrice * it.quantity
-        ).toFixed(2)}`
+        )}`
       );
     });
     lines.push("");
-    lines.push(`*Total:* $${Number(order.total).toFixed(2)}`);
-
+    lines.push(`*Total:* ${fmtCOP(order.total)}`);
     return encodeURIComponent(lines.join("\n"));
   };
 
@@ -78,28 +95,26 @@ const CartPage = () => {
     try {
       const items = toOrderItems();
 
-      // ⚠️ el backend calcula total y controla stock; aquí solo enviamos items+shippingInfo
+      // ⚠️ El backend calcula total y controla stock; aquí sólo enviamos items + shippingInfo
       const { data } = await axios.post(
         "http://localhost:5000/api/orders",
         { items, shippingInfo },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Ideal: repoblar order (si tu endpoint no hace populate aquí, puedes reconsultar /api/orders/:id)
       const order = data.order;
-
-      // Construir WhatsApp y abrir
       const text = buildWhatsAppText(order, shippingInfo);
       const waLink = `https://wa.me/${ADMIN_WHATSAPP}?text=${text}`;
       window.open(waLink, "_blank", "noopener,noreferrer");
 
-      alert("Pedido realizado exitosamente");
+      showToast("Pedido realizado exitosamente", "success");
       clearCart();
       navigate("/my-orders");
     } catch (err) {
-      alert(
+      showToast(
         "Error al realizar el pedido: " +
-          (err.response?.data?.error || "Intenta más tarde.")
+          (err.response?.data?.error || "Intenta más tarde."),
+        "error"
       );
     } finally {
       setLoading(false);
@@ -108,46 +123,99 @@ const CartPage = () => {
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
-        Carrito de Compras
-      </h2>
+    <div className="cart">
+      <h1 className="cart__title">Carrito de Compras</h1>
 
       {cart.length === 0 ? (
-        <p style={{ textAlign: "center" }}>Tu carrito está vacío.</p>
+        <div className="cart__empty">
+          <div className="cart__bag" aria-hidden />
+          <h3>Tu carrito está vacío</h3>
+          <p>Explora nuestras artesanías y encuentra tu próximo favorito.</p>
+          <Link to="/artesanias" className="btn btn--primary">
+            Ver productos
+          </Link>
+        </div>
       ) : (
-        <>
-          {cart.map((item) => (
-            <CartItem
-              key={`${item.product._id}-${item.size?._id}-${item.color?._id}`}
-              item={item}
-              updateItem={updateItem}
-              removeFromCart={removeFromCart}
-            />
-          ))}
+        <div className="cart__grid">
+          {/* Lista de ítems */}
+          <section className="cart__list" aria-label="Productos en el carrito">
+            {cart.map((item) => (
+              <div
+                key={`${item.product._id}-${item.size?._id}-${item.color?._id}`}
+                className="cart__row"
+              >
+                {/* CartItem: tu componente existente */}
+                <CartItem
+                  item={item}
+                  updateItem={updateItem}
+                  removeFromCart={removeFromCart}
+                />
 
-          <h3 style={{ textAlign: "right", marginTop: "20px" }}>
-            Total a pagar: <span style={{ color: "#2d89e5" }}>${total}</span>
-          </h3>
+                {/* Línea de totales por ítem (seguro, aunque CartItem ya muestre) */}
+                <div className="cart__line">
+                  <span>
+                    {fmtCOP(unitPrice(item.product))} × {item.quantity}
+                  </span>
+                  <b>{fmtCOP(unitPrice(item.product) * item.quantity)}</b>
+                </div>
+              </div>
+            ))}
 
-          <div style={{ textAlign: "right", marginTop: "10px" }}>
-            <button
-              disabled={loading}
-              onClick={startCheckout}
-              style={{
-                backgroundColor: "#2d89e5",
-                color: "white",
-                border: "none",
-                padding: "10px 16px",
-                borderRadius: "4px",
-                cursor: "pointer",
-                opacity: loading ? 0.7 : 1,
-              }}
-            >
-              {loading ? "Procesando..." : "Finalizar compra"}
-            </button>
-          </div>
-        </>
+            <div className="cart__actions">
+              <Link to="/artesanias" className="btn btn--ghost">
+                ← Seguir comprando
+              </Link>
+              <button
+                className="btn btn--danger"
+                onClick={() => {
+                  if (confirm("¿Vaciar el carrito?")) clearCart();
+                }}
+              >
+                Vaciar carrito
+              </button>
+            </div>
+          </section>
+
+          {/* Resumen / Checkout */}
+          <aside className="cart__summary" aria-label="Resumen de compra">
+            <div className="sum__box">
+              <h3>Resumen</h3>
+
+              <div className="sum__row">
+                <span>Subtotal</span>
+                <span>{fmtCOP(subtotal)}</span>
+              </div>
+              <div className="sum__row">
+                <span>Envío</span>
+                <span>{shipping === 0 ? "Gratis" : fmtCOP(shipping)}</span>
+              </div>
+              <div className="sum__row">
+                <span>Impuestos</span>
+                <span>{taxes === 0 ? "-" : fmtCOP(taxes)}</span>
+              </div>
+
+              <hr className="sum__rule" />
+
+              <div className="sum__row sum__row--total">
+                <span>Total a pagar</span>
+                <b>{fmtCOP(total)}</b>
+              </div>
+
+              <button
+                className="btn btn--primary sum__checkout"
+                disabled={loading}
+                onClick={startCheckout}
+              >
+                {loading ? "Procesando..." : "Finalizar compra"}
+              </button>
+
+              <p className="sum__hint">
+                Pagas de forma segura. Al confirmar, podrás coordinar el envío por
+                WhatsApp con nuestro equipo.
+              </p>
+            </div>
+          </aside>
+        </div>
       )}
 
       <CheckoutModal

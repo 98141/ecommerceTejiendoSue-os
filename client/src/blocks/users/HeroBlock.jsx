@@ -4,7 +4,7 @@ import img from "../../assets/hat.png";
 const HeroBlock = ({
   title = "Artesanía Sandoneña",
   highlight = "Auténtica",
-  subtitle = `Descubre nuestra colección exclusiva de productos hechos a mano con paja toquilla, una tradición ancestral ecuatoriana que combina elegancia y calidad excepcional.`,
+  subtitle = `Descubre nuestra colección exclusiva de productos hechos a mano con paja toquilla, una tradición ancestral sandoneña que combina elegancia y calidad excepcional.`,
   ctaPrimaryText = "Explorar Productos",
   ctaSecondaryText = "Nuestra Historia",
   onPrimaryClick = () => {},
