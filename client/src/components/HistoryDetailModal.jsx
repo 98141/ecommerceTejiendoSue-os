@@ -19,6 +19,7 @@ export default function HistoryDetailModal({ id, open, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Cargar detalle
   useEffect(() => {
     if (!open || !id) return;
 
@@ -41,6 +42,14 @@ export default function HistoryDetailModal({ id, open, onClose }) {
 
     fetchDetail();
   }, [open, id, token]);
+
+  // Cerrar con Escape
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   const getCategoryLabel = () => {
     if (!item) return "—";
@@ -73,45 +82,24 @@ export default function HistoryDetailModal({ id, open, onClose }) {
 
   return (
     <div
-      className="history-detail-modal"
+      className="history-detail-overlay"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="history-detail-title"
       onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "1rem",
-        zIndex: 999
-      }}
     >
       <div
-        className="modal-card"
+        className="history-detail-card"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#111",
-          color: "#fff",
-          width: "min(900px, 100%)",
-          borderRadius: 12,
-          padding: "1rem 1rem 1.25rem"
-        }}
       >
-        <div
-          className="modal-header"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderBottom: "1px solid #333",
-            paddingBottom: ".5rem",
-            marginBottom: "1rem"
-          }}
-        >
-          <h3>Detalle de ingreso</h3>
-          <button className="close-btn" onClick={onClose} aria-label="Cerrar modal">
+        <div className="modal-header">
+          <h3 id="history-detail-title">Detalle de ingreso</h3>
+          <button
+            className="close-btn"
+            onClick={onClose}
+            aria-label="Cerrar modal"
+            title="Cerrar"
+          >
             ✕
           </button>
         </div>
@@ -119,26 +107,19 @@ export default function HistoryDetailModal({ id, open, onClose }) {
         <div className="modal-body">
           {loading ? (
             <div className="loading-indicator">
-              <div className="loading-spinner"></div>
+              <div className="loading-spinner" />
               <p>Cargando detalles...</p>
             </div>
           ) : error ? (
             <div className="error-message">
               <p>{error}</p>
-              <button className="retry-btn" onClick={handleRetry}>
+              <button className="btn btn--primary btn-sm" onClick={handleRetry}>
                 Reintentar
               </button>
             </div>
           ) : item ? (
             <>
-              <div
-                className="grid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                  gap: ".5rem .75rem"
-                }}
-              >
+              <div className="grid">
                 <div className="grid-item">
                   <strong>Fecha</strong>
                   <span>{new Date(item.createdAt).toLocaleString()}</span>
@@ -165,41 +146,43 @@ export default function HistoryDetailModal({ id, open, onClose }) {
                 </div>
 
                 {item.note && (
-                  <div className="grid-item" style={{ gridColumn: "1 / -1" }}>
+                  <div className="grid-item grid-span">
                     <strong>Nota</strong>
                     <span>{item.note}</span>
                   </div>
                 )}
               </div>
 
-              <div className="variants-section" style={{ marginTop: "1rem" }}>
+              <div className="variants-section">
                 <h4>Variantes</h4>
-                <table className="variants-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      <th>Talla</th>
-                      <th>Color</th>
-                      <th>Stock inicial</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {item.variants && item.variants.length > 0 ? (
-                      item.variants.map((v, idx) => (
-                        <tr key={idx}>
-                          <td>{v.size?.label || "—"}</td>
-                          <td>{v.color?.name || "—"}</td>
-                          <td>{v.initialStock ?? 0}</td>
-                        </tr>
-                      ))
-                    ) : (
+                <div className="table-wrap">
+                  <table className="variants-table">
+                    <thead>
                       <tr>
-                        <td colSpan="3" className="no-variants-message">
-                          No hay variantes registradas
-                        </td>
+                        <th>Talla</th>
+                        <th>Color</th>
+                        <th>Stock inicial</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {item.variants && item.variants.length > 0 ? (
+                        item.variants.map((v, idx) => (
+                          <tr key={idx}>
+                            <td>{v.size?.label || "—"}</td>
+                            <td>{v.color?.name || "—"}</td>
+                            <td>{v.initialStock ?? 0}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="3" className="no-variants-message">
+                            No hay variantes registradas
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </>
           ) : null}

@@ -39,6 +39,7 @@ export default function AdminProductEntryHistoryPage() {
     const { name, value } = e.target;
     setQuery((q) => ({ ...q, page: 1, [name]: value }));
   };
+
   const handlePage = (p) => setQuery((q) => ({ ...q, page: p }));
 
   useEffect(() => {
@@ -49,47 +50,49 @@ export default function AdminProductEntryHistoryPage() {
 
   return (
     <div className="history-container">
-      <div
-        className="head-row"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "1rem",
-        }}
-      >
+      <div className="head-row">
         <h2>Historial de productos ingresados</h2>
         {canExport(user?.role) && <ExportMenu query={query} />}
       </div>
 
-      <div
-        className="filters"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: ".5rem",
-          marginBottom: "1rem",
-        }}
-      >
+      <div className="filters">
         <input
+          className="input"
           name="search"
           value={query.search}
           onChange={handleChange}
           placeholder="Buscar (nombre, descripción)"
         />
         <input
+          className="input"
           type="date"
           name="from"
           value={query.from}
           onChange={handleChange}
         />
-        <input type="date" name="to" value={query.to} onChange={handleChange} />
-        <select name="limit" value={query.limit} onChange={handleChange}>
+        <input
+          className="input"
+          type="date"
+          name="to"
+          value={query.to}
+          onChange={handleChange}
+        />
+        <select
+          className="input"
+          name="limit"
+          value={query.limit}
+          onChange={handleChange}
+        >
           <option value={10}>10</option>
           <option value={20}>20</option>
           <option value={50}>50</option>
         </select>
-        <select name="sort" value={query.sort} onChange={handleChange}>
+        <select
+          className="input"
+          name="sort"
+          value={query.sort}
+          onChange={handleChange}
+        >
           <option value="createdAt:desc">Fecha ↓</option>
           <option value="createdAt:asc">Fecha ↑</option>
           <option value="price:asc">Precio ↑</option>
@@ -97,11 +100,8 @@ export default function AdminProductEntryHistoryPage() {
         </select>
       </div>
 
-      <div className="table-wrap" style={{ overflow: "auto" }}>
-        <table
-          className="history-table"
-          style={{ width: "100%", borderCollapse: "collapse" }}
-        >
+      <div className="table-wrap">
+        <table className="history-table">
           <thead>
             <tr>
               <th>Fecha</th>
@@ -115,7 +115,9 @@ export default function AdminProductEntryHistoryPage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={6}>Cargando…</td>
+                <td colSpan={6} className="loading">
+                  Cargando…
+                </td>
               </tr>
             )}
             {!loading && error && (
@@ -127,7 +129,9 @@ export default function AdminProductEntryHistoryPage() {
             )}
             {!loading && !error && data.length === 0 && (
               <tr>
-                <td colSpan={6}>Sin resultados</td>
+                <td colSpan={6} className="empty">
+                  Sin resultados
+                </td>
               </tr>
             )}
             {!loading &&
@@ -139,8 +143,14 @@ export default function AdminProductEntryHistoryPage() {
                   <td>{row.name}</td>
                   <td>{formatCOP(row.price)}</td>
                   <td>{row.variants?.length || 0}</td>
-                  <td>
-                    <button onClick={() => setOpenId(row._id)}>Ver</button>
+                  <td className="col-actions">
+                    <button
+                      className="btn btn--ghost btn-sm"
+                      onClick={() => setOpenId(row._id)}
+                      aria-label={`Ver detalle de ${row.name}`}
+                    >
+                      Ver
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -149,36 +159,30 @@ export default function AdminProductEntryHistoryPage() {
       </div>
 
       {totalPages > 1 && (
-        <div
-          className="pagination"
-          style={{
-            display: "flex",
-            gap: ".5rem",
-            justifyContent: "center",
-            marginTop: "1rem",
-          }}
-        >
+        <div className="pagination">
           <button
+            className="btn btn--ghost btn-sm"
             disabled={query.page <= 1}
             onClick={() => handlePage(query.page - 1)}
           >
             Anterior
           </button>
+
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <button
               key={p}
-              className={p === query.page ? "active" : ""}
+              className={`btn btn--ghost btn-sm ${
+                p === query.page ? "is-active" : ""
+              }`}
               onClick={() => handlePage(p)}
-              style={
-                p === query.page
-                  ? { fontWeight: "bold", textDecoration: "underline" }
-                  : undefined
-              }
+              aria-current={p === query.page ? "page" : undefined}
             >
               {p}
             </button>
           ))}
+
           <button
+            className="btn btn--ghost btn-sm"
             disabled={query.page >= totalPages}
             onClick={() => handlePage(query.page + 1)}
           >

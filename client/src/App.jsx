@@ -61,7 +61,6 @@ function App() {
           <Route path="/admin/products" element={<AdminProductManager />} />
           <Route path="/admin/products/:id/history" element={<ProductHistoryPage />} />
           <Route path="/admin/products/new" element={<NewProductPage />} />
-          <Route path="/admin/categories" element={<AdminCategoryPage />} />
           <Route path="/admin/dashboard" element={<AdminDashboarPage />} />
           <Route
             path="/admin/products/edit/:id"
@@ -69,6 +68,7 @@ function App() {
           />
           <Route path="/support/:withUserId" element={<SupportChatPage />} />
           <Route path="/admin/inbox" element={<AdminInboxPage />} />
+          <Route path="/admin/categories" element={<AdminCategoryPage />} />
           <Route path="/admin/sizes" element={<AdminSizesPage />} />
           <Route path="/admin/colors" element={<AdminColorsPage />} />
           <Route path="/admin/historial" element={<AdminProductEntryHistoryPage />} />
@@ -78,7 +78,7 @@ function App() {
           <Route path="/support" element={<SupportChatPage />} />
         </Route>
         {/* tus otras rutas... */}
-        <Route path="*" element={<NotFoundPage />} /> {/* 👈 ruta comodín */}
+        <Route path="*" element={<NotFoundPage />} /> 
       </Routes>
       {/* Contenedor de notificaciones */}
       <ToastContainer position="top-right" autoClose={3000} />
