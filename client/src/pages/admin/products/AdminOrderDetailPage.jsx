@@ -120,19 +120,17 @@ const AdminOrderDetailPage = () => {
     }
   };
 
-  // ====== PDF (landscape) con mini-tabla "Variante" y COP ======
+  // ====== PDF (landscape) ======
   const exportSingleOrderToPDF = () => {
     if (!order) return;
 
-    // Paleta
-    const HEAD_BG = [10, 102, 194];   // azul
-    const HEAD_TX = [255, 255, 255];  // blanco
-    const GRID = [220, 226, 235];     // gris líneas
-    const ALT_ROW = [244, 248, 254];  // zebra
+    const HEAD_BG = [10, 102, 194];
+    const HEAD_TX = [255, 255, 255];
+    const GRID = [220, 226, 235];
+    const ALT_ROW = [244, 248, 254];
 
     const doc = new jsPDF({ orientation: "landscape", unit: "mm" });
 
-    // Encabezado del documento
     doc.setFontSize(14);
     doc.text("Factura de Pedido", 14, 12);
 
@@ -153,16 +151,14 @@ const AdminOrderDetailPage = () => {
       y += 6;
     }
 
-    // Columnas con dataKey para mini-tabla
     const columns = [
       { header: "Producto", dataKey: "product" },
-      { header: "Variante", dataKey: "variant" }, // mini-tabla
+      { header: "Variante", dataKey: "variant" },
       { header: "Cantidad", dataKey: "qty" },
       { header: "Precio", dataKey: "price" },
       { header: "Subtotal", dataKey: "subtotal" },
     ];
 
-    // Filas
     const body = (order.items || []).map((item) => {
       const hasPrice = typeof item.product?.price === "number";
       const price = hasPrice ? item.product.price : 0;
@@ -174,7 +170,7 @@ const AdminOrderDetailPage = () => {
         variant: {
           size: item.size?.label || "-",
           color: item.color?.name || "-",
-        }, // objeto para dibujar
+        },
         qty,
         price: hasPrice ? formatCOP(price) : "-",
         subtotal: hasPrice ? formatCOP(subtotal) : "-",
@@ -193,14 +189,8 @@ const AdminOrderDetailPage = () => {
         lineWidth: 0.2,
         valign: "middle",
       },
-      headStyles: {
-        fillColor: HEAD_BG,
-        textColor: HEAD_TX,
-        lineWidth: 0,
-      },
-      alternateRowStyles: {
-        fillColor: ALT_ROW,
-      },
+      headStyles: { fillColor: HEAD_BG, textColor: HEAD_TX, lineWidth: 0 },
+      alternateRowStyles: { fillColor: ALT_ROW },
       columnStyles: {
         product: { cellWidth: 80 },
         variant: { cellWidth: 50 },
@@ -209,48 +199,35 @@ const AdminOrderDetailPage = () => {
         subtotal: { halign: "right", cellWidth: 32 },
       },
       didParseCell: (data) => {
-        if (data.section === "body" && data.column.dataKey === "variant") {
-          // quitamos el texto normal para dibujar la mini-tabla
+        if (data.section === "body" && data.column.dataKey === "variant")
           data.cell.text = [];
-        }
       },
       didDrawCell: (data) => {
         if (data.section !== "body" || data.column.dataKey !== "variant")
           return;
-
         const Doc = data.doc;
         const { x, y, width, height } = data.cell;
-
-        // padding interno
         const pad = 1.5;
-        const ix = x + pad;
-        const iy = y + pad;
-        const iw = width - pad * 2;
-        const ih = height - pad * 2;
-
+        const ix = x + pad,
+          iy = y + pad,
+          iw = width - pad * 2,
+          ih = height - pad * 2;
         const headerH = Math.min(6, ih * 0.35);
         const midX = ix + iw / 2;
 
-        // Marco
         Doc.setDrawColor(GRID[0], GRID[1], GRID[2]);
         Doc.setLineWidth(0.2);
         Doc.rect(ix, iy, iw, ih);
-
-        // Header
         Doc.setFillColor(235, 240, 248);
         Doc.rect(ix, iy, iw, headerH, "F");
-
-        // Divisor vertical
         Doc.setDrawColor(GRID[0], GRID[1], GRID[2]);
         Doc.line(midX, iy, midX, iy + ih);
 
-        // Títulos
         Doc.setTextColor(31, 45, 61);
         Doc.setFontSize(8.5);
         Doc.text("Talla", ix + 2, iy + headerH - 2);
         Doc.text("Color", midX + 2, iy + headerH - 2);
 
-        // Valores
         const val = data.cell.raw || {};
         const valueY = iy + headerH + 4.5;
         Doc.setTextColor(55, 65, 81);
@@ -260,12 +237,10 @@ const AdminOrderDetailPage = () => {
       },
     });
 
-    // Total al final
     const endY = doc.lastAutoTable?.finalY ?? y + 4;
     doc.setFontSize(11);
     doc.text(`Total: ${formatCOP(order.total ?? 0)}`, 14, endY + 8);
 
-    // Comentario admin (si existe)
     if (order.adminComment) {
       doc.setFontSize(10);
       doc.text("Comentario del administrador:", 14, endY + 16);
@@ -305,7 +280,7 @@ const AdminOrderDetailPage = () => {
         </button>
       </div>
 
-      {/* Productos del pedido: tabla solo lectura */}
+      {/* Productos del pedido */}
       <div className="section">
         <h3 className="section__title">
           <FaClipboardList className="icon" /> Productos del pedido
@@ -331,8 +306,6 @@ const AdminOrderDetailPage = () => {
                 return (
                   <tr key={item._id || idx}>
                     <td>{item.product?.name || "Producto eliminado"}</td>
-
-                    {/* === Variante como mini-tabla dentro de la celda === */}
                     <td className="variant-cell">
                       <table className="variant-mini-table">
                         <thead>
@@ -349,7 +322,6 @@ const AdminOrderDetailPage = () => {
                         </tbody>
                       </table>
                     </td>
-
                     <td>{qty}</td>
                     <td>{hasPrice ? priceFmt(price) : "-"}</td>
                     <td>{hasPrice ? priceFmt(subtotal) : "-"}</td>

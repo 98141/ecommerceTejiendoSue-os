@@ -1,4 +1,5 @@
 @import url("../src/style/adminCategoryPage.css");
+@import url("../src/style/adminDashboard.css");
 @import url("../src/style/AdminDashboardPage.css");
 @import url("../src/style/adminInboxPages.css");
 @import url("../src/style/adminListmanages.css");
@@ -8,6 +9,7 @@
 @import url("../src/style/adminProductHistorialPage.css");
 @import url("../src/style/adminProductRow.css");
 @import url("../src/style/adminProductManager.css");
+@import url("../src/style/adminSalesHistoryPage.css");
 @import url("../src/style/cardItem.css");
 @import url("../src/style/cardPage.css");
 @import url("../src/style/checkoutModal.css");

@@ -6,18 +6,17 @@ import { formatCOP } from "../../utils/currency";
 const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
   const navigate = useNavigate();
 
-  // Estado modal
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmMode, setConfirmMode] = useState(null); // "status" | "cancel"
   const [pendingStatus, setPendingStatus] = useState("");
 
-  // Opciones válidas según estado actual
+  // Mantengo la lógica; agrego "cancelado" como opción de cambio desde "pendiente"
   const nextStatusOptions = useMemo(() => {
     switch (order.status) {
       case "pendiente":
-        return ["enviado"];
+        return ["enviado", "cancelado"];
       case "enviado":
         return ["entregado"];
       case "entregado":
@@ -31,6 +30,16 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
     const next = e.target.value;
     if (!next || next === order.status) return;
 
+    if (next === "cancelado") {
+      setConfirmMode("cancel");
+      setConfirmTitle("Cancelar pedido");
+      setConfirmMessage(
+        "¿Deseas cancelar este pedido? Se restablecerá el stock."
+      );
+      setConfirmOpen(true);
+      return;
+    }
+
     setPendingStatus(next);
     setConfirmMode("status");
     setConfirmTitle("Confirmar cambio de estado");
@@ -39,13 +48,6 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
         ? "¿Marcar el pedido como ENVIADO?"
         : "¿Marcar el pedido como ENTREGADO?"
     );
-    setConfirmOpen(true);
-  };
-
-  const openCancelModal = () => {
-    setConfirmMode("cancel");
-    setConfirmTitle("Cancelar pedido");
-    setConfirmMessage("¿Deseas cancelar este pedido? Se restablecerá el stock.");
     setConfirmOpen(true);
   };
 
@@ -73,48 +75,55 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
     setConfirmMessage("");
   };
 
-  const badgeClass = `order-card__badge order-card__badge--${order.status}`;
+  const badgeClass = `oc__badge is-${order.status}`;
+
+  const unitPrice = (it) =>
+    Number(
+      it?.unitPrice ?? it?.product?.effectivePrice ?? it?.product?.price ?? 0
+    );
 
   return (
-    <div className="order-card">
-      <div className="order-card__header">
-        <h4 className="order-card__title">Pedido #{order._id}</h4>
-        <span
-          className={badgeClass}
-          aria-label={`Estado: ${order.status}`}
-          title={`Estado: ${order.status}`}
-        >
+    <article className="oc">
+      <header className="oc__head">
+        <h4 className="oc__title">
+          Pedido{" "}
+          <span className="oc__id">
+            #{String(order._id).slice(-8).toUpperCase()}
+          </span>
+        </h4>
+        <span className={badgeClass} aria-label={`Estado: ${order.status}`}>
           {order.status}
+        </span>
+      </header>
+
+      <div className="oc__meta">
+        <span>
+          <b>Nombre:</b> {order.user?.name || "N/A"}
+        </span>
+        <span>
+          <b>Email:</b> {order.user?.email || "N/A"}
+        </span>
+        <span>
+          <b>Fecha:</b> {new Date(order.createdAt).toLocaleString()}
+        </span>
+        <span>
+          <b>Total:</b> {formatCOP(order.total)}
         </span>
       </div>
 
-      <p className="order-card__meta">
-        <strong>Nombre de usuario:</strong> {order.user?.name || "N/A"}
-      </p>
-      <p className="order-card__meta">
-        <strong>Usuario:</strong> {order.user?.email || "N/A"}
-      </p>
-      <p className="order-card__meta">
-        <strong>Fecha:</strong> {new Date(order.createdAt).toLocaleString()}
-      </p>
-      <p className="order-card__meta">
-        <strong>Total:</strong> {formatCOP(order.total)}
-      </p>
-
-      <div className="order-card__status-block">
-        <label htmlFor={`status-${order._id}`} className="order-card__label">
-          Cambiar estado:
+      <div className="oc__ctrl">
+        <label htmlFor={`status-${order._id}`} className="oc__label">
+          Cambiar estado
         </label>
-
         {nextStatusOptions.length > 0 ? (
           <select
             id={`status-${order._id}`}
             onChange={handleSelectChange}
             defaultValue=""
-            className="order-card__select"
+            className="oc__select"
           >
             <option value="" disabled>
-              Selecciona nuevo estado…
+              Selecciona…
             </option>
             {nextStatusOptions.map((opt) => (
               <option key={opt} value={opt}>
@@ -123,13 +132,20 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
             ))}
           </select>
         ) : (
-          <em className="order-card__no-changes">No hay cambios disponibles</em>
+          <em className="oc__nochanges">No hay cambios disponibles</em>
         )}
+        <div className="oc__spacer" />
+        {/* ⬇⬇ Estilo nuevo para el botón de detalle */}
+        <button
+          className="btn btn--detail"
+          onClick={() => navigate(`/admin/orders/${order._id}`)}
+        >
+          Ver detalle
+        </button>
       </div>
 
-      {/* Tabla de ítems */}
-      <div className="table-responsive order-card__table-wrap">
-        <table className="table table-order-items">
+      <div className="oc__tablewrap">
+        <table className="oc__table">
           <thead>
             <tr>
               <th>Producto</th>
@@ -142,17 +158,17 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
           </thead>
           <tbody>
             {(order.items || []).map((item, i) => {
-              const price = item.product?.price ?? 0;
               const qty = Number(item.quantity) || 0;
-              const subtotal = qty * Number(price);
+              const up = unitPrice(item);
+              const sub = qty * up;
               return (
                 <tr key={item._id || i}>
                   <td>{item.product?.name || "Producto eliminado"}</td>
                   <td>{item.size?.label || "-"}</td>
                   <td>{item.color?.name || "-"}</td>
                   <td>{qty}</td>
-                  <td>{formatCOP(price)}</td>
-                  <td>{formatCOP(subtotal)}</td>
+                  <td>{formatCOP(up)}</td>
+                  <td>{formatCOP(sub)}</td>
                 </tr>
               );
             })}
@@ -175,23 +191,23 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
         </table>
       </div>
 
-      <div className="order-card__actions">
-        {order.status === "pendiente" && (
+      {order.status === "pendiente" && (
+        <div className="oc__actions">
           <button
             className="btn btn--danger"
-            onClick={openCancelModal}
-            title="Cancelar pedido (restaura stock)"
+            onClick={() => {
+              setConfirmMode("cancel");
+              setConfirmTitle("Cancelar pedido");
+              setConfirmMessage(
+                "¿Deseas cancelar este pedido? Se restablecerá el stock."
+              );
+              setConfirmOpen(true);
+            }}
           >
             Cancelar pedido
           </button>
-        )}
-        <button
-          className="btn btn--dark"
-          onClick={() => navigate(`/admin/orders/${order._id}`)}
-        >
-          Ver detalle
-        </button>
-      </div>
+        </div>
+      )}
 
       {confirmOpen && (
         <ConfirmModal
@@ -201,7 +217,7 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
           onCancel={handleCancelModal}
         />
       )}
-    </div>
+    </article>
   );
 };
 

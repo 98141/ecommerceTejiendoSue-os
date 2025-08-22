@@ -17,13 +17,10 @@ const FilterExportControls = ({
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-    }
+    if (e.key === "Enter") e.preventDefault(); // evita submit
   };
 
   const exportDisabled = !!dateError || !hasResults;
-
   const tooltipMessage = dateError
     ? dateError
     : !hasResults
@@ -31,79 +28,79 @@ const FilterExportControls = ({
     : "";
 
   return (
-    <div
-      style={{
-        marginBottom: "20px",
-        display: "flex",
-        gap: "1rem",
-        flexWrap: "wrap",
-        alignItems: "center",
-      }}
+    <section
+      className="af"
+      onKeyDown={handleKeyDown}
+      aria-label="Controles de filtro y exportación"
     >
-      <label>Estado:</label>
-      <select
-        value={statusFilter}
-        onChange={(e) => setStatusFilter(e.target.value)}
-      >
-        <option value="todos">Todos</option>
-        <option value="pendiente">Pendiente</option>
-        <option value="enviado">Enviado</option>
-        <option value="entregado">Entregado</option>
-      </select>
+      <div className="af__group">
+        <label className="af__label">Estado</label>
+        <select
+          className="af__select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="todos">Todos</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="enviado">Enviado</option>
+          <option value="entregado">Entregado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
 
-      <label>Buscar:</label>
-      <input
-        type="text"
-        placeholder="Correo, nombre o ID"
-        value={searchFilter}
-        onChange={(e) => setSearchFilter(e.target.value)}
-        onKeyDown={handleKeyDown}
-      />
+      <div className="af__group af__group--grow">
+        <label className="af__label">Buscar</label>
+        <input
+          className="af__input"
+          type="text"
+          placeholder="Correo, nombre o ID"
+          value={searchFilter}
+          onChange={(e) => setSearchFilter(e.target.value)}
+        />
+      </div>
 
-      <label>Desde:</label>
-      <input
-        type="date"
-        value={dateRange.from}
-        onChange={(e) =>
-          setDateRange({ ...dateRange, from: e.target.value })
-        }
-      />
+      <div className="af__group">
+        <label className="af__label">Desde</label>
+        <input
+          className="af__input"
+          type="date"
+          value={dateRange.from}
+          onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
+        />
+      </div>
 
-      <label>Hasta:</label>
-      <input
-        type="date"
-        value={dateRange.to}
-        onChange={(e) =>
-          setDateRange({ ...dateRange, to: e.target.value })
-        }
-      />
+      <div className="af__group">
+        <label className="af__label">Hasta</label>
+        <input
+          className="af__input"
+          type="date"
+          value={dateRange.to}
+          onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
+        />
+      </div>
 
-      {/* Botón Exportar PDF */}
-      <div title={exportDisabled ? tooltipMessage : ""}>
+      <div className="af__sep" />
+
+      <div className="af__actions" title={exportDisabled ? tooltipMessage : ""}>
+        <button className="btn btn--ghost" onClick={handleClearFilters}>
+          Limpiar
+        </button>
         <button
-          className="export-button"
+          className="btn btn--primary"
           onClick={exportToPDF}
           disabled={exportDisabled}
         >
-          {exportDisabled && <span className="warning-icon">⚠️</span>}
-          Exportar PDF
+          {exportDisabled ? "PDF (bloqueado)" : "Exportar PDF"}
         </button>
-      </div>
-
-      {/* Botón Exportar Excel */}
-      <div title={exportDisabled ? tooltipMessage : ""}>
         <button
-          className="export-button"
+          className="btn btn--dark"
           onClick={exportToExcel}
           disabled={exportDisabled}
         >
-          {exportDisabled && <span className="warning-icon">⚠️</span>}
-          Exportar Excel
+          {exportDisabled ? "Excel (bloqueado)" : "Exportar Excel"}
         </button>
       </div>
-
-      <button onClick={handleClearFilters}>Limpiar filtros</button>
-    </div>
+    </section>
   );
 };
 
