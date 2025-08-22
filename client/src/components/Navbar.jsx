@@ -5,7 +5,6 @@ import { CartContext } from "../contexts/CartContext";
 import { SupportContext } from "../contexts/SupportContext";
 import { useToast } from "../contexts/ToastContext";
 import ConfirmModal from "../blocks/ConfirmModalBlock";
-import logo from "../assets/PPFINAL.png";
 
 /* ==================== Helpers de "ruta activa" ==================== */
 const isMatch = (pathname, matcher) => {
@@ -21,7 +20,7 @@ const isMatch = (pathname, matcher) => {
 /* ================================================================= */
 
 /** ===================== MENÚ CONFIG ===================== */
-const menuConfig = ({ role, totalItems, hidePublic }) => {
+const menuConfig = ({ role, hidePublic }) => {
   const publicGroup = hidePublic
     ? []
     : [
@@ -164,11 +163,7 @@ const menuConfig = ({ role, totalItems, hidePublic }) => {
               },
             ],
           },
-          {
-            label: `Carrito (${totalItems})`,
-            to: "/cart",
-            activeMatch: /^\/cart(\/|$)/,
-          },
+          // 👇 Carrito eliminado del menú (queda solo como icono)
           {
             label: "Mis pedidos",
             to: "/my-orders",
@@ -185,7 +180,7 @@ const menuConfig = ({ role, totalItems, hidePublic }) => {
             to: "/admin/dashboard",
             activeMatch: /^\/admin\/dashboard(\/|$)/,
           },
-          { label: "Pedidos", to: "/admin", activeMatch: /^\/admin\/?$/ }, // exacto
+          { label: "Pedidos", to: "/admin", activeMatch: /^\/admin\/?$/ },
           {
             label: "Historial",
             to: "/admin/orders",
@@ -214,9 +209,10 @@ const Navbar = () => {
   const location = useLocation();
 
   const [showConfirm, setShowConfirm] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState(null); // desktop/tablet
-  const [drawerOpen, setDrawerOpen] = useState(false); // móvil
-  const [mobileOpenIndex, setMobileOpenIndex] = useState(null); // acordeón móvil
+  const [openDropdown, setOpenDropdown] = useState(null); // desktop
+  const [drawerOpen, setDrawerOpen] = useState(false); // mobile
+  const [mobileOpenIndex, setMobileOpenIndex] = useState(null); // accordion (si lo necesitas)
+  const [showSearch, setShowSearch] = useState(false); // search desktop
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const navRef = useRef(null);
@@ -230,7 +226,7 @@ const Navbar = () => {
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
       .join(" ");
 
-  // Cerrar dropdowns/drawer con click fuera y Esc
+  // Cierra dropdowns/drawer con click fuera y Esc
   useEffect(() => {
     const onClickOutside = (e) => {
       if (navRef.current && !navRef.current.contains(e.target)) {
@@ -242,6 +238,7 @@ const Navbar = () => {
         setOpenDropdown(null);
         setDrawerOpen(false);
         setMobileOpenIndex(null);
+        setShowSearch(false);
       }
     };
     document.addEventListener("mousedown", onClickOutside);
@@ -252,13 +249,14 @@ const Navbar = () => {
     };
   }, []);
 
-  const items = menuConfig({ role: user?.role, totalItems, hidePublic });
+  const items = menuConfig({ role: user?.role, hidePublic });
 
   const goSupportPath = user
     ? user.role === "admin"
       ? "/admin/inbox"
       : "/support"
     : "/login";
+
   const isSupportActive =
     isMatch(location.pathname, /^\/support(\/|$)/) ||
     isMatch(location.pathname, /^\/admin\/inbox(\/|$)/);
@@ -269,183 +267,272 @@ const Navbar = () => {
     navigate("/");
   };
 
-  // Desktop/Tablet: al clic, abre y PERMANECE hasta clic fuera o selección
-  const onTopItemClick = (item, idx, hasChildren) => {
-    if (window.innerWidth < 768) return;
-    if (!hasChildren) {
-      navigate(item.to);
-      return;
-    }
-    setOpenDropdown((cur) => (cur === idx ? null : idx));
-  };
-
-  // Móvil: acordeón controlado
-  const onMobileParentClick = (item, idx) => {
-    if (!item.children) {
-      navigate(item.to);
-      setDrawerOpen(false);
-      setMobileOpenIndex(null);
-      return;
-    }
-    setMobileOpenIndex((cur) => (cur === idx ? null : idx));
+  // Íconos
+  const handleSearchToggle = () => setShowSearch((s) => !s);
+  const handleWishlist = () =>
+    showToast("Favoritos estará disponible pronto.", "info");
+  const handleAccountClick = () => {
+    if (!user) navigate("/login");
+    else navigate(user.role === "admin" ? "/admin/dashboard" : "/");
   };
 
   return (
     <>
       <nav className="navbar-container" ref={navRef}>
-        {/* IZQUIERDA: LOGO */}
-        <div className="nav-left">
-          <Link
-            to={user ? (user.role === "admin" ? "/admin/dashboard" : "/") : "/"}
-            className="brand"
-          >
-            <img src={logo} alt="Tejiendo Raíces" className="brand-logo" />
-            <span className="brand-name">Tejiendo&nbsp;Raíces</span>
-          </Link>
-        </div>
-
-        {/* CENTRO: MENÚ (desktop/tablet) */}
-        <div className="nav-center">
-          <ul className="menu-root" role="menubar" aria-label="Menú principal">
-            {items.map((item, idx) => {
-              const hasChildren =
-                Array.isArray(item.children) && item.children.length > 0;
-              const parentActive =
-                isMatch(location.pathname, item.activeMatch || item.to) ||
-                (hasChildren &&
-                  item.children.some((c) =>
-                    isMatch(location.pathname, c.activeMatch || c.to)
-                  ));
-
-              return (
-                <li
-                  key={item.label}
-                  className={`menu-item ${openDropdown === idx ? "open" : ""}`}
-                  onMouseEnter={() => {
-                    if (window.innerWidth >= 768 && hasChildren)
-                      setOpenDropdown(idx);
-                  }}
-                  onMouseLeave={() => {
-                    if (window.innerWidth >= 768) setOpenDropdown(null);
-                  }}
-                >
-                  <button
-                    className={`menu-top ${parentActive ? "active" : ""}`}
-                    aria-haspopup={hasChildren ? "true" : "false"}
-                    aria-expanded={openDropdown === idx}
-                    onClick={() => onTopItemClick(item, idx, hasChildren)}
-                  >
-                    {item.label}
-                    {hasChildren && (
-                      <span className="chev" aria-hidden>
-                        ▾
-                      </span>
-                    )}
-                  </button>
-
-                  {hasChildren && (
-                    <div
-                      className="dropdown"
-                      role="menu"
-                      aria-label={`Submenú de ${item.label}`}
-                    >
-                      {item.children.map((child) => {
-                        const childActive = isMatch(
-                          location.pathname,
-                          child.activeMatch || child.to
-                        );
-                        return (
-                          <Link
-                            key={child.to}
-                            className={`dropdown-link ${
-                              childActive ? "active" : ""
-                            }`}
-                            to={child.to}
-                            onClick={() => setOpenDropdown(null)}
-                            role="menuitem"
-                          >
-                            {child.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-
-        {/* DERECHA */}
-        <div className="nav-right">
-          {user && (
+        <div className="navbar-wrapper">
+          {/* IZQUIERDA: LOGO */}
+          <div className="nav-left">
             <Link
-              to={goSupportPath}
-              className={`nav-link support-link ${
-                isSupportActive ? "active" : ""
-              }`}
+              to={
+                user ? (user.role === "admin" ? "/admin/dashboard" : "/") : "/"
+              }
+              className="brand"
             >
-              Soporte
-              {unreadCount > 0 && (
-                <span className="notification-badge">{unreadCount}</span>
-              )}
+              <span className="brand-name">Artesanías Paja Toquilla</span>
             </Link>
-          )}
+          </div>
 
-          {user ? (
-            <div className="user-box">
-              <div className="user-avatar" aria-hidden>
-                {user.name?.charAt(0)?.toUpperCase() ?? "U"}
-              </div>
-              <span className="nav-user">
-                Hola, {capitalizeInitials(user.name)}
-              </span>
+          {/* CENTRO: MENÚ (solo desktop/tablet) */}
+          <div className="nav-center">
+            <ul
+              className="menu-root"
+              role="menubar"
+              aria-label="Menú principal"
+            >
+              {items.map((item, idx) => {
+                const hasChildren =
+                  Array.isArray(item.children) && item.children.length > 0;
+                const parentActive =
+                  isMatch(location.pathname, item.activeMatch || item.to) ||
+                  (hasChildren &&
+                    item.children.some((c) =>
+                      isMatch(location.pathname, c.activeMatch || c.to)
+                    ));
+
+                return (
+                  <li
+                    key={item.label}
+                    className={`menu-item ${
+                      openDropdown === idx ? "open" : ""
+                    }`}
+                    onMouseEnter={() => {
+                      if (window.innerWidth >= 1024 && hasChildren)
+                        setOpenDropdown(idx);
+                    }}
+                    onMouseLeave={() => {
+                      if (window.innerWidth >= 1024) setOpenDropdown(null);
+                    }}
+                  >
+                    <button
+                      className={`menu-top ${parentActive ? "active" : ""}`}
+                      aria-haspopup={hasChildren ? "true" : "false"}
+                      aria-expanded={openDropdown === idx}
+                      onClick={() => {
+                        if (!hasChildren) {
+                          navigate(item.to);
+                          return;
+                        }
+                        setOpenDropdown((cur) => (cur === idx ? null : idx));
+                      }}
+                    >
+                      {item.label}
+                      {hasChildren && (
+                        <span className="chev" aria-hidden>
+                          ▾
+                        </span>
+                      )}
+                    </button>
+
+                    {hasChildren && (
+                      <div
+                        className="dropdown"
+                        role="menu"
+                        aria-label={`Submenú de ${item.label}`}
+                        aria-hidden={openDropdown !== idx}
+                      >
+                        {item.children.map((child) => {
+                          const childActive = isMatch(
+                            location.pathname,
+                            child.activeMatch || child.to
+                          );
+                          return (
+                            <Link
+                              key={child.to}
+                              className={`dropdown-link ${
+                                childActive ? "active" : ""
+                              }`}
+                              to={child.to}
+                              onClick={() => setOpenDropdown(null)}
+                              role="menuitem"
+                            >
+                              {child.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {/* DERECHA */}
+          <div className="nav-right">
+            {/* Iconos (solo desktop) */}
+            <div className="icon-bar">
               <button
-                onClick={() => setShowConfirm(true)}
-                className="logout-button"
+                className={`icon-btn ${showSearch ? "active" : ""}`}
+                onClick={handleSearchToggle}
+                aria-label="Buscar"
+                title="Buscar"
+                type="button"
               >
-                Salir
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 14 15.5l.27.28v.79L20 21l1-1-5.5-5.5zM5 10.5A5.5 5.5 0 1 1 10.5 16 5.51 5.51 0 0 1 5 10.5z" />
+                </svg>
               </button>
-            </div>
-          ) : (
-            <div className="auth-links">
-              <Link
-                to="/login"
-                className={
-                  isMatch(location.pathname, /^\/login(\/|$)/)
-                    ? "nav-link active"
-                    : "nav-link"
-                }
-              >
-                Login
-              </Link>
-              <Link
-                to="/register"
-                className={
-                  isMatch(location.pathname, /^\/register(\/|$)/)
-                    ? "nav-link active"
-                    : "nav-link"
-                }
-              >
-                Registro
-              </Link>
-            </div>
-          )}
 
-          {/* Hamburguesa (móvil) */}
-          <button
-            className={`burger ${drawerOpen ? "active" : ""}`}
-            onClick={() => {
-              setDrawerOpen((s) => !s);
-              setMobileOpenIndex(null);
+              <button
+                className="icon-btn"
+                onClick={handleWishlist}
+                aria-label="Favoritos"
+                title="Favoritos"
+                type="button"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 21s-6.716-4.35-9.33-7.12C.5 11.6 1.09 8.16 3.64 6.84A4.86 4.86 0 0 1 12 8.17a4.86 4.86 0 0 1 8.36-1.33c2.55 1.32 3.14 4.76.97 7.04C18.716 16.65 12 21 12 21z" />
+                </svg>
+              </button>
+
+              <Link
+                to="/cart"
+                className="icon-btn cart-btn"
+                aria-label="Carrito"
+                title="Carrito"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 4h-2l-1 2v2h2l3.6 7.59L8.24 18H19v-2H9.42l1.1-2h6.45a2 2 0 0 0 1.79-1.11L21 7H6.21l-.94-2H3" />
+                </svg>
+                {totalItems > 0 && (
+                  <span className="cart-badge">{totalItems}</span>
+                )}
+              </Link>
+            </div>
+
+            {/* Perfil (siempre visible; en mobile queda solo este + burger) */}
+            <button
+              className="account-btn"
+              onClick={handleAccountClick}
+              aria-label="Cuenta"
+              title="Cuenta"
+              type="button"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
+              </svg>
+            </button>
+
+            {/* Soporte + usuario (solo desktop) */}
+            {user && (
+              <Link
+                to={goSupportPath}
+                className={`nav-link support-link ${
+                  isSupportActive ? "active" : ""
+                }`}
+              >
+                Soporte
+                {unreadCount > 0 && (
+                  <span className="notification-badge">{unreadCount}</span>
+                )}
+              </Link>
+            )}
+
+            {user ? (
+              <div className="user-box">
+                <div className="user-avatar" aria-hidden>
+                  {user.name?.charAt(0)?.toUpperCase() ?? "U"}
+                </div>
+                <span className="nav-user">
+                  Hola, {capitalizeInitials(user.name)}
+                </span>
+                <button
+                  onClick={() => setShowConfirm(true)}
+                  className="logout-button"
+                  type="button"
+                >
+                  Salir
+                </button>
+              </div>
+            ) : (
+              <div className="auth-links">
+                <Link
+                  to="/login"
+                  className={
+                    isMatch(location.pathname, /^\/login(\/|$)/)
+                      ? "nav-link active"
+                      : "nav-link"
+                  }
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  className={
+                    isMatch(location.pathname, /^\/register(\/|$)/)
+                      ? "nav-link active"
+                      : "nav-link"
+                  }
+                >
+                  Registro
+                </Link>
+              </div>
+            )}
+
+            {/* Hamburguesa (móvil) */}
+            <button
+              className={`burger ${drawerOpen ? "active" : ""}`}
+              onClick={() => {
+                setDrawerOpen((s) => !s);
+                setMobileOpenIndex(null);
+                setShowSearch(false);
+              }}
+              aria-label="Abrir menú"
+              aria-expanded={drawerOpen}
+              type="button"
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+          </div>
+        </div>
+
+        {/* Búsqueda desplegable (desktop/tablet) */}
+        <div
+          className={`search-bar ${showSearch ? "open" : ""}`}
+          role="region"
+          aria-hidden={!showSearch}
+        >
+          <form
+            className="search-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const q = e.currentTarget.elements.q.value.trim();
+              if (!q) return;
+              showToast(`Buscando: ${q}`, "info");
             }}
-            aria-label="Abrir menú"
-            aria-expanded={drawerOpen}
           >
-            <span />
-            <span />
-            <span />
-          </button>
+            <input
+              name="q"
+              type="search"
+              placeholder="Busca productos, colecciones…"
+              aria-label="Buscar"
+            />
+            <button type="submit" className="btn-search">
+              Buscar
+            </button>
+          </form>
         </div>
 
         {/* Drawer móvil */}
@@ -462,9 +549,68 @@ const Navbar = () => {
                 setMobileOpenIndex(null);
               }}
               aria-label="Cerrar menú"
+              type="button"
             >
               ✕
             </button>
+          </div>
+
+          {/* Barra de iconos dentro del drawer (buscador, favoritos, carrito) */}
+          <div className="drawer-icons">
+            <button
+              className="icon-btn"
+              onClick={handleSearchToggle}
+              aria-label="Buscar"
+            >
+              <svg viewBox="0 0 24 24">
+                <path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 14 15.5l.27.28v.79L20 21l1-1-5.5-5.5zM5 10.5A5.5 5.5 0 1 1 10.5 16 5.51 5.51 0 0 1 5 10.5z" />
+              </svg>
+            </button>
+            <button
+              className="icon-btn"
+              onClick={handleWishlist}
+              aria-label="Favoritos"
+            >
+              <svg viewBox="0 0 24 24">
+                <path d="M12 21s-6.716-4.35-9.33-7.12C.5 11.6 1.09 8.16 3.64 6.84A4.86 4.86 0 0 1 12 8.17a4.86 4.86 0 0 1 8.36-1.33c2.55 1.32 3.14 4.76.97 7.04C18.716 16.65 12 21 12 21z" />
+              </svg>
+            </button>
+            <Link
+              to="/cart"
+              className="icon-btn cart-btn"
+              aria-label="Carrito"
+              onClick={() => setDrawerOpen(false)}
+            >
+              <svg viewBox="0 0 24 24">
+                <path d="M7 4h-2l-1 2v2h2l3.6 7.59L8.24 18H19v-2H9.42l1.1-2h6.45a2 2 0 0 0 1.79-1.11L21 7H6.21l-.94-2H3" />
+              </svg>
+              {totalItems > 0 && (
+                <span className="cart-badge">{totalItems}</span>
+              )}
+            </Link>
+          </div>
+
+          {/* Buscador compacto dentro del drawer */}
+          <div className="drawer-search">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = e.currentTarget.elements.qm.value.trim();
+                if (!q) return;
+                setDrawerOpen(false);
+                showToast(`Buscando: ${q}`, "info");
+                // Si tienes ruta de búsqueda, podrías:
+                // navigate(`/buscar?q=${encodeURIComponent(q)}`);
+              }}
+            >
+              <input
+                name="qm"
+                type="search"
+                placeholder="Buscar…"
+                aria-label="Buscar en móvil"
+              />
+              <button type="submit">Ir</button>
+            </form>
           </div>
 
           <div className="drawer-content">
@@ -486,9 +632,17 @@ const Navbar = () => {
                 >
                   <button
                     className={`drawer-parent ${parentActive ? "active" : ""}`}
-                    onClick={() => onMobileParentClick(item, idx)}
+                    onClick={() => {
+                      if (!hasChildren) {
+                        setDrawerOpen(false);
+                        navigate(item.to);
+                      } else {
+                        setMobileOpenIndex((cur) => (cur === idx ? null : idx));
+                      }
+                    }}
                     aria-expanded={isOpen}
                     aria-haspopup={hasChildren ? "true" : "false"}
+                    type="button"
                   >
                     <span>{item.label}</span>
                     {hasChildren && (
@@ -531,56 +685,26 @@ const Navbar = () => {
             })}
 
             <div className="drawer-sep" />
-            {user ? (
-              <>
-                <Link
-                  to={goSupportPath}
-                  onClick={() => {
-                    setDrawerOpen(false);
-                    setMobileOpenIndex(null);
-                  }}
-                  className={`drawer-link support-mobile ${
-                    isSupportActive ? "active" : ""
-                  }`}
-                >
-                  Soporte
-                  {unreadCount > 0 && (
-                    <span className="badge-inline">{unreadCount}</span>
-                  )}
-                </Link>
-                <button
-                  className="drawer-logout"
-                  onClick={() => {
-                    setDrawerOpen(false);
-                    setMobileOpenIndex(null);
-                    setShowConfirm(true);
-                  }}
-                >
-                  Cerrar sesión
-                </button>
-              </>
-            ) : (
-              <div className="drawer-auth">
-                <Link
-                  to="/login"
-                  onClick={() => {
-                    setDrawerOpen(false);
-                    setMobileOpenIndex(null);
-                  }}
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/register"
-                  onClick={() => {
-                    setDrawerOpen(false);
-                    setMobileOpenIndex(null);
-                  }}
-                >
-                  Registro
-                </Link>
-              </div>
+
+            {user && (
+              <Link
+                to={goSupportPath}
+                onClick={() => {
+                  setDrawerOpen(false);
+                  setMobileOpenIndex(null);
+                }}
+                className={`drawer-link support-mobile ${
+                  isSupportActive ? "active" : ""
+                }`}
+              >
+                Soporte
+                {unreadCount > 0 && (
+                  <span className="badge-inline">{unreadCount}</span>
+                )}
+              </Link>
             )}
+
+            {/* 👇 En móvil NO mostramos login/registro, tal como pediste */}
           </div>
         </aside>
 
