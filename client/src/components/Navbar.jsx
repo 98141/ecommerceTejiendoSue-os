@@ -163,7 +163,6 @@ const menuConfig = ({ role, hidePublic }) => {
               },
             ],
           },
-          // 👇 Carrito eliminado del menú (queda solo como icono)
           {
             label: "Mis pedidos",
             to: "/my-orders",
@@ -190,6 +189,38 @@ const menuConfig = ({ role, hidePublic }) => {
             label: "Productos",
             to: "/admin/products",
             activeMatch: /^\/admin\/products(\/|$)/,
+            children: [
+              {
+                label: "Ver productos",
+                to: "/admin/products",
+                activeMatch: /^\/admin\/products(\/|$)/,
+              },
+              {
+                label: "Agregar producto",
+                to: "/admin/products/new",
+                activeMatch: /^\/admin\/products\/new(\/|$)/,
+              },
+              {
+                label: "Categorias",
+                to: "/admin/categories",
+                activeMatch: /^\/admin\/categories(\/|$)/,
+              },
+              {
+                label: "Tallas",
+                to: "/admin/sizes",
+                activeMatch: /^\/admin\/sizes(\/|$)/,
+              },
+              {
+                label: "Colores",
+                to: "/admin/colors",
+                activeMatch: /^\/admin\/colors(\/|$)/,
+              },
+              {
+                label: "Historial",
+                to: "/admin/historial",
+                activeMatch: /^\/admin\/history(\/|$)/,
+              },
+            ],
           },
         ]
       : [];
@@ -315,23 +346,23 @@ const Navbar = () => {
                     className={`menu-item ${
                       openDropdown === idx ? "open" : ""
                     }`}
+                    // 👇 eliminamos el auto-close en mouseleave
                     onMouseEnter={() => {
                       if (window.innerWidth >= 1024 && hasChildren)
                         setOpenDropdown(idx);
-                    }}
-                    onMouseLeave={() => {
-                      if (window.innerWidth >= 1024) setOpenDropdown(null);
                     }}
                   >
                     <button
                       className={`menu-top ${parentActive ? "active" : ""}`}
                       aria-haspopup={hasChildren ? "true" : "false"}
                       aria-expanded={openDropdown === idx}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
                         if (!hasChildren) {
                           navigate(item.to);
                           return;
                         }
+                        // toggle con clic
                         setOpenDropdown((cur) => (cur === idx ? null : idx));
                       }}
                     >
@@ -362,7 +393,7 @@ const Navbar = () => {
                                 childActive ? "active" : ""
                               }`}
                               to={child.to}
-                              onClick={() => setOpenDropdown(null)}
+                              onClick={() => setOpenDropdown(null)} // cierra solo al dar click
                               role="menuitem"
                             >
                               {child.label}

@@ -228,13 +228,6 @@ const AdminProductPage = () => {
     <div className="admin-products">
       <div className="header">
         <h2>Administrar Productos</h2>
-        <div className="header-actions">
-          <button onClick={() => navigate("/admin/products/new")} className="btn-add">+ Agregar producto</button>
-          <button onClick={() => navigate("/admin/categories")} className="btn-add">+ Categorías</button>
-          <button onClick={() => navigate("/admin/sizes")} className="btn-add">+ Tallas</button>
-          <button onClick={() => navigate("/admin/colors")} className="btn-add">+ Colores</button>
-          <button onClick={() => navigate("/admin/historial")} className="btn-add">+ Historial</button>
-        </div>
       </div>
 
       <div className="toolbar">
