@@ -233,23 +233,22 @@ const menuConfig = ({ role, hidePublic }) => {
 
 const Navbar = () => {
   const { user, logout } = useContext(AuthContext);
-  const { cart } = useContext(CartContext);
+  const { totalItems } = useContext(CartContext);
   const { unreadCount } = useContext(SupportContext);
   const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [showConfirm, setShowConfirm] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState(null); // desktop
-  const [drawerOpen, setDrawerOpen] = useState(false); // mobile
-  const [mobileOpenIndex, setMobileOpenIndex] = useState(null); // accordion (si lo necesitas)
-  const [showSearch, setShowSearch] = useState(false); // search desktop
-
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mobileOpenIndex, setMobileOpenIndex] = useState(null);
+  const [showSearch, setShowSearch] = useState(false);
   const navRef = useRef(null);
 
   const isAdminRoute = location.pathname.startsWith("/admin");
   const hidePublic = isAdminRoute || Boolean(user);
+  const isCustomer = user?.role === "user";
 
   const capitalizeInitials = (name) =>
     (name || "")
@@ -257,7 +256,6 @@ const Navbar = () => {
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
       .join(" ");
 
-  // Cierra dropdowns/drawer con click fuera y Esc
   useEffect(() => {
     const onClickOutside = (e) => {
       if (navRef.current && !navRef.current.contains(e.target)) {
@@ -298,7 +296,6 @@ const Navbar = () => {
     navigate("/");
   };
 
-  // Íconos
   const handleSearchToggle = () => setShowSearch((s) => !s);
   const handleWishlist = () =>
     showToast("Favoritos estará disponible pronto.", "info");
@@ -323,7 +320,7 @@ const Navbar = () => {
             </Link>
           </div>
 
-          {/* CENTRO: MENÚ (solo desktop/tablet) */}
+          {/* CENTRO: MENÚ */}
           <div className="nav-center">
             <ul
               className="menu-root"
@@ -346,7 +343,6 @@ const Navbar = () => {
                     className={`menu-item ${
                       openDropdown === idx ? "open" : ""
                     }`}
-                    // 👇 eliminamos el auto-close en mouseleave
                     onMouseEnter={() => {
                       if (window.innerWidth >= 1024 && hasChildren)
                         setOpenDropdown(idx);
@@ -362,7 +358,6 @@ const Navbar = () => {
                           navigate(item.to);
                           return;
                         }
-                        // toggle con clic
                         setOpenDropdown((cur) => (cur === idx ? null : idx));
                       }}
                     >
@@ -393,7 +388,7 @@ const Navbar = () => {
                                 childActive ? "active" : ""
                               }`}
                               to={child.to}
-                              onClick={() => setOpenDropdown(null)} // cierra solo al dar click
+                              onClick={() => setOpenDropdown(null)}
                               role="menuitem"
                             >
                               {child.label}
@@ -410,48 +405,50 @@ const Navbar = () => {
 
           {/* DERECHA */}
           <div className="nav-right">
-            {/* Iconos (solo desktop) */}
-            <div className="icon-bar">
-              <button
-                className={`icon-btn ${showSearch ? "active" : ""}`}
-                onClick={handleSearchToggle}
-                aria-label="Buscar"
-                title="Buscar"
-                type="button"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 14 15.5l.27.28v.79L20 21l1-1-5.5-5.5zM5 10.5A5.5 5.5 0 1 1 10.5 16 5.51 5.51 0 0 1 5 10.5z" />
-                </svg>
-              </button>
+            {/* Iconos (solo desktop) — SOLO para clientes */}
+            {isCustomer && (
+              <div className="icon-bar">
+                <button
+                  className={`icon-btn ${showSearch ? "active" : ""}`}
+                  onClick={handleSearchToggle}
+                  aria-label="Buscar"
+                  title="Buscar"
+                  type="button"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 14 15.5l.27.28v.79L20 21l1-1-5.5-5.5zM5 10.5A5.5 5.5 0 1 1 10.5 16 5.51 5.51 0 0 1 5 10.5z" />
+                  </svg>
+                </button>
 
-              <button
-                className="icon-btn"
-                onClick={handleWishlist}
-                aria-label="Favoritos"
-                title="Favoritos"
-                type="button"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 21s-6.716-4.35-9.33-7.12C.5 11.6 1.09 8.16 3.64 6.84A4.86 4.86 0 0 1 12 8.17a4.86 4.86 0 0 1 8.36-1.33c2.55 1.32 3.14 4.76.97 7.04C18.716 16.65 12 21 12 21z" />
-                </svg>
-              </button>
+                <button
+                  className="icon-btn"
+                  onClick={handleWishlist}
+                  aria-label="Favoritos"
+                  title="Favoritos"
+                  type="button"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 21s-6.716-4.35-9.33-7.12C.5 11.6 1.09 8.16 3.64 6.84A4.86 4.86 0 0 1 12 8.17a4.86 4.86 0 0 1 8.36-1.33c2.55 1.32 3.14 4.76.97 7.04C18.716 16.65 12 21 12 21z" />
+                  </svg>
+                </button>
 
-              <Link
-                to="/cart"
-                className="icon-btn cart-btn"
-                aria-label="Carrito"
-                title="Carrito"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M7 4h-2l-1 2v2h2l3.6 7.59L8.24 18H19v-2H9.42l1.1-2h6.45a2 2 0 0 0 1.79-1.11L21 7H6.21l-.94-2H3" />
-                </svg>
-                {totalItems > 0 && (
-                  <span className="cart-badge">{totalItems}</span>
-                )}
-              </Link>
-            </div>
+                <Link
+                  to="/cart"
+                  className="icon-btn cart-btn"
+                  aria-label="Carrito"
+                  title="Carrito"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M7 4h-2l-1 2v2h2l3.6 7.59L8.24 18H19v-2H9.42l1.1-2h6.45a2 2 0 0 0 1.79-1.11L21 7H6.21l-.94-2H3" />
+                  </svg>
+                  {totalItems > 0 && (
+                    <span className="cart-badge">{totalItems}</span>
+                  )}
+                </Link>
+              </div>
+            )}
 
-            {/* Perfil (siempre visible; en mobile queda solo este + burger) */}
+            {/* Perfil */}
             <button
               className="account-btn"
               onClick={handleAccountClick}
@@ -464,7 +461,7 @@ const Navbar = () => {
               </svg>
             </button>
 
-            {/* Soporte + usuario (solo desktop) */}
+            {/* Soporte + usuario */}
             {user && (
               <Link
                 to={goSupportPath}
@@ -539,32 +536,34 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Búsqueda desplegable (desktop/tablet) */}
-        <div
-          className={`search-bar ${showSearch ? "open" : ""}`}
-          role="region"
-          aria-hidden={!showSearch}
-        >
-          <form
-            className="search-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const q = e.currentTarget.elements.q.value.trim();
-              if (!q) return;
-              showToast(`Buscando: ${q}`, "info");
-            }}
+        {/* Búsqueda desplegable (desktop/tablet) — solo cliente */}
+        {isCustomer && (
+          <div
+            className={`search-bar ${showSearch ? "open" : ""}`}
+            role="region"
+            aria-hidden={!showSearch}
           >
-            <input
-              name="q"
-              type="search"
-              placeholder="Busca productos, colecciones…"
-              aria-label="Buscar"
-            />
-            <button type="submit" className="btn-search">
-              Buscar
-            </button>
-          </form>
-        </div>
+            <form
+              className="search-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = e.currentTarget.elements.q.value.trim();
+                if (!q) return;
+                showToast(`Buscando: ${q}`, "info");
+              }}
+            >
+              <input
+                name="q"
+                type="search"
+                placeholder="Busca productos, colecciones…"
+                aria-label="Buscar"
+              />
+              <button type="submit" className="btn-search">
+                Buscar
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Drawer móvil */}
         <aside
@@ -586,63 +585,65 @@ const Navbar = () => {
             </button>
           </div>
 
-          {/* Barra de iconos dentro del drawer (buscador, favoritos, carrito) */}
-          <div className="drawer-icons">
-            <button
-              className="icon-btn"
-              onClick={handleSearchToggle}
-              aria-label="Buscar"
-            >
-              <svg viewBox="0 0 24 24">
-                <path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 14 15.5l.27.28v.79L20 21l1-1-5.5-5.5zM5 10.5A5.5 5.5 0 1 1 10.5 16 5.51 5.51 0 0 1 5 10.5z" />
-              </svg>
-            </button>
-            <button
-              className="icon-btn"
-              onClick={handleWishlist}
-              aria-label="Favoritos"
-            >
-              <svg viewBox="0 0 24 24">
-                <path d="M12 21s-6.716-4.35-9.33-7.12C.5 11.6 1.09 8.16 3.64 6.84A4.86 4.86 0 0 1 12 8.17a4.86 4.86 0 0 1 8.36-1.33c2.55 1.32 3.14 4.76.97 7.04C18.716 16.65 12 21 12 21z" />
-              </svg>
-            </button>
-            <Link
-              to="/cart"
-              className="icon-btn cart-btn"
-              aria-label="Carrito"
-              onClick={() => setDrawerOpen(false)}
-            >
-              <svg viewBox="0 0 24 24">
-                <path d="M7 4h-2l-1 2v2h2l3.6 7.59L8.24 18H19v-2H9.42l1.1-2h6.45a2 2 0 0 0 1.79-1.11L21 7H6.21l-.94-2H3" />
-              </svg>
-              {totalItems > 0 && (
-                <span className="cart-badge">{totalItems}</span>
-              )}
-            </Link>
-          </div>
+          {/* Iconos dentro del drawer — SOLO cliente */}
+          {isCustomer && (
+            <div className="drawer-icons">
+              <button
+                className="icon-btn"
+                onClick={handleSearchToggle}
+                aria-label="Buscar"
+              >
+                <svg viewBox="0 0 24 24">
+                  <path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 14 15.5l.27.28v.79L20 21l1-1-5.5-5.5zM5 10.5A5.5 5.5 0 1 1 10.5 16 5.51 5.51 0 0 1 5 10.5z" />
+                </svg>
+              </button>
+              <button
+                className="icon-btn"
+                onClick={handleWishlist}
+                aria-label="Favoritos"
+              >
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 21s-6.716-4.35-9.33-7.12C.5 11.6 1.09 8.16 3.64 6.84A4.86 4.86 0 0 1 12 8.17a4.86 4.86 0 0 1 8.36-1.33c2.55 1.32 3.14 4.76.97 7.04C18.716 16.65 12 21 12 21z" />
+                </svg>
+              </button>
+              <Link
+                to="/cart"
+                className="icon-btn cart-btn"
+                aria-label="Carrito"
+                onClick={() => setDrawerOpen(false)}
+              >
+                <svg viewBox="0 0 24 24">
+                  <path d="M7 4h-2l-1 2v2h2l3.6 7.59L8.24 18H19v-2H9.42l1.1-2h6.45a2 2 0 0 0 1.79-1.11L21 7H6.21l-.94-2H3" />
+                </svg>
+                {totalItems > 0 && (
+                  <span className="cart-badge">{totalItems}</span>
+                )}
+              </Link>
+            </div>
+          )}
 
-          {/* Buscador compacto dentro del drawer */}
-          <div className="drawer-search">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const q = e.currentTarget.elements.qm.value.trim();
-                if (!q) return;
-                setDrawerOpen(false);
-                showToast(`Buscando: ${q}`, "info");
-                // Si tienes ruta de búsqueda, podrías:
-                // navigate(`/buscar?q=${encodeURIComponent(q)}`);
-              }}
-            >
-              <input
-                name="qm"
-                type="search"
-                placeholder="Buscar…"
-                aria-label="Buscar en móvil"
-              />
-              <button type="submit">Ir</button>
-            </form>
-          </div>
+          {/* Buscador compacto — solo cliente */}
+          {isCustomer && (
+            <div className="drawer-search">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const q = e.currentTarget.elements.qm.value.trim();
+                  if (!q) return;
+                  setDrawerOpen(false);
+                  showToast(`Buscando: ${q}`, "info");
+                }}
+              >
+                <input
+                  name="qm"
+                  type="search"
+                  placeholder="Buscar…"
+                  aria-label="Buscar en móvil"
+                />
+                <button type="submit">Ir</button>
+              </form>
+            </div>
+          )}
 
           <div className="drawer-content">
             {items.map((item, idx) => {
@@ -718,24 +719,37 @@ const Navbar = () => {
             <div className="drawer-sep" />
 
             {user && (
-              <Link
-                to={goSupportPath}
-                onClick={() => {
-                  setDrawerOpen(false);
-                  setMobileOpenIndex(null);
-                }}
-                className={`drawer-link support-mobile ${
-                  isSupportActive ? "active" : ""
-                }`}
-              >
-                Soporte
-                {unreadCount > 0 && (
-                  <span className="badge-inline">{unreadCount}</span>
-                )}
-              </Link>
-            )}
+              <>
+                <Link
+                  to={goSupportPath}
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    setMobileOpenIndex(null);
+                  }}
+                  className={`drawer-link support-mobile ${
+                    isSupportActive ? "active" : ""
+                  }`}
+                >
+                  Soporte
+                  {unreadCount > 0 && (
+                    <span className="badge-inline">{unreadCount}</span>
+                  )}
+                </Link>
 
-            {/* 👇 En móvil NO mostramos login/registro, tal como pediste */}
+                {/* Botón Salir en menú hamburguesa */}
+                <button
+                  className="drawer-logout"
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    setMobileOpenIndex(null);
+                    setShowConfirm(true);
+                  }}
+                  type="button"
+                >
+                  Salir
+                </button>
+              </>
+            )}
           </div>
         </aside>
 

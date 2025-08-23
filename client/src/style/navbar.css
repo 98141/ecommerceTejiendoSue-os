@@ -19,7 +19,7 @@
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
 }
 .navbar-wrapper {
-  max-width: var(--maxw);
+ /* max-width: var(--maxw);*/
   margin: 0 auto;
   padding: 0.6rem 1rem;
   display: grid;
