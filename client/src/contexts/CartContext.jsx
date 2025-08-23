@@ -83,13 +83,13 @@ function readGuestCart() {
 function writeGuestCart(items) {
   try {
     localStorage.setItem(GUEST_LS_KEY, JSON.stringify(toGuestStorage(items)));
-  } catch {}
+  } catch {/* empty */}
 }
 
 function clearGuestCart() {
   try {
     localStorage.removeItem(GUEST_LS_KEY);
-  } catch {}
+  } catch { /* empty */ }
 }
 
 /* =============== Fetch helper con ETag =============== */
@@ -110,7 +110,7 @@ async function apiFetch(path, { method = "GET", body, token, ifMatch } = {}) {
   let data = null;
   try {
     data = await res.json();
-  } catch {}
+  } catch {/* empty */}
 
   if (!res.ok) {
     const err = new Error(data?.error || data?.message || `HTTP ${res.status}`);
