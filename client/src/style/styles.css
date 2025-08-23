@@ -18,11 +18,19 @@
   box-sizing: border-box;
 }
 
-body {
-  font-family: Arial, sans-serif;
-  background-color: white;
-  color: black;
-  font-family: Georgia, "Times New Roman", Times, serif;
+html, body, #root {
+  height: 100%;
+  margin: 0; /* por si el reset no lo hace */
+}
+
+.app-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.site-main {
+  min-height: 0;
 }
 
 /* ===== Card base ===== */
