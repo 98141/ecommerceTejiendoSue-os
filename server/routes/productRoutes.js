@@ -15,6 +15,7 @@ const {
   getProductSalesHistory,
 } = require("../controllers/productController");
 
+const Product = require("../models/Product"); 
 const { verifyToken, isAdmin } = require("../middleware/auth");
 const uploadMiddleware = require("../middleware/uploadMiddleware");
 
@@ -28,21 +29,62 @@ const productLimiter = rateLimit({
 
 const isObjectId = (v) => mongoose.Types.ObjectId.isValid(v);
 
-/** Validadores comunes (evitamos escapar en BD; sanitizamos y validamos) */
+/* ===================== Helpers "public shape" ===================== */
+
+function computeEffectivePrice(p, now = new Date()) {
+  const price = Number(p.price) || 0;
+  const d = p.discount || {};
+  if (!d.enabled) return price;
+  const start = d.startAt ? new Date(d.startAt) : null;
+  const end = d.endAt ? new Date(d.endAt) : null;
+  if (start && now < start) return price;
+  if (end && now > end) return price;
+
+  let eff = price;
+  if (d.type === "PERCENT") {
+    eff = price - (price * (Number(d.value) || 0)) / 100;
+  } else {
+    eff = price - (Number(d.value) || 0);
+  }
+  if (eff < 0) eff = 0;
+  return Number(eff.toFixed(2));
+}
+
+function shapePublicProduct(p) {
+  // Devuelve lo necesario para el carrito/tienda (ligero y consistente)
+  return {
+    _id: p._id,
+    name: p.name,
+    price: p.price,
+    effectivePrice: computeEffectivePrice(p),
+    images: Array.isArray(p.images) ? p.images : [],
+    // Solo lo esencial de variantes con labels ya poblados
+    variants: Array.isArray(p.variants)
+      ? p.variants.map((v) => ({
+          size: v.size
+            ? { _id: v.size._id || v.size, label: v.size.label }
+            : null,
+          color: v.color
+            ? { _id: v.color._id || v.color, name: v.color.name }
+            : null,
+          stock: typeof v.stock === "number" ? v.stock : 0,
+        }))
+      : [],
+  };
+}
+
+/* ====================== Validadores existentes ====================== */
+
 const createUpdateValidators = [
   body("name").optional().isString().trim().isLength({ min: 1, max: 200 }),
   body("description").optional().isString().trim().isLength({ max: 5000 }),
   body("price").optional().isFloat({ min: 0 }),
-
-  // single category
   body("categories")
     .optional()
     .custom((v) => {
       if (!isObjectId(v)) throw new Error("Categoría inválida.");
       return true;
     }),
-
-  // variants llegará en JSON string
   body("variants")
     .optional()
     .custom((raw) => {
@@ -60,8 +102,6 @@ const createUpdateValidators = [
         throw new Error("Formato de variantes inválido.");
       }
     }),
-
-  // descuento si llega con campos planos (si llega JSON en req.body.discount, se valida en el controller)
   body("discount[enabled]").optional().isIn(["true", "false"]),
   body("discount[type]").optional().isIn(["PERCENT", "FIXED"]),
   body("discount[value]").optional().isFloat({ min: 0 }),
@@ -69,10 +109,56 @@ const createUpdateValidators = [
   body("discount[endAt]").optional().isISO8601(),
 ];
 
-/** Rutas */
+/* ======================= Rutas PÚBLICAS NUEVAS ======================= */
+/**
+ * ⚠️ IMPORTANTE: /bulk DEBE IR ANTES de "/:id" o Express lo capturará como id="bulk".
+ */
+
+// GET /api/products/bulk?ids=1,2,3
+router.get("/bulk", async (req, res, next) => {
+  try {
+    const idsParam = String(req.query.ids || "");
+    const ids = idsParam.split(",").map((s) => s.trim()).filter(Boolean);
+    const ok = ids.filter((id) => /^[0-9a-fA-F]{24}$/.test(id));
+    if (!ok.length) return res.json([]);
+
+    const prods = await Product.find({ _id: { $in: ok } })
+      .populate({ path: "variants.size", select: "label" })
+      .populate({ path: "variants.color", select: "name" })
+      .lean();
+
+    return res.json(prods.map(shapePublicProduct));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/products/public/:id  (opcional como fallback single)
+router.get("/public/:id", async (req, res, next) => {
+  try {
+    const id = String(req.params.id || "");
+    if (!/^[0-9a-fA-F]{24}$/.test(id))
+      return res.status(400).json({ error: "invalid id" });
+
+    const p = await Product.findById(id)
+      .populate({ path: "variants.size", select: "label" })
+      .populate({ path: "variants.color", select: "name" })
+      .lean();
+
+    if (!p) return res.status(404).json({ error: "not found" });
+    return res.json(shapePublicProduct(p));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ===================== Rutas existentes (tu código) ===================== */
+
+// Listado y detalle (controladores existentes)
 router.get("/", getProducts);
 router.get("/:id", getProductById);
 
+// Crear
 router.post(
   "/",
   productLimiter,
@@ -83,6 +169,7 @@ router.post(
   createProduct
 );
 
+// Actualizar
 router.put(
   "/:id",
   productLimiter,
@@ -93,8 +180,10 @@ router.put(
   updateProduct
 );
 
+// Eliminar
 router.delete("/:id", verifyToken, isAdmin, deleteProduct);
 
+// Historial
 router.get("/:id/history", verifyToken, isAdmin, getProductHistory);
 router.get("/history/all", verifyToken, isAdmin, getProductEntryHistory);
 

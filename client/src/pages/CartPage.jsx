@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { CartContext } from "../contexts/CartContext";
 import { AuthContext } from "../contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
@@ -8,6 +8,7 @@ import CheckoutModal from "../blocks/users/CheckoutModal";
 import { useToast } from "../contexts/ToastContext";
 
 const ADMIN_WHATSAPP = "573147788069";
+const API_BASE = "http://localhost:5000/api";
 
 /** Formatea a COP sin decimales */
 const fmtCOP = (n) =>
@@ -23,8 +24,84 @@ const unitPrice = (product) =>
     ? Number(product.effectivePrice)
     : Number(product?.price || 0);
 
+/* ---------------- Resolver de productos ---------------- */
+
+/**
+ * Toma una lista de ids y retorna un mapa { [productId]: product }
+ * Intenta usar /api/products/bulk?ids=... y si no existe, cae a GET por id.
+ */
+function useProductsMap(ids, token) {
+  const [map, setMap] = useState({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancel = false;
+    const run = async () => {
+      const unique = Array.from(new Set((ids || []).filter(Boolean)));
+      if (unique.length === 0) {
+        setMap({});
+        return;
+      }
+      setLoading(true);
+      try {
+        // 1) Intento bulk
+        const bulkUrl = `${API_BASE}/products/bulk?ids=${encodeURIComponent(
+          unique.join(",")
+        )}`;
+        const headers = token
+          ? { Authorization: `Bearer ${token}` }
+          : undefined;
+        try {
+          const r = await axios.get(bulkUrl, { headers });
+          if (!cancel) {
+            const obj = {};
+            for (const p of r.data || []) obj[String(p._id)] = p;
+            setMap(obj);
+          }
+        } catch {
+          // 2) Fallback: por id
+          const results = await Promise.all(
+            unique.map(async (id) => {
+              try {
+                const rr = await axios.get(`${API_BASE}/products/${id}`, {
+                  headers,
+                });
+                return rr.data;
+              } catch {
+                return null;
+              }
+            })
+          );
+          if (!cancel) {
+            const obj = {};
+            for (const p of results.filter(Boolean)) obj[String(p._id)] = p;
+            setMap(obj);
+          }
+        }
+      } finally {
+        if (!cancel) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancel = true;
+    };
+  }, [ids, token]);
+
+  return { map, loading };
+}
+
+/* ---------------- Página ---------------- */
+
 const CartPage = () => {
-  const { cart, updateItem, removeFromCart, clearCart } = useContext(CartContext);
+  // 👇 Usamos la capa de compatibilidad del contexto para no romper CartItem
+  // Si tu CartContext no expone cartLegacy aún, usa { cartLegacy: cart } en el Provider
+  const {
+    cartLegacy: cart,
+    updateItem,
+    removeFromCart,
+    clearCart,
+  } = useContext(CartContext);
   const { token, user } = useContext(AuthContext);
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -32,10 +109,42 @@ const CartPage = () => {
   const [openModal, setOpenModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Lista de productIds presentes
+  const productIds = useMemo(
+    () => cart.map((it) => it?.product?._id).filter(Boolean),
+    [cart]
+  );
+
+  // Trae datos reales de productos (name, price, images, discount…)
+  const { map: productsMap } = useProductsMap(productIds, token);
+
+  // Ítems enriquecidos: mantiene shape legacy esperado por CartItem,
+  // pero con product poblado si está disponible.
+  const displayItems = useMemo(
+    () =>
+      cart.map((it) => {
+        const pid = it?.product?._id;
+        const resolved = pid ? productsMap[pid] : null;
+        // siempre garantizamos que product tenga al menos {_id}
+        const product =
+          resolved ||
+          (pid ? { _id: pid } : { _id: "unknown", name: "Producto" });
+        return {
+          ...it,
+          product,
+        };
+      }),
+    [cart, productsMap]
+  );
+
   /** Subtotal (sumatoria líneas) */
   const subtotal = useMemo(
-    () => cart.reduce((sum, it) => sum + unitPrice(it.product) * it.quantity, 0),
-    [cart]
+    () =>
+      displayItems.reduce(
+        (sum, it) => sum + unitPrice(it.product) * (Number(it.quantity) || 0),
+        0
+      ),
+    [displayItems]
   );
 
   /** En un futuro aquí podrías calcular envío, impuestos, cupones, etc. */
@@ -44,11 +153,11 @@ const CartPage = () => {
   const total = subtotal + shipping + taxes;
 
   const toOrderItems = () =>
-    cart.map((item) => ({
-      product: item.product._id,
-      size: item.size?._id,
-      color: item.color?._id,
-      quantity: item.quantity,
+    displayItems.map((item) => ({
+      product: item.product?._id,
+      size: item.size?._id || null,
+      color: item.color?._id || null,
+      quantity: Number(item.quantity) || 1,
     }));
 
   const startCheckout = () => {
@@ -56,7 +165,7 @@ const CartPage = () => {
       showToast("Debes iniciar sesión para realizar el pedido.", "warning");
       return navigate("/login");
     }
-    if (cart.length === 0) {
+    if (displayItems.length === 0) {
       showToast("Tu carrito está vacío.", "info");
       return;
     }
@@ -69,7 +178,9 @@ const CartPage = () => {
     lines.push(`ID: ${order._id}`);
     lines.push(`Cliente: ${user?.name || "N/A"} (${user?.email || ""})`);
     if (shippingInfo) {
-      lines.push(`Envío: ${shippingInfo.fullName} | Tel: ${shippingInfo.phone}`);
+      lines.push(
+        `Envío: ${shippingInfo.fullName} | Tel: ${shippingInfo.phone}`
+      );
       lines.push(`${shippingInfo.address}, ${shippingInfo.city}`);
       if (shippingInfo.notes) lines.push(`Notas: ${shippingInfo.notes}`);
     }
@@ -97,7 +208,7 @@ const CartPage = () => {
 
       // ⚠️ El backend calcula total y controla stock; aquí sólo enviamos items + shippingInfo
       const { data } = await axios.post(
-        "http://localhost:5000/api/orders",
+        `${API_BASE}/orders`,
         { items, shippingInfo },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -126,7 +237,7 @@ const CartPage = () => {
     <div className="cart">
       <h1 className="cart__title">Carrito de Compras</h1>
 
-      {cart.length === 0 ? (
+      {displayItems.length === 0 ? (
         <div className="cart__empty">
           <div className="cart__bag" aria-hidden />
           <h3>Tu carrito está vacío</h3>
@@ -139,27 +250,33 @@ const CartPage = () => {
         <div className="cart__grid">
           {/* Lista de ítems */}
           <section className="cart__list" aria-label="Productos en el carrito">
-            {cart.map((item) => (
-              <div
-                key={`${item.product._id}-${item.size?._id}-${item.color?._id}`}
-                className="cart__row"
-              >
-                {/* CartItem: tu componente existente */}
-                <CartItem
-                  item={item}
-                  updateItem={updateItem}
-                  removeFromCart={removeFromCart}
-                />
+            {displayItems.map((item) => {
+              const key = `${item.product?._id || "p"}-${
+                item.size?._id || ""
+              }-${item.color?._id || ""}`;
+              return (
+                <div key={key} className="cart__row">
+                  {/* CartItem: espera item.product (obj), item.size/color (obj|null) */}
+                  <CartItem
+                    item={item}
+                    updateItem={updateItem}
+                    removeFromCart={removeFromCart}
+                  />
 
-                {/* Línea de totales por ítem (seguro, aunque CartItem ya muestre) */}
-                <div className="cart__line">
-                  <span>
-                    {fmtCOP(unitPrice(item.product))} × {item.quantity}
-                  </span>
-                  <b>{fmtCOP(unitPrice(item.product) * item.quantity)}</b>
+                  {/* Totales por ítem */}
+                  <div className="cart__line">
+                    <span>
+                      {fmtCOP(unitPrice(item.product))} × {item.quantity}
+                    </span>
+                    <b>
+                      {fmtCOP(
+                        unitPrice(item.product) * (Number(item.quantity) || 0)
+                      )}
+                    </b>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             <div className="cart__actions">
               <Link to="/artesanias" className="btn btn--ghost">
@@ -210,8 +327,8 @@ const CartPage = () => {
               </button>
 
               <p className="sum__hint">
-                Pagas de forma segura. Al confirmar, podrás coordinar el envío por
-                WhatsApp con nuestro equipo.
+                Pagas de forma segura. Al confirmar, podrás coordinar el envío
+                por WhatsApp con nuestro equipo.
               </p>
             </div>
           </aside>

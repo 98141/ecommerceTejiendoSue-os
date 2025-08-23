@@ -16,6 +16,7 @@ const colorRoutes = require("./routes/colorRoutes");
 const visitRoutes = require("./routes/visitRouter");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const productEntryHistoryRoutes = require("./routes/productEntryHistoryRoutes");
+const cartRoutes = require("./routes/cartRoutes");
 
 const ensureUploadsFolderExists = require("./utils/products");
 
@@ -64,6 +65,7 @@ app.use("/api/sizes", sizeRoutes);
 app.use("/api/colors", colorRoutes);
 app.use("/api/visits", visitRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use('/api/cart', cartRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)

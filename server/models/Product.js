@@ -72,4 +72,5 @@ productSchema.methods.getEffectivePrice = function(now = new Date()) {
 
 productSchema.index({ "discount.enabled": 1, "discount.endAt": 1 });
 
-module.exports = mongoose.model("Product", productSchema);
+const Product = mongoose.models.Product || mongoose.model("Product", productSchema);
+module.exports = Product;

@@ -9,4 +9,5 @@ const sizeSchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model("Size", sizeSchema);
+const Size = mongoose.models.Size || mongoose.model("Size", sizeSchema);
+module.exports = Size;

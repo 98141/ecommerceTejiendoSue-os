@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "express-rate-limit": "^8.0.1",
-    "multer": "^2.0.1",
-    "nodemailer": "^7.0.5"
-  }
-}
