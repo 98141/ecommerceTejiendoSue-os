@@ -1,14 +1,17 @@
-// src/contexts/CartContext.jsx
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { AuthContext } from "./AuthContext";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { AuthContext } from "../contexts/AuthContext";
 
 export const CartContext = createContext();
 
-// Límite máximo por ítem (ajústalo a tu negocio)
+// Límite razonable por ítem (ajústalo a tu negocio)
 const MAX_QTY_PER_ITEM = 20;
-
-// Clave temporal de “último carrito” (buffer durante la hidratación de Auth)
-const LAST_CART_KEY = "cart:last";
 
 function clampQty(q) {
   const n = Number(q) || 0;
@@ -22,16 +25,18 @@ function variantKey(productId, sizeId, colorId) {
   )}`;
 }
 
-// Extrae ids de forma segura
+// Extrae ids de forma segura (tolera que size/color sean objeto o id, o no existan)
 function getIdsFromItem(item) {
+  const sizeVal = item?.size;
+  const colorVal = item?.color;
   return {
     productId: item?.product?._id,
-    sizeId: item?.size?._id ?? item?.size ?? null,
-    colorId: item?.color?._id ?? item?.color ?? null,
+    sizeId: typeof sizeVal === "object" ? sizeVal?._id : sizeVal ?? null,
+    colorId: typeof colorVal === "object" ? colorVal?._id : colorVal ?? null,
   };
 }
 
-// Serializa solo lo esencial
+// Serializa solo lo esencial para storage
 function toStorableCart(cart) {
   return cart.map((i) => ({
     product: {
@@ -54,7 +59,7 @@ function toStorableCart(cart) {
   }));
 }
 
-// Limpia entradas corruptas/duplicadas
+// Limpia entradas corruptas y deduplica por variante (sumando cantidades)
 function sanitizeCart(cart) {
   if (!Array.isArray(cart)) return [];
   const dedup = new Map();
@@ -78,139 +83,86 @@ function sanitizeCart(cart) {
   return Array.from(dedup.values());
 }
 
-// Une dos carritos (suma cantidades por variante)
-function mergeCarts(a, b) {
-  return sanitizeCart([
-    ...(Array.isArray(a) ? a : []),
-    ...(Array.isArray(b) ? b : []),
-  ]);
-}
-
-// Construye la clave de storage por usuario
+// Storage key por usuario
 const storageKeyFor = (userId) => (userId ? `cart:${userId}` : null);
-
-// Lee buffer de “último carrito”
-function readLastCart() {
-  try {
-    const raw = localStorage.getItem(LAST_CART_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    // opcionalmente podrías validar antigüedad con parsed.ts
-    return {
-      userId: parsed?.userId ?? null,
-      items: sanitizeCart(parsed?.items ?? []),
-    };
-  } catch {
-    return null;
-  }
-}
-
-// Escribe buffer de “último carrito”
-function writeLastCart(userId, cart) {
-  try {
-    localStorage.setItem(
-      LAST_CART_KEY,
-      JSON.stringify({
-        userId: userId ?? null,
-        items: toStorableCart(cart),
-        ts: Date.now(),
-      })
-    );
-  } catch {
-    // ignorar
-  }
-}
-
-// Limpia buffer
-function clearLastCart() {
-  try {
-    localStorage.removeItem(LAST_CART_KEY);
-  } catch {
-    // ignorar
-  }
-}
 
 export const CartProvider = ({ children }) => {
   const { user } = useContext(AuthContext);
   const userId = user?.id || user?._id || null;
   const isCustomer = user?.role === "user";
 
-  // 1) Estado del carrito (inicia desde el buffer para evitar “pérdida” visual tras recargar)
-  const [cart, setCart] = useState(() => {
-    const last = readLastCart();
-    return last?.items ?? [];
-  });
+  const [cart, setCart] = useState([]); // estado en memoria
 
-  // 2) Cuando ya sabemos que es cliente, cargar su carrito desde su clave específica y
-  //    unir con lo que estuviera en el buffer (si existe), luego limpiar el buffer.
+  // Evita persistir justo cuando acabamos de cargar desde storage
+  const justLoadedRef = useRef(false);
+
+  // CARGA: reemplazar carrito cuando cambia el usuario o su rol (solo clientes)
   useEffect(() => {
     if (!isCustomer) {
-      // No cliente: mantener en memoria lo que hay (no se mostrará en UI si ocultas)
-      // También puedes limpiar si prefieres: setCart([]);
+      setCart([]); // si no es cliente (guest/admin) => carrito vacío
+      justLoadedRef.current = false;
       return;
     }
+
     const key = storageKeyFor(userId);
-    if (!key) return;
+    if (!key) {
+      setCart([]); // sin id no persistimos
+      justLoadedRef.current = false;
+      return;
+    }
 
     try {
       const raw = localStorage.getItem(key);
-      const userCart = sanitizeCart(raw ? JSON.parse(raw) : []);
-      const last = readLastCart();
-
-      let merged = userCart;
-      if (last?.items?.length) {
-        // Si el buffer pertenece al mismo userId o es anónimo, únelo
-        if (!last.userId || last.userId === userId) {
-          merged = mergeCarts(userCart, last.items);
-        }
-      }
-
-      setCart(merged);
-      // Guarda inmediatamente y limpia buffer
-      localStorage.setItem(key, JSON.stringify(toStorableCart(merged)));
-      clearLastCart();
+      const parsed = raw ? JSON.parse(raw) : [];
+      const cleaned = sanitizeCart(parsed);
+      // Reemplaza (NO mezcles) para no duplicar
+      setCart(cleaned);
+      // Marcamos que acabamos de cargar para que el siguiente efecto no re-escriba inmediatamente
+      justLoadedRef.current = true;
     } catch {
-      // si falla parsing, deja el estado actual
+      setCart([]);
+      justLoadedRef.current = false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, isCustomer]);
 
-  // 3) Persistir cambios:
-  //    - Si es cliente → guarda en su clave y también en el buffer (para rehidratación suave)
-  //    - Si no es cliente → solo buffer (no se mostrará, pero evita “saltos” si Auth se hidrata)
+  // PERSISTENCIA: guarda cada cambio (solo clientes)
   useEffect(() => {
-    if (isCustomer) {
-      const key = storageKeyFor(userId);
-      if (key) {
-        try {
-          localStorage.setItem(key, JSON.stringify(toStorableCart(cart)));
-        } catch {}
-      }
-      writeLastCart(userId, cart);
-    } else {
-      // invitado o admin: escribe solo buffer; UI del carrito debería estar oculta para admin
-      writeLastCart(null, cart);
+    if (!isCustomer) return;
+    const key = storageKeyFor(userId);
+    if (!key) return;
+
+    // Si venimos justo de cargar, saltamos una escritura para evitar
+    // efectos en cascada que pueden causar “duplicado” en algunas apps.
+    if (justLoadedRef.current) {
+      justLoadedRef.current = false;
+      return;
+    }
+
+    try {
+      localStorage.setItem(key, JSON.stringify(toStorableCart(cart)));
+    } catch {
+      // storage lleno u otro error → ignorar silencioso
     }
   }, [cart, userId, isCustomer]);
 
   /**
    * addToCart(product, quantity=1)
+   * product puede traer size/color embebidos como objeto o id.
    */
   const addToCart = (product, quantity = 1) => {
-    // Solo clientes deben poder agregar (seguridad UX)
-    if (!isCustomer) return;
+    if (!isCustomer) return; // Solo clientes pueden agregar
     const qty = clampQty(quantity);
-    const size = product?.size ?? null;
-    const color = product?.color ?? null;
-
     if (!product?._id) return;
 
-    const sizeId = typeof size === "object" ? size?._id : size;
-    const colorId = typeof color === "object" ? color?._id : color;
+    const sizeVal = product?.size ?? null;
+    const colorVal = product?.color ?? null;
+    const sizeId = typeof sizeVal === "object" ? sizeVal?._id : sizeVal;
+    const colorId = typeof colorVal === "object" ? colorVal?._id : colorVal;
 
     setCart((prev) => {
       const key = variantKey(product._id, sizeId, colorId);
       let found = false;
+
       const next = prev.map((i) => {
         const { productId, sizeId: sId, colorId: cId } = getIdsFromItem(i);
         if (variantKey(productId, sId, cId) === key) {
@@ -228,14 +180,14 @@ export const CartProvider = ({ children }) => {
             price: product.price,
             images: Array.isArray(product.images) ? product.images : [],
           },
-          size: size
-            ? typeof size === "object"
-              ? { _id: sizeId, label: size.label }
+          size: sizeVal
+            ? typeof sizeVal === "object"
+              ? { _id: sizeId, label: sizeVal.label }
               : sizeId
             : null,
-          color: color
-            ? typeof color === "object"
-              ? { _id: colorId, name: color.name }
+          color: colorVal
+            ? typeof colorVal === "object"
+              ? { _id: colorId, name: colorVal.name }
               : colorId
             : null,
           quantity: qty,
@@ -294,6 +246,7 @@ export const CartProvider = ({ children }) => {
     setCart([]);
   };
 
+  // Por si te resulta útil en la UI
   const totalItems = useMemo(
     () =>
       isCustomer ? cart.reduce((s, i) => s + (Number(i.quantity) || 0), 0) : 0,
