@@ -9,14 +9,16 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmMessage, setConfirmMessage] = useState("");
-  const [confirmMode, setConfirmMode] = useState(null); // "status" | "cancel"
+  const [confirmMode, setConfirmMode] = useState(null);
   const [pendingStatus, setPendingStatus] = useState("");
 
   // Mantengo la lógica; agrego "cancelado" como opción de cambio desde "pendiente"
   const nextStatusOptions = useMemo(() => {
     switch (order.status) {
       case "pendiente":
-        return ["enviado", "cancelado"];
+        return ["facturado", "cancelado"];
+      case "facturado":
+        return ["enviado"];
       case "enviado":
         return ["entregado"];
       case "entregado":
@@ -43,11 +45,13 @@ const OrderCardBlock = ({ order, onStatusChange, onCancel }) => {
     setPendingStatus(next);
     setConfirmMode("status");
     setConfirmTitle("Confirmar cambio de estado");
-    setConfirmMessage(
-      next === "enviado"
-        ? "¿Marcar el pedido como ENVIADO?"
-        : "¿Marcar el pedido como ENTREGADO?"
-    );
+    if (next === "enviado") {
+      setConfirmMessage("¿Marcar el pedido como ENVIADO?");
+    } else if (next === "entregado") {
+      setConfirmMessage("¿Marcar el pedido como ENTREGADO?");
+    } else if (next === "facturado") {
+      setConfirmMessage("¿Marcar el pedido como FACTURADO?");
+    }
     setConfirmOpen(true);
   };
 

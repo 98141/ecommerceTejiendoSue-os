@@ -163,6 +163,11 @@
   color: #8a5a00;
   border-color: #ffe3b3;
 }
+.oc__badge.is-facturado {
+  background: #f1cd67;
+  color: #7c500d;
+  border-color: #eb9a10;
+}
 .oc__badge.is-enviado {
   background: #e9f2ff;
   color: #1e60b6;

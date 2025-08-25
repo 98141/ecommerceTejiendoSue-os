@@ -23,10 +23,12 @@ const stepIndexFromStatus = (status) => {
   switch ((status || "").toLowerCase()) {
     case "pendiente":
       return 0;
-    case "enviado":
+    case "facturado":
       return 1;
-    case "entregado":
+    case "enviado":
       return 2;
+    case "entregado":
+      return 3;
     default:
       return 0;
   }
@@ -69,7 +71,7 @@ const MyOrdersPage = () => {
   if (!token) {
     return (
       <div className="orders">
-        <h1 className="orders__title">Mis Pedidos</h1>
+        <h1 className="orders__title">Mis Pedidos </h1>
         <div className="orders__empty">
           <div className="orders__icon" aria-hidden />
           <p>Necesitas iniciar sesión para ver tus pedidos.</p>
@@ -130,7 +132,7 @@ const MyOrdersPage = () => {
 
                 {/* Progreso */}
                 <div className="order__progress">
-                  {["Recibido", "Enviado", "Entregado"].map((lbl, i) => (
+                  {["Recibido","Facturado", "Enviado", "Entregado"].map((lbl, i) => (
                     <div
                       key={lbl}
                       className={`step ${i <= step ? "done" : ""}`}
@@ -154,7 +156,7 @@ const MyOrdersPage = () => {
 
                       return (
                         <li key={idx} className="oi">
-                         {/*<img
+                          {/*<img
                             src={img}
                             alt={p.name || "Producto"}
                             onError={(e) =>
