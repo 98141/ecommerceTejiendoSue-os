@@ -299,10 +299,11 @@ const Navbar = () => {
   const handleSearchToggle = () => setShowSearch((s) => !s);
   const handleWishlist = () =>
     showToast("Favoritos estará disponible pronto.", "info");
-  const handleAccountClick = () => {
-    if (!user) navigate("/login");
-    else navigate(user.role === "admin" ? "/admin/dashboard" : "/");
-  };
+  const accountPath = !user
+    ? "/login"
+    : user.role === "admin"
+    ? "/admin/dashboard"
+    : "/";
 
   return (
     <>
@@ -408,29 +409,37 @@ const Navbar = () => {
             {/* Iconos (solo desktop) — SOLO para clientes */}
             {isCustomer && (
               <div className="icon-bar">
-                <button
+                <Link
+                  to="#"
+                  onClick={(e) => {
+                    e.preventDefault(); // evita navegación
+                    handleSearchToggle(); // ejecuta tu lógica
+                  }}
                   className={`icon-btn ${showSearch ? "active" : ""}`}
-                  onClick={handleSearchToggle}
                   aria-label="Buscar"
                   title="Buscar"
-                  type="button"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 14 15.5l.27.28v.79L20 21l1-1-5.5-5.5zM5 10.5A5.5 5.5 0 1 1 10.5 16 5.51 5.51 0 0 1 5 10.5z" />
                   </svg>
-                </button>
-
-                <button
-                  className="icon-btn"
-                  onClick={handleWishlist}
+                </Link>
+                <Link
+                  to="#"
+                  onClick={(e) => {
+                    e.preventDefault(); // evita que navegue
+                    handleWishlist();
+                  }}
+                  className="icon-btn cart-btn"
                   aria-label="Favoritos"
                   title="Favoritos"
-                  type="button"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 21s-6.716-4.35-9.33-7.12C.5 11.6 1.09 8.16 3.64 6.84A4.86 4.86 0 0 1 12 8.17a4.86 4.86 0 0 1 8.36-1.33c2.55 1.32 3.14 4.76.97 7.04C18.716 16.65 12 21 12 21z" />
+                    <path d="M20.8 4.6c-1.9-1.7-4.9-1.7-6.8 0l-1 1-1-1c-1.9-1.7-4.9-1.7-6.8 0s-1.9 4.5 0 6.2l7.8 7.2 7.8-7.2c1.9-1.7 1.9-4.5 0-6.2z" />
                   </svg>
-                </button>
+                  {totalItems > 0 && (
+                    <span className="cart-badge">{totalItems}</span>
+                  )}
+                </Link>
 
                 <Link
                   to="/cart"
@@ -449,31 +458,34 @@ const Navbar = () => {
             )}
 
             {/* Perfil */}
-            <button
-              className="account-btn"
-              onClick={handleAccountClick}
-              aria-label="Cuenta"
-              title="Cuenta"
-              type="button"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
-              </svg>
-            </button>
 
             {/* Soporte + usuario */}
             {user && (
-              <Link
-                to={goSupportPath}
-                className={`nav-link support-link ${
-                  isSupportActive ? "active" : ""
-                }`}
-              >
-                Soporte
-                {unreadCount > 0 && (
-                  <span className="notification-badge">{unreadCount}</span>
-                )}
-              </Link>
+              <>
+                <Link
+                  to={accountPath}
+                  className={`icon-btn support-link ${
+                    isSupportActive ? "active" : ""
+                  }`}
+                  aria-label="Perfil"
+                  title="Perfil"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
+                  </svg>
+                </Link>
+                <Link
+                  to={goSupportPath}
+                  className={`nav-link support-link ${
+                    isSupportActive ? "active" : ""
+                  }`}
+                >
+                  Soporte
+                  {unreadCount > 0 && (
+                    <span className="notification-badge">{unreadCount}</span>
+                  )}
+                </Link>
+              </>
             )}
 
             {user ? (
@@ -720,6 +732,24 @@ const Navbar = () => {
 
             {user && (
               <>
+                <Link
+                  to="#"
+                  onClick={(e) => {
+                    e.preventDefault(); // evita navegación
+                    showToast("Perfil estará disponible pronto.", "info");
+                  }}
+                  className={`drawer-link support-mobile ${
+                    isSupportActive ? "active" : ""
+                  }`}
+                  aria-label="Perfil"
+                  title="Perfil"
+                >
+                  Perfil
+                  {unreadCount > 0 && (
+                    <span className="badge-inline">{unreadCount}</span>
+                  )}
+                </Link>
+
                 <Link
                   to={goSupportPath}
                   onClick={() => {

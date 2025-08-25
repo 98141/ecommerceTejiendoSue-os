@@ -243,7 +243,7 @@
 }
 .icon-btn svg path,
 .account-btn svg path {
-  fill: currentColor; /* asegura visibilidad */
+  fill: currentColor; 
 }
 .cart-btn {
   text-decoration: none;
@@ -263,6 +263,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+.icon-btn svg {
+  stroke: currentColor;
+  fill: none; 
 }
 
 /* ====== SEARCH BAR (desktop/tablet) ====== */
