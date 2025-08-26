@@ -51,8 +51,8 @@ export default function CheckoutModal({ open, onClose, onConfirm }) {
     const er = {};
     if (!form.fullName.trim()) er.fullName = "Ingresa tu nombre completo.";
     if (!form.phone.trim()) er.phone = "Ingresa un número de contacto.";
-    else if (!/^\+?\d{7,15}$/.test(form.phone.trim()))
-      er.phone = "Usa sólo números (7-15 dígitos).";
+    else if (!/^\+?\d{8,15}$/.test(form.phone.trim()))
+      er.phone = "Usa sólo números (8-15 dígitos).";
     if (!form.address.trim()) er.address = "Ingresa tu dirección.";
     if (!form.city.trim()) er.city = "Ingresa tu ciudad.";
     setErrors(er);

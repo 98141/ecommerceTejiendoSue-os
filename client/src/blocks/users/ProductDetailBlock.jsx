@@ -1,8 +1,11 @@
 import { useState, useContext, useEffect, useMemo, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
+
+import apiUrl from "../../api/apiClient";
+import { getBaseUrl } from "../../api/apiClient";
+
 import { AuthContext } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
-import axios from "axios";
 import ProductPriceBlock from "../ProductPrice";
 
 /* =============== Helpers =============== */
@@ -78,10 +81,12 @@ const MiniCard = ({ item }) => {
       ? item.effectivePrice
       : computeEffectiveFallback(item);
 
+    const baseUrl = getBaseUrl();
+
   return (
     <Link to={`/product/${item?._id}`} className="mini">
       <img
-        src={`http://localhost:5000${mainImage}`}
+        src={`${baseUrl}${mainImage}`}
         onError={(e) => (e.currentTarget.src = "/placeholder.jpg")}
         alt={item?.name}
         loading="lazy"
@@ -113,6 +118,8 @@ const ProductDetailBlock = ({
   const [selectedColor, setSelectedColor] = useState("");
   const [availableStock, setAvailableStock] = useState(0);
   const [quantity, setQuantity] = useState(1);
+
+  const baseUrl = getBaseUrl();
 
   const { user } = useContext(AuthContext);
   const { showToast } = useToast();
@@ -154,7 +161,7 @@ const ProductDetailBlock = ({
     if (!lbOpen) return;
     const preload = (src) => {
       const img = new Image();
-      img.src = `http://localhost:5000${src}`;
+      img.src = `${baseUrl}${src}`;
     };
     preload(images[(lbIndex + 1) % images.length]);
     preload(images[(lbIndex - 1 + images.length) % images.length]);
@@ -176,8 +183,8 @@ const ProductDetailBlock = ({
     const fetchSizeAndColorNames = async () => {
       try {
         const [sizeRes, colorRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/sizes"),
-          axios.get("http://localhost:5000/api/colors"),
+          apiUrl.get("sizes"),
+          apiUrl.get("colors"),
         ]);
         setSizes(sizeRes.data);
         setColors(colorRes.data);
@@ -339,7 +346,7 @@ const ProductDetailBlock = ({
                 type="button"
               >
                 <img
-                  src={`http://localhost:5000${img}`}
+                  src={`${baseUrl}${img}`}
                   onError={(e) => (e.currentTarget.src = "/placeholder.jpg")}
                   alt={`mini-${idx}`}
                   loading="lazy"
@@ -358,7 +365,7 @@ const ProductDetailBlock = ({
               type="button"
             >
               <img
-                src={`http://localhost:5000${selectedImage}`}
+                src={`${baseUrl}${selectedImage}`}
                 alt={product.name}
                 onError={(e) => (e.currentTarget.src = "/placeholder.jpg")}
                 className="pd__mainimg"
@@ -632,7 +639,7 @@ const ProductDetailBlock = ({
 
         <figure className="lb__stage" onClick={(e) => e.stopPropagation()}>
           <img
-            src={`http://localhost:5000${images[lbIndex]}`}
+            src={`${baseUrl}${images[lbIndex]}`}
             alt={`imagen ${lbIndex + 1}`}
             className="lb__img"
             loading="eager"
@@ -653,7 +660,7 @@ const ProductDetailBlock = ({
                 type="button"
               >
                 <img
-                  src={`http://localhost:5000${img}`}
+                  src={`${baseUrl}${img}`}
                   alt={`mini ${i + 1}`}
                 />
               </button>

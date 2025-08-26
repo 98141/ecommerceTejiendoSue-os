@@ -1,5 +1,8 @@
+import { getBaseUrl } from "../../api/apiClient";
+
 const CartItem = ({ item, removeFromCart, updateItem }) => {
   const { product, quantity, size, color } = item;
+  const baseUrl = getBaseUrl();
 
   const handleChange = (e) => {
     const newQty = Number(e.target.value);
@@ -11,7 +14,7 @@ const CartItem = ({ item, removeFromCart, updateItem }) => {
   return (
     <div className="cart-item">
       <img
-        src={`http://localhost:5000${product.images?.[0]}`}
+        src={`${baseUrl}${product.images?.[0]}`}
         alt={product.name}
         className="cart-image"
       />
@@ -33,7 +36,7 @@ const CartItem = ({ item, removeFromCart, updateItem }) => {
       </div>
       <button
         className="cart-remove"
-        onClick={() => removeFromCart(product._id,  size._id, color._id)}
+        onClick={() => removeFromCart(product._id, size._id, color._id)}
       >
         Quitar
       </button>

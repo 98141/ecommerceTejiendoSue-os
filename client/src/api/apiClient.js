@@ -100,5 +100,8 @@ api.interceptors.response.use(
   }
 );
 
+export const getBaseUrl = () =>
+  import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
+
 export { api, API_BASE_URL };
 export default api;

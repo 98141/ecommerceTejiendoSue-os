@@ -1,4 +1,5 @@
 const ConfirmModal = ({ title, message, onConfirm, onCancel }) => {
+  
   return (
     <div className="modal-overlay">
       <div className="modal-box">

@@ -1,7 +1,9 @@
 import { useState, useContext } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import api from "../api/apiClient";
+
+import apiUrl from "../api/apiClient";
+
 import { useToast } from "../contexts/ToastContext";
 
 const LoginForm = () => {
@@ -31,7 +33,7 @@ const LoginForm = () => {
     setLoading(true);
 
     try {
-      const res = await api.post("/users/login", { email, password });
+      const res = await apiUrl.post("/users/login", { email, password });
       login(res.data.token, res.data.user);
 
       showToast("Inicio de sesión exitoso", "success");

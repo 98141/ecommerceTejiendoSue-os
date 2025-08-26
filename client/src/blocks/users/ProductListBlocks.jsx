@@ -1,6 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
+
 import ProductPrice from "../ProductPrice";
+import { getBaseUrl } from "../../api/apiClient";
 
 /** === Fallback defensivo de precio efectivo (si backend no lo trae) === */
 const computeEffectiveFallback = (product) => {
@@ -27,6 +29,8 @@ const percentOff = (price, effectivePrice, discount) => {
 
 const ProductListBlocks = ({ product, onAddToCart }) => {
   const navigate = useNavigate();
+
+  const baseUrl = getBaseUrl();
 
   const mainImage = product?.images?.[0] || "/placeholder.jpg";
   const effectivePrice =
@@ -87,7 +91,7 @@ const ProductListBlocks = ({ product, onAddToCart }) => {
 
         <Link to={detailHref} className="plb__imageLink" aria-label={`Ver ${product?.name}`}>
           <img
-            src={`http://localhost:5000${mainImage}`}
+            src={`${baseUrl}${mainImage}`}
             alt={product?.name || "Producto artesanal"}
             className="plb__image"
             loading="lazy"

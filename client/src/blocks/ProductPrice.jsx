@@ -1,6 +1,7 @@
 import { formatCOP } from "../utils/currency";
 
 const ProductPriceBlock = ({ price, effectivePrice, className = "" }) => {
+  
   const p = Number(price || 0);
   const e = Number(effectivePrice || 0);
   const hasDiscount = e > 0 && e < p;

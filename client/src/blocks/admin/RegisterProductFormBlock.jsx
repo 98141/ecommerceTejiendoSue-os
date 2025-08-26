@@ -2,8 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { FaTimesCircle, FaPlusCircle } from "react-icons/fa";
 
-import axios from "axios";
-
 import { useToast } from "../../contexts/ToastContext"; 
 import apiUrl from "../../api/apiClient";
 
@@ -83,7 +81,7 @@ const RegisterProductForm = ({ categories, onSubmit }) => {
 
   const toastInfo = (msg) => showToast(msg, "info");
   const toastWarn = (msg) => showToast(msg, "warning");
-  const toastError = (msg) => showToast(msg, "error");
+  //const toastError = (msg) => showToast(msg, "error");
   const toastOk = (msg) => showToast(msg, "success");
 
   /* ============ Imágenes: validación tipo/tamaño y previews ============ */

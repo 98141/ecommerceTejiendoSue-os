@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 const SupportChatBlock = ({ messages, onSendMessage, user }) => {
+  
   const [newMessage, setNewMessage] = useState("");
   const inputRef = useRef(null);
   const bottomRef = useRef(null);

@@ -1,7 +1,9 @@
 import { useState, useContext } from "react";
-import { AuthContext } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import api from "../api/apiClient";
+
+import apiUrl from "../api/apiClient";
+
+import { AuthContext } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 
 const RegisterForm = () => {
@@ -45,7 +47,7 @@ const RegisterForm = () => {
 
     try {
       setLoading(true);
-      const res = await api.post("/users/register", { name, email, password });
+      const res = await apiUrl.post("/users/register", { name, email, password });
       login(res.data.token, res.data.user);
       showToast("Registro exitoso. Revisa tu correo.", "info");
       navigate("/");
