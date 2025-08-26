@@ -29,6 +29,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ProductHistoryPage from "./pages/admin/products/AdminProductHistoryPage";
 import AdminProductEntryHistoryPage from "./pages/admin/products/AdminProductEntryHistoyPage";
+import CatalogoPage from "./pages/user/CatalogoPage";
 
 function App() {
   return (
@@ -53,6 +54,13 @@ function App() {
               path="/reset-password/:token"
               element={<ResetPasswordPage />}
             />
+            <Route path="/tienda" element={<CatalogoPage />} />
+            <Route path="/categoria/:slug" element={<CatalogoPage />} />
+
+            {/* Compatibilidad con el navbar actual */}
+            <Route path="/artesanias/:slug" element={<CatalogoPage />} />
+            <Route path="/cafe/:slug" element={<CatalogoPage />} />
+            <Route path="/panela/:slug" element={<CatalogoPage />} />
 
             {/* Privadas para usuarios */}
             <Route element={<PrivateRoute allowedRoles={["user"]} />}>

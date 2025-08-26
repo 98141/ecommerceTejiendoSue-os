@@ -104,19 +104,34 @@ const menuConfig = ({ role, hidePublic }) => {
             activeMatch: /^\/artesanias(\/|$)/,
             children: [
               {
-                label: "Sombreros de Iraca",
-                to: "/artesanias/sombreros",
-                activeMatch: /^\/artesanias\/sombreros(\/|$)/,
+                label: "Hogar",
+                to: "/categoria/hogar",
+                activeMatch: /^\/categoria\/hogar(\/|$)/,
               },
               {
-                label: "Accesorios",
-                to: "/artesanias/accesorios",
-                activeMatch: /^\/artesanias\/accesorios(\/|$)/,
+                label: "Carteras",
+                to: "/categoria/carteras",
+                activeMatch: /^\/categoria\/carteras(\/|$)/,
               },
               {
-                label: "Colecciones",
-                to: "/artesanias/colecciones",
-                activeMatch: /^\/artesanias\/colecciones(\/|$)/,
+                label: "Sombreros",
+                to: "/categoria/sombreros",
+                activeMatch: /^\/categoria\/sombreros(\/|$)/,
+              },
+              {
+                label: "Manualidades",
+                to: "/categoria/manualidades",
+                activeMatch: /^\/categoria\/manualidades(\/|$)/,
+              },
+              {
+                label: "Letras",
+                to: "/categoria/letras",
+                activeMatch: /^\/categoria\/letras(\/|$)/,
+              },
+              {
+                label: "Aretes",
+                to: "/categoria/aretes",
+                activeMatch: /^\/categoria\/aretes(\/|$)/,
               },
             ],
           },
@@ -127,17 +142,17 @@ const menuConfig = ({ role, hidePublic }) => {
             children: [
               {
                 label: "Origen Nariño",
-                to: "/cafe/narino",
+                to: "/",
                 activeMatch: /^\/cafe\/narino(\/|$)/,
               },
               {
                 label: "Tostiones",
-                to: "/cafe/tostiones",
+                to: "/",
                 activeMatch: /^\/cafe\/tostiones(\/|$)/,
               },
               {
                 label: "Métodos",
-                to: "/cafe/metodos",
+                to: "/",
                 activeMatch: /^\/cafe\/metodos(\/|$)/,
               },
             ],
@@ -149,17 +164,17 @@ const menuConfig = ({ role, hidePublic }) => {
             children: [
               {
                 label: "Trapiche",
-                to: "/panela/tradicion",
+                to: "/",
                 activeMatch: /^\/panela\/tradicion(\/|$)/,
               },
               {
                 label: "Presentaciones",
-                to: "/panela/presentaciones",
+                to: "/",
                 activeMatch: /^\/panela\/presentaciones(\/|$)/,
               },
               {
                 label: "Recetas",
-                to: "/panela/recetas",
+                to: "/",
                 activeMatch: /^\/panela\/recetas(\/|$)/,
               },
             ],
@@ -341,7 +356,7 @@ const Navbar = () => {
 
                 return (
                   <li
-                    key={item.label}
+                    key={`${item.to || item.label || "item"}-${idx}`}
                     className={`menu-item ${
                       openDropdown === idx ? "open" : ""
                     }`}
@@ -378,14 +393,16 @@ const Navbar = () => {
                         aria-label={`Submenú de ${item.label}`}
                         aria-hidden={openDropdown !== idx}
                       >
-                        {item.children.map((child) => {
+                        {item.children.map((child, cIdx) => {
                           const childActive = isMatch(
                             location.pathname,
                             child.activeMatch || child.to
                           );
                           return (
                             <Link
-                              key={child.to}
+                              key={`${item.to || "root"}::${
+                                child.to || child.label
+                              }::${cIdx}`}
                               className={`dropdown-link ${
                                 childActive ? "active" : ""
                               }`}
@@ -413,8 +430,8 @@ const Navbar = () => {
                 <Link
                   to="#"
                   onClick={(e) => {
-                    e.preventDefault(); // evita navegación
-                    handleSearchToggle(); // ejecuta tu lógica
+                    e.preventDefault();
+                    handleSearchToggle();
                   }}
                   className={`icon-btn ${showSearch ? "active" : ""}`}
                   aria-label="Buscar"
@@ -427,7 +444,7 @@ const Navbar = () => {
                 <Link
                   to="#"
                   onClick={(e) => {
-                    e.preventDefault(); // evita que navegue
+                    e.preventDefault();
                     handleWishlist();
                   }}
                   className="icon-btn cart-btn"
@@ -562,7 +579,8 @@ const Navbar = () => {
                 e.preventDefault();
                 const q = e.currentTarget.elements.q.value.trim();
                 if (!q) return;
-                showToast(`Buscando: ${q}`, "info");
+                setShowSearch(false);
+                navigate(`/tienda?q=${encodeURIComponent(q)}`);
               }}
             >
               <input
@@ -644,7 +662,9 @@ const Navbar = () => {
                   const q = e.currentTarget.elements.qm.value.trim();
                   if (!q) return;
                   setDrawerOpen(false);
-                  showToast(`Buscando: ${q}`, "info");
+                  setMobileOpenIndex(null);
+                  setShowSearch(false);
+                  navigate(`/tienda?q=${encodeURIComponent(q)}`);
                 }}
               >
                 <input
@@ -672,7 +692,7 @@ const Navbar = () => {
 
               return (
                 <div
-                  key={item.label}
+                  key={`drawer-${item.to || item.label || "item"}-${idx}`}
                   className={`drawer-item ${isOpen ? "open" : ""}`}
                 >
                   <button
@@ -702,14 +722,16 @@ const Navbar = () => {
                       className="drawer-children"
                       style={{ maxHeight: isOpen ? "480px" : "0" }}
                     >
-                      {item.children.map((child) => {
+                      {item.children.map((child, cIdx) => {
                         const childActive = isMatch(
                           location.pathname,
                           child.activeMatch || child.to
                         );
                         return (
                           <Link
-                            key={child.to}
+                            key={`drawer-${item.to || "root"}::${
+                              child.to || child.label
+                            }::${cIdx}`}
                             to={child.to}
                             onClick={() => {
                               setDrawerOpen(false);
@@ -736,7 +758,7 @@ const Navbar = () => {
                 <Link
                   to="#"
                   onClick={(e) => {
-                    e.preventDefault(); // evita navegación
+                    e.preventDefault();
                     showToast("Perfil estará disponible pronto.", "info");
                   }}
                   className={`drawer-link support-mobile ${
