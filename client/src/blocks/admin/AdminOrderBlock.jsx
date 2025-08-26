@@ -1,4 +1,5 @@
 const AdminOrderRow = ({ order }) => {
+  
   return (
     <tr>
       <td>{order.user?.name || "Usuario eliminado"}</td>

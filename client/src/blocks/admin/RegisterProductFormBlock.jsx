@@ -1,8 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { FaTimesCircle, FaPlusCircle } from "react-icons/fa";
+
 import axios from "axios";
+
 import { useToast } from "../../contexts/ToastContext"; 
+import apiUrl from "../../api/apiClient";
 
 const MAX_IMAGE_MB = 10;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -52,8 +55,8 @@ const RegisterProductForm = ({ categories, onSubmit }) => {
   const fetchOptions = async () => {
     try {
       const [resSizes, resColors] = await Promise.all([
-        axios.get("http://localhost:5000/api/sizes"),
-        axios.get("http://localhost:5000/api/colors"),
+        apiUrl.get("sizes"),
+        apiUrl.get("colors"),
       ]);
       setSizes(resSizes.data || []);
       setColors(resColors.data || []);

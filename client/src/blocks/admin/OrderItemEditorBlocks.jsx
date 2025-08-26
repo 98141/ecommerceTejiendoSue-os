@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
+import apiUrl from "../../api/apiClient";
+
 const OrderItemEditor = ({ item, onChange, index }) => {
   const [sizes, setSizes] = useState([]);
   const [colors, setColors] = useState([]);

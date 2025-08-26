@@ -1,10 +1,9 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import axios from "axios";
 import { FaTimesCircle, FaPlusCircle } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 import { formatCOP } from "../../utils/currency"; 
-import api from "../../api/client";
+import apiURL from "../../api/apiClient";
 
 /** Util: convierte fecha ISO a valor compatible con <input type="datetime-local"> */
 const toDatetimeLocal = (iso) => {
@@ -69,12 +68,6 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
   const [sizes, setSizes] = useState([]);
   const [colors, setColors] = useState([]);
 
-  // Rutas con API
-  const apiCategories = api("categories");
-  const apiSizes = api("sizes");
-  const apiColors = api("colors");
-  const apiProductId = api(`products/${productId}`);
-
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -83,7 +76,7 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
     price: "",
     // Campos de descuento
     discountEnabled: false,
-    discountType: "PERCENT", // PERCENT | FIXED
+    discountType: "PERCENT", 
     discountValue: "",
     discountStartAt: "",
     discountEndAt: "",
@@ -121,10 +114,10 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
     try {
       const [productRes, categoriesRes, sizesRes, colorsRes] =
         await Promise.all([
-          axios.get(`${apiProductId}`),
-          axios.get(`${apiCategories}`),
-          axios.get(`${apiSizes}`),
-          axios.get(`${apiColors}`),
+          apiURL.get(`products/${productId}`),
+          apiURL.get(`categories`),
+          apiURL.get(`sizes`),
+          apiURL.get(`colors`),
         ]);
 
       const p = productRes.data;
@@ -332,8 +325,8 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
         formData.append("discount", JSON.stringify(discountPayload));
       }
 
-      const { data } = await axios.put(
-        `${apiProductId}`,
+      const { data } = await apiURL.put(
+        `products/${productId}`,
         formData,
         {
           headers: {

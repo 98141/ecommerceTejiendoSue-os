@@ -16,8 +16,9 @@ const FilterExportControls = ({
     setDateRange({ from: "", to: "" });
   };
 
+  // evita submit
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") e.preventDefault(); // evita submit
+    if (e.key === "Enter") e.preventDefault(); 
   };
 
   const exportDisabled = !!dateError || !hasResults;

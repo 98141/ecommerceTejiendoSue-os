@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+
+import apiUrl from "../../../api/apiClient";
 
 function fmt(date) {
   return date.toISOString().slice(0, 10);
@@ -21,9 +22,11 @@ const DashboardFilters = ({ onFilterChange }) => {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [groupByMonth, setGroupByMonth] = useState(true);
 
+ 
+
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/api/categories")
+    apiUrl
+      .get("categories")
       .then((res) => setCategories(res.data))
       .catch((err) => console.error("Error cargando categorías:", err));
   }, []);

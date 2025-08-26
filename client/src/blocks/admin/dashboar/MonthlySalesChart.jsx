@@ -8,7 +8,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { formatCOP } from "../../../utils/currency"; // ✅ usamos tu helper
+import { formatCOP } from "../../../utils/currency"; 
 
 function alignSeries(current = [], previous = []) {
   const mapCurr = new Map(current.map((d) => [d.period, d.total]));

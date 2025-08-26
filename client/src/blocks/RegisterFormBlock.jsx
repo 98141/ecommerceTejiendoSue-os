@@ -1,7 +1,7 @@
 import { useState, useContext } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import api from "../api/axios";
+import api from "../api/apiClient";
 import { useToast } from "../contexts/ToastContext";
 
 const RegisterForm = () => {
