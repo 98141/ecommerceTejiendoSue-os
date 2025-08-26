@@ -1,21 +1,17 @@
-import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import axios from "axios";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
+import apiUrl from "../api/apiClient";
+
 import { AuthContext } from "../contexts/AuthContext";
 import { formatCOP } from "../utils/currency";
-import api from "../api/client";
 
 const AdminSalesHistoryPage = () => {
-  const { token } = useContext(AuthContext);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Ruta
-  const apiHistory = api(`orders/sales-history?`)
 
   // Filtros
   const [from, setFrom] = useState("");
@@ -28,11 +24,6 @@ const AdminSalesHistoryPage = () => {
 
   // Ref para debounce (fechas)
   const debounceRef = useRef(null);
-
-  const authHeaders = useMemo(
-    () => ({ headers: { Authorization: `Bearer ${token}` } }),
-    [token]
-  );
 
   // --- Helpers de fecha ---
   const validateDateRange = (fromStr, toStr) => {
@@ -81,10 +72,7 @@ const AdminSalesHistoryPage = () => {
       if (opts.to) params.append("to", opts.to);
       if (opts.status) params.append("status", opts.status);
 
-      const res = await axios.get(
-        `${apiHistory}?${params.toString()}`,
-        authHeaders
-      );
+      const res = await apiUrl.get(`/orders/sales-history?${params.toString()}`);
       setRows(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       console.error(e);
@@ -96,8 +84,7 @@ const AdminSalesHistoryPage = () => {
 
   // Carga inicial
   useEffect(() => {
-    fetchData({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchData({}); 
   }, []);
 
   // Validación de fechas (si NO hay mes seleccionado)

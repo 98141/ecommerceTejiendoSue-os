@@ -1,24 +1,22 @@
 import { useEffect, useState, useContext } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
+
+import apiUrl from "../api/apiClient";
 
 import ProductListBlocks from "../blocks/users/ProductListBlocks";
 import HeroBlock from "../blocks/users/HeroBlock";
 import { AuthContext } from "../contexts/AuthContext";
-import api from "../api/client";
+
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  // Ruta
-  const apiProducts = api ("products")
-
   useEffect(() => {
     if (user?.role !== "admin") {
-      axios
-        .get(`${apiProducts}`)
+      apiUrl
+        .get(`products`)
         .then((res) => setProducts(res.data))
         .catch(() => alert("Error al cargar productos"));
     }

@@ -1,5 +1,7 @@
 import { useState } from "react";
-import axios from "axios";
+
+import apiUrl from "../api/apiClient"
+
 import { useToast } from "../contexts/ToastContext";
 
 const ForgotPasswordPage = () => {
@@ -9,7 +11,7 @@ const ForgotPasswordPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("http://localhost:5000/api/users/forgot-password", { email });
+      await apiUrl.post("users/forgot-password", { email });
       showToast("Revisa tu correo para restablecer tu contraseña", "info");
     } catch (err) {
       const msg = err.response?.data?.error || "Error al solicitar restablecimiento";

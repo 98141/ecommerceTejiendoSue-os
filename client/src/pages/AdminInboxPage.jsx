@@ -1,5 +1,7 @@
 import { useEffect, useState, useContext } from "react";
-import axios from "axios";
+
+import apiUrl from "../api/apiClient";
+
 import { AuthContext } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { socket } from "../socket";
@@ -18,8 +20,8 @@ const AdminInboxPage = () => {
   const fetchInbox = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        "http://localhost:5000/api/messages/inbox/admin",
+      const res = await apiUrl.get(
+        "messages/inbox/admin",
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -34,8 +36,8 @@ const AdminInboxPage = () => {
 
   const updateStatus = async (userId, status) => {
     try {
-      await axios.post(
-        "http://localhost:5000/api/messages/status",
+      await apiUrl.post(
+        "messages/status",
         { userId, status },
         { headers: { Authorization: `Bearer ${token}` } }
       );

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+
+import apiUrl from "../api/apiClient";
+
 import { useToast } from "../contexts/ToastContext";
 
 const ResetPasswordPage = () => {
@@ -23,7 +25,7 @@ const ResetPasswordPage = () => {
     }
 
     try {
-      await axios.post(`http://localhost:5000/api/users/reset-password/${token}`, { password });
+      await apiUrl.post(`users/reset-password/${token}`, { password });
       showToast("Contraseña actualizada con éxito", "success");
       navigate("/login");
     } catch (err) {

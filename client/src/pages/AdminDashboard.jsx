@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, useContext } from "react";
-import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import dayjs from "dayjs";
+
+import apiUrl from "../api/apiClient";
 
 import { AuthContext } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
@@ -32,8 +33,8 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
 
   const fetchOrders = () => {
     setLoading(true);
-    axios
-      .get("http://localhost:5000/api/orders", {
+    apiUrl
+      .get("orders", {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => setOrders(res.data))
@@ -42,9 +43,9 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
   };
 
   const handleStatusChange = (id, status) => {
-    return axios
+    return apiUrl
       .patch(
-        `http://localhost:5000/api/orders/${id}/status`,
+        `orders/${id}/status`,
         { status },
         {
           headers: {
@@ -68,9 +69,9 @@ const AdminOrdersPage = ({ statusFilterProp = "pendiente" }) => {
   };
 
   const handleCancel = (id) => {
-    return axios
+    return apiUrl
       .post(
-        `http://localhost:5000/api/orders/${id}/cancel`,
+        `orders/${id}/cancel`,
         {},
         {
           headers: {

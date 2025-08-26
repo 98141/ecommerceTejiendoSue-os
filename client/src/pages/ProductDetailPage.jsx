@@ -1,6 +1,8 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState, useContext } from "react";
-import axios from "axios";
+
+import apiUrl from "../api/apiClient";
+
 import ProductDetailBlock from "../blocks/users/ProductDetailBlock";
 import { CartContext } from "../contexts/CartContext";
 
@@ -10,8 +12,8 @@ const ProductDetail = () => {
   const { addToCart } = useContext(CartContext);
 
   useEffect(() => {
-    axios
-      .get(`http://localhost:5000/api/products/${id}`)
+    apiUrl
+      .get(`products/${id}`)
       .then((res) => setProduct(res.data))
       .catch(() => alert("No se pudo cargar el producto."));
   }, [id]);

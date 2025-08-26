@@ -2,13 +2,14 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { CartContext } from "../contexts/CartContext";
 import { AuthContext } from "../contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+
+import apiUrl from "../api/apiClient";
+
 import CartItem from "../blocks/users/CartItem";
 import CheckoutModal from "../blocks/users/CheckoutModal";
 import { useToast } from "../contexts/ToastContext";
 
 const ADMIN_WHATSAPP = "573147788069";
-const API_BASE = "http://localhost:5000/api";
 
 /** Formatea a COP sin decimales */
 const fmtCOP = (n) =>
@@ -45,14 +46,14 @@ function useProductsMap(ids, token) {
       setLoading(true);
       try {
         // 1) Intento bulk
-        const bulkUrl = `${API_BASE}/products/bulk?ids=${encodeURIComponent(
+        const bulkUrl = `products/bulk?ids=${encodeURIComponent(
           unique.join(",")
         )}`;
         const headers = token
           ? { Authorization: `Bearer ${token}` }
           : undefined;
         try {
-          const r = await axios.get(bulkUrl, { headers });
+          const r = await apiUrl.get(bulkUrl, { headers });
           if (!cancel) {
             const obj = {};
             for (const p of r.data || []) obj[String(p._id)] = p;
@@ -63,7 +64,7 @@ function useProductsMap(ids, token) {
           const results = await Promise.all(
             unique.map(async (id) => {
               try {
-                const rr = await axios.get(`${API_BASE}/products/${id}`, {
+                const rr = await apiUrl.get(`products/${id}`, {
                   headers,
                 });
                 return rr.data;
@@ -207,8 +208,8 @@ const CartPage = () => {
       const items = toOrderItems();
 
       // ⚠️ El backend calcula total y controla stock; aquí sólo enviamos items + shippingInfo
-      const { data } = await axios.post(
-        `${API_BASE}/orders`,
+      const { data } = await apiUrl.post(
+        `orders`,
         { items, shippingInfo },
         { headers: { Authorization: `Bearer ${token}` } }
       );

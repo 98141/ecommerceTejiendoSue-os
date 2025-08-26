@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+
 import api from "../api/apiClient";
+
 import { useToast } from "../contexts/ToastContext";
 
 const EmailVerificationPage = () => {

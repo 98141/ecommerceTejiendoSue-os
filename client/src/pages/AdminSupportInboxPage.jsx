@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+
+import apiUrl from "../api/apiClient";
+
 import { useContext } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 
@@ -12,7 +14,7 @@ const AdminSupportInboxPage = () => {
   useEffect(() => {
     const fetchInbox = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/messages/inbox", {
+        const res = await apiUrl.get("messages/inbox", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUsers(res.data);

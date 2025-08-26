@@ -1,5 +1,6 @@
 import { useEffect, useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+
 import { SupportContext } from "../contexts/SupportContext";
 import { AuthContext } from "../contexts/AuthContext";
 import SupportChatBlock from "../blocks/SupportChatBlock";
@@ -19,7 +20,7 @@ const SupportChatPage = () => {
 
   const getTargetId = () => {
     if (!user) return null;
-    if (user.role === "user") return "686c4d1c64583fa5d6a198dd"; // ID del admin
+    if (user.role === "user") return "687c285756076cf6e9836fce"; // ID del admin 
     if (user.role === "admin") return withUserId || null;
     return null;
   };

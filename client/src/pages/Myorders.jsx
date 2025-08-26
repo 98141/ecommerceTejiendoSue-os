@@ -1,6 +1,8 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
+
+import apiUrl from "../api/apiClient";
+
 import { AuthContext } from "../contexts/AuthContext";
 
 /* ===== Helpers ===== */
@@ -52,7 +54,7 @@ const MyOrdersPage = () => {
     }
     (async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/orders/my", {
+        const res = await apiUrl.get("orders/my", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (mounted) setOrders(res.data || []);
