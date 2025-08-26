@@ -1,18 +1,21 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { AuthContext } from "../contexts/AuthContext";
-import { formatCOP } from "../utils/currency";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
-const API = "http://localhost:5000/api";
+import { AuthContext } from "../contexts/AuthContext";
+import { formatCOP } from "../utils/currency";
+import api from "../api/client";
 
 const AdminSalesHistoryPage = () => {
   const { token } = useContext(AuthContext);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Ruta
+  const apiHistory = api(`orders/sales-history?`)
 
   // Filtros
   const [from, setFrom] = useState("");
@@ -79,7 +82,7 @@ const AdminSalesHistoryPage = () => {
       if (opts.status) params.append("status", opts.status);
 
       const res = await axios.get(
-        `${API}/orders/sales-history?${params.toString()}`,
+        `${apiHistory}?${params.toString()}`,
         authHeaders
       );
       setRows(Array.isArray(res.data) ? res.data : []);

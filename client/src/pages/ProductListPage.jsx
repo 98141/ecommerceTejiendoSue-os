@@ -5,16 +5,20 @@ import { useNavigate } from "react-router-dom";
 import ProductListBlocks from "../blocks/users/ProductListBlocks";
 import HeroBlock from "../blocks/users/HeroBlock";
 import { AuthContext } from "../contexts/AuthContext";
+import api from "../api/client";
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
   const { user } = useContext(AuthContext);
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+
+  // Ruta
+  const apiProducts = api ("products")
 
   useEffect(() => {
     if (user?.role !== "admin") {
       axios
-        .get("http://localhost:5000/api/products")
+        .get(`${apiProducts}`)
         .then((res) => setProducts(res.data))
         .catch(() => alert("Error al cargar productos"));
     }
@@ -30,15 +34,12 @@ const ProductList = () => {
       </div>
     );
   }
-  
 
   return (
     <div style={{ padding: "20px" }}>
       <HeroBlock
         onPrimaryClick={() => navigate("/products")}
         onSecondaryClick={() => navigate("/nosotros")}
-        // Si aún no tienes la imagen local, puedes usar temporalmente un enlace directo:
-        // imageSrc="https://images.unsplash.com/photo-1589364515321-049889246b8b?q=80&w=1600&auto=format&fit=crop"
       />
       <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
         Catálogo de Artesanías

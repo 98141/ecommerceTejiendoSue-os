@@ -4,6 +4,7 @@ import { FaTimesCircle, FaPlusCircle } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 import { formatCOP } from "../../utils/currency"; 
+import api from "../../api/client";
 
 /** Util: convierte fecha ISO a valor compatible con <input type="datetime-local"> */
 const toDatetimeLocal = (iso) => {
@@ -68,6 +69,12 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
   const [sizes, setSizes] = useState([]);
   const [colors, setColors] = useState([]);
 
+  // Rutas con API
+  const apiCategories = api("categories");
+  const apiSizes = api("sizes");
+  const apiColors = api("colors");
+  const apiProductId = api(`products/${productId}`);
+
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -114,10 +121,10 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
     try {
       const [productRes, categoriesRes, sizesRes, colorsRes] =
         await Promise.all([
-          axios.get(`http://localhost:5000/api/products/${productId}`),
-          axios.get("http://localhost:5000/api/categories"),
-          axios.get("http://localhost:5000/api/sizes"),
-          axios.get("http://localhost:5000/api/colors"),
+          axios.get(`${apiProductId}`),
+          axios.get(`${apiCategories}`),
+          axios.get(`${apiSizes}`),
+          axios.get(`${apiColors}`),
         ]);
 
       const p = productRes.data;
@@ -326,7 +333,7 @@ const AdminEditProductForm = ({ productId, token, onSuccess, showToast }) => {
       }
 
       const { data } = await axios.put(
-        `http://localhost:5000/api/products/${productId}`,
+        `${apiProductId}`,
         formData,
         {
           headers: {
