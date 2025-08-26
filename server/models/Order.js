@@ -38,7 +38,9 @@ const orderSchema = new mongoose.Schema(
     trackingNumber: { type: String, default: "" },
     shippingCompany: { type: String, default: "" },
     adminComment: { type: String, default: "" },
-    shippingInfo: { type: shippingInfoSchema, default: undefined }, // <— NUEVO
+    shippingInfo: { type: shippingInfoSchema, default: undefined },
+    // 🔒 Evita sumar ventas dos veces si el estado cambia varias veces
+    wasCountedForBestsellers: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

@@ -15,6 +15,8 @@ const {
   getProductSalesHistory,
 } = require("../controllers/productController");
 
+const { searchProducts, getProductSections } = require("../controllers/productSearchController");
+
 const Product = require("../models/Product"); 
 const { verifyToken, isAdmin } = require("../middleware/auth");
 const uploadMiddleware = require("../middleware/uploadMiddleware");
@@ -152,7 +154,11 @@ router.get("/public/:id", async (req, res, next) => {
   }
 });
 
-/* ===================== Rutas existentes (tu código) ===================== */
+router.get("/search", productLimiter, searchProducts);
+
+router.get("/sections", productLimiter, getProductSections);
+
+/* ===================== Rutas existentes ===================== */
 
 // Listado y detalle (controladores existentes)
 router.get("/", getProducts);

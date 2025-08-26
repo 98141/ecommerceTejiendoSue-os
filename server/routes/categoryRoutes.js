@@ -4,19 +4,20 @@ const {
   createCategory,
   getAllCategories,
   getCategoryById,
+  getCategoryBySlug,   
   updateCategory,
   deleteCategory,
 } = require("../controllers/categoryController");
-
 const { verifyToken, isAdmin } = require("../middleware/auth");
 
-// 📌 Rutas protegidas solo para admin
+// Protegidas admin
 router.post("/", verifyToken, isAdmin, createCategory);
 router.put("/:id", verifyToken, isAdmin, updateCategory);
 router.delete("/:id", verifyToken, isAdmin, deleteCategory);
 
-// 📌 Rutas públicas
+// Públicas
 router.get("/", getAllCategories);
+router.get("/slug/:slug", getCategoryBySlug); // <— nuevo
 router.get("/:id", getCategoryById);
 
 module.exports = router;

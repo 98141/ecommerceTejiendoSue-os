@@ -207,21 +207,47 @@ exports.getAllOrders = async (req, res) => {
 /** ========================== UPDATE STATUS (ADMIN) ========================== */
 exports.updateOrderStatus = async (req, res) => {
   try {
+    const { id } = req.params;
     const { status } = req.body;
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
+
+    const allowed = ["pendiente", "facturado", "enviado", "entregado", "cancelado"];
+    if (!allowed.includes(String(status))) {
+      return res.status(400).json({ error: "Estado inválido" });
+    }
+
+    const order = await Order.findById(id);
     if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
 
-    // 🔄 Invalida caché del dashboard (cambio de estado)
-    clearDashboardCache();
+    const prevStatus = order.status;
+    order.status = String(status);
 
-    res.json(order);
+    // ✅ Consideramos "facturado" como "pago confirmado"
+    const becomesPaid = status === "facturado";
+
+    // Solo incrementar una vez en la vida de la orden
+    if (becomesPaid && !order.wasCountedForBestsellers) {
+      for (const item of order.items) {
+        if (item.product && item.quantity > 0) {
+          await Product.updateOne(
+            { _id: item.product },
+            { $inc: { salesCount: Number(item.quantity) || 0 } }
+          );
+        }
+      }
+      order.wasCountedForBestsellers = true;
+    }
+
+    await order.save();
+
+    return res.json({
+      message: "Estado actualizado correctamente",
+      order,
+      prevStatus,
+      incrementedBestSellers: becomesPaid && order.wasCountedForBestsellers,
+    });
   } catch (err) {
-    console.error("Error updateOrderStatus:", err);
-    res.status(400).json({ error: err.message });
+    console.error("Error al actualizar estado del pedido:", err);
+    return res.status(500).json({ error: "Error al actualizar estado del pedido" });
   }
 };
 
