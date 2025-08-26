@@ -1,11 +1,14 @@
 import AdminListManager from "../../../blocks/admin/AdminListManagesBlocks";
+import api from "../../../api/client";
 
 const AdminColorsPage = () => {
+  const colors = api("colors");
+
   return (
     <div className="admin-page-container">
       <AdminListManager
         title="Colores"
-        apiEndpoint="http://localhost:5000/api/colors"
+        apiEndpoint={colors}
         fieldName="name"
       />
     </div>

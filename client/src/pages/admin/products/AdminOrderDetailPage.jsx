@@ -1,6 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useContext } from "react";
 import axios from "axios";
+
+import api from "../../../api/client";
 import { AuthContext } from "../../../contexts/AuthContext";
 import AdminOrderCommentBlock from "../../../blocks/admin/AdminOrderCommentBlock";
 import { toast } from "react-toastify";
@@ -33,10 +35,13 @@ const AdminOrderDetailPage = () => {
   const [orderIds, setOrderIds] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
 
+  const orderId = api(`orders/${id}`);
+  const orderPedido = api(`orders/ids`);
+
   useEffect(() => {
     const fetchOrder = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/orders/${id}`, {
+        const res = await axios.get(`${orderId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setOrder(res.data);
@@ -59,7 +64,7 @@ const AdminOrderDetailPage = () => {
   useEffect(() => {
     const fetchIds = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/orders/ids", {
+        const res = await axios.get(`${orderPedido}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const ids = res.data || [];
@@ -89,7 +94,7 @@ const AdminOrderDetailPage = () => {
         adminComment: fields.adminComment,
       };
 
-      await axios.put(`http://localhost:5000/api/orders/${id}`, payload, {
+      await axios.put(`${orderId}`, payload, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,

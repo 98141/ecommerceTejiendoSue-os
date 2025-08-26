@@ -42,6 +42,7 @@ const FilterExportControls = ({
         >
           <option value="todos">Todos</option>
           <option value="pendiente">Pendiente</option>
+          <option value="facturado">Facturado</option>
           <option value="enviado">Enviado</option>
           <option value="entregado">Entregado</option>
           <option value="cancelado">Cancelado</option>

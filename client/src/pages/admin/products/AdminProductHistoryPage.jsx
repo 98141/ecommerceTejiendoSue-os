@@ -5,7 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../../contexts/AuthContext";
 import { useToast } from "../../../contexts/ToastContext";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable"; // 👈 Importar la función (NO como side-effect)
+import autoTable from "jspdf-autotable"; 
 import * as XLSX from "xlsx";
 
 const API = "http://localhost:5000/api";

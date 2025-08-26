@@ -4,7 +4,8 @@ import { getToken, setToken, logout } from "../utils/authHelpers";
 // Axios personalizado
 const api = axios.create({
   baseURL: "http://localhost:5000/api",
-  withCredentials: true // permite enviar cookies httpOnly
+  // permite enviar cookies httpOnly
+  withCredentials: true 
 });
 
 // Interceptor para renovar accessToken automáticamente
@@ -28,7 +29,8 @@ api.interceptors.response.use(
         const newToken = res.data.token;
         setToken(newToken);
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        return api(originalRequest); // Reintenta con nuevo token
+        // Reintenta con nuevo token
+        return api(originalRequest); 
       } catch (refreshError) {
         logout(); // Limpia sesión
         window.location.href = "/login";
