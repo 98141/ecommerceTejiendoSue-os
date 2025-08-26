@@ -1,6 +1,7 @@
 import { createContext, useState } from "react";
 import { getToken, setToken, removeToken } from "../utils/authHelpers";
-import api from "../api/axios";
+
+import apiUrl from "../api/apiClient";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext();
@@ -21,7 +22,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await api.post("/users/logout");
+      await apiUrl.post("/users/logout");
     } catch (error) {
       console.error("Error al cerrar sesión en el backend:", error.message);
     }

@@ -6,10 +6,11 @@ import {
   useRef,
   useState,
 } from "react";
+
+import api from "../api/apiClient";
+
 import { AuthContext } from "./AuthContext";
 
-/** Ajusta según tu server (si tienes proxy, deja "/api") */
-const API_BASE = "http://localhost:5000/api";
 const GUEST_LS_KEY = "guest_cart_v1";
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -83,44 +84,53 @@ function readGuestCart() {
 function writeGuestCart(items) {
   try {
     localStorage.setItem(GUEST_LS_KEY, JSON.stringify(toGuestStorage(items)));
-  } catch {/* empty */}
+  } catch {
+    /* empty */
+  }
 }
 
 function clearGuestCart() {
   try {
     localStorage.removeItem(GUEST_LS_KEY);
-  } catch { /* empty */ }
+  } catch {
+    /* empty */
+  }
 }
 
 /* =============== Fetch helper con ETag =============== */
 
-async function apiFetch(path, { method = "GET", body, token, ifMatch } = {}) {
-  const headers = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  if (ifMatch) headers["If-Match"] = ifMatch;
-
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    credentials: "include",
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  const etag = res.headers.get("ETag");
-  let data = null;
+async function apiFetch(path, { method = "GET", body, ifMatch } = {}) {
+  // eslint-disable-next-line no-useless-catch
   try {
-    data = await res.json();
-  } catch {/* empty */}
+    const res = await api.request({
+      url: path,
+      method,
+      data: body,
+      headers: {
+        ...(ifMatch ? { "If-Match": ifMatch } : {}),
+      },
+      // importante: queremos el header ETag
+      validateStatus: () => true, // dejamos que nosotros manejemos errores
+    });
 
-  if (!res.ok) {
-    const err = new Error(data?.error || data?.message || `HTTP ${res.status}`);
-    err.status = res.status;
-    err.data = data;
-    err.etag = etag;
-    throw err;
+    const etag = res.headers["etag"] || null;
+    const data = res.data;
+
+    if (res.status < 200 || res.status >= 300) {
+      const err = new Error(
+        data?.error || data?.message || `HTTP ${res.status}`
+      );
+      err.status = res.status;
+      err.data = data;
+      err.etag = etag;
+      throw err;
+    }
+
+    return { data, etag };
+  } catch (error) {
+    // axios ya trae más info
+    throw error;
   }
-
-  return { data, etag };
 }
 
 /* =============== Provider =============== */
@@ -133,8 +143,8 @@ export const CartProvider = ({ children }) => {
   const userId = user?.id || user?._id || null;
 
   // Estado "canónico" (remoto o invitado): solo IDs + cantidad
-  const [cart, setCart] = useState([]); // [{ productId, sizeId, colorId, quantity }]
-  const [mode, setMode] = useState("guest"); // "guest" | "remote"
+  const [cart, setCart] = useState([]);
+  const [mode, setMode] = useState("guest");
   const etagRef = useRef(null);
   const retryingRef = useRef(false);
 
@@ -398,16 +408,6 @@ export const CartProvider = ({ children }) => {
     [cart]
   );
 
-  /** ========= Capa de compatibilidad para UI antigua =========
-   * cartLegacy emula la forma previa:
-   * {
-   *   product: { _id },
-   *   size:    { _id } | null,
-   *   color:   { _id } | null,
-   *   quantity
-   * }
-   * Úsalo temporalmente: const { cartLegacy } = useContext(CartContext)
-   */
   const cartLegacy = useMemo(
     () =>
       cart.map((i) => ({
@@ -421,16 +421,14 @@ export const CartProvider = ({ children }) => {
 
   const value = useMemo(
     () => ({
-      // Nuevo formato canónico
-      cart, // [{ productId, sizeId, colorId, quantity }]
+      cart,
       totalItems,
-      mode, // "guest" | "remote"
+      mode,
       addToCart,
       updateItem,
       removeFromCart,
       clearCart,
-      // Compat temporal (para que CartPage no rompa)
-      cartLegacy, // <- usa este en tu CartPage actual
+      cartLegacy,
     }),
     [cart, totalItems, mode, cartLegacy]
   );

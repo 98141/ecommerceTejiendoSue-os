@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useContext } from "react";
-import axios from "axios";
+
+import apiUrl from '../api/apiClient'
+
 import { AuthContext } from "../contexts/AuthContext";
 
 const debounceFn = (fn, delay = 400) => {
@@ -29,7 +31,7 @@ export function useProductEntryHistory(initialQuery = {}) {
       try {
         const params = { ...q };
         Object.keys(params).forEach(k => { if (params[k] === "" || params[k] == null) delete params[k]; });
-        const { data } = await axios.get("http://localhost:5000/api/productsHistory/history", {
+        const { data } = await apiUrl.get("productsHistory/history", {
           headers: { Authorization: `Bearer ${token}` },
           params
         });
