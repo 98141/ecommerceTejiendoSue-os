@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useContext, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+
 import { useProductEntryHistory } from "../../../hooks/useProductEntryHistory";
 import HistoryDetailModal from "../../../components/HistoryDetailModal";
 import { AuthContext } from "../../../contexts/AuthContext";

@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+import apiUrl from "../api/apiClient";
 
 /**
- * Reemplaza estos valores cuando tengas las URLs reales.
+ * Reemplaza con las URLs reales.
  * Si la URL está vacía, se muestra el icono deshabilitado (no clickable).
  */
 const SOCIAL_LINKS = {
@@ -22,10 +21,10 @@ const Footer = () => {
     const increaseVisitIfFirst = async () => {
       try {
         if (!sessionStorage.getItem("visited")) {
-          await axios.post(`${API_URL}/api/visits/increment`);
+          await apiUrl.post(`visits/increment`);
           sessionStorage.setItem("visited", "true");
         }
-        const res = await axios.get(`${API_URL}/api/visits`);
+        const res = await apiUrl.get(`visits`);
         setVisits(res.data.count || 0);
       } catch (err) {
         console.error("Error con contador de visitas:", err);
@@ -37,7 +36,7 @@ const Footer = () => {
   const year = new Date().getFullYear();
 
   // helper para social icon (si no hay url => deshabilitado)
-  const SocialIcon = ({ type, href, label, children }) => {
+  const SocialIcon = ({ href, label, children }) => {
     const isEnabled = Boolean(href);
     const className = `sf__social ${isEnabled ? "" : "is-disabled"}`;
     if (!isEnabled) {

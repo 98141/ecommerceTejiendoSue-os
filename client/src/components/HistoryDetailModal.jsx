@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from "react";
-import axios from "axios";
 
-import api from "../api/client"
+import apiUrl from "../api/apiClient";
+
 import { AuthContext } from "../contexts/AuthContext";
 import { formatCOP } from "../utils/format";
 
@@ -21,8 +21,6 @@ export default function HistoryDetailModal({ id, open, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const productHistory = api(`productsHistory/history/${id}`)
-
   // Cargar detalle
   useEffect(() => {
     if (!open || !id) return;
@@ -31,8 +29,8 @@ export default function HistoryDetailModal({ id, open, onClose }) {
       setLoading(true);
       setError(null);
       try {
-        const response = await axios.get(
-          `${productHistory}`,
+        const response = await apiUrl.get(
+          `productsHistory/history/${id}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setItem(response.data);
@@ -70,8 +68,8 @@ export default function HistoryDetailModal({ id, open, onClose }) {
     try {
       setError(null);
       setLoading(true);
-      const response = await axios.get(
-        `${productHistory}`,
+      const response = await apiUrl.get(
+        `productsHistory/history/${id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setItem(response.data);
