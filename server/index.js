@@ -1,12 +1,124 @@
+/* ========================== Core & Libs ========================== */
 require("dotenv").config();
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
 const http = require("http");
-const { Server } = require("socket.io");
+const express = require("express");
 const cookieParser = require("cookie-parser");
+const cors = require("cors");
+const helmet = require("helmet");
+const compression = require("compression");
+const mongoose = require("mongoose");
+const { Server } = require("socket.io");
 
+/* ========================== App & Env ============================ */
+const app = express();
+
+const PORT = Number(process.env.PORT || 5000);
+
+// Preferimos FRONTEND_ORIGIN; si no existe, usamos CLIENT_URL; fallback localhost
+const FRONTEND_ORIGIN = (
+  process.env.FRONTEND_ORIGIN ||
+  process.env.CLIENT_URL ||
+  "http://localhost:5173"
+).replace(/\/+$/, "");
+
+/* ======================= Funciones utilitarias =================== */
+// Asegura /uploads/products para servir imágenes
+function ensureUploadsFolderExists() {
+  try {
+    const uploadsRoot = path.join(__dirname, "uploads");
+    const productsDir = path.join(uploadsRoot, "products");
+
+    if (!fs.existsSync(uploadsRoot)) {
+      fs.mkdirSync(uploadsRoot, { recursive: true });
+    }
+    if (!fs.existsSync(productsDir)) {
+      fs.mkdirSync(productsDir, { recursive: true });
+    }
+    const keep = path.join(productsDir, ".gitkeep");
+    if (!fs.existsSync(keep)) {
+      fs.writeFileSync(keep, "");
+    }
+    console.log("📁 Directorios de uploads asegurados:", productsDir);
+  } catch (err) {
+    console.error("❌ No se pudo asegurar la carpeta de uploads:", err);
+  }
+}
+
+/* =========================== Middlewares ========================= */
+app.use(
+  helmet({
+    // Activa CSP cuando elimines inline styles/scripts en el frontend
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+app.use(compression());
+
+app.use(
+  express.json({
+    limit: "2mb",
+    strict: true,
+  })
+);
+app.use(cookieParser());
+
+/* ============================= CORS ============================== */
+const corsOptions = {
+  origin: FRONTEND_ORIGIN,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Req-Id"],
+  exposedHeaders: ["X-Req-Id"],
+  maxAge: 86400, // preflight cache (1 día)
+};
+app.use(cors(corsOptions));
+
+/* ====================== HTTP server + Socket.IO ================== */
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: FRONTEND_ORIGIN,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
+
+// Eventos básicos de chat (ajusta a tus necesidades)
+io.on("connection", (socket) => {
+  socket.on("sendMessage", (message) => {
+    io.emit("newMessage", message);
+  });
+  socket.on("disconnect", () => {});
+});
+
+// Exponer io para uso en controladores
+app.set("io", io);
+
+/* ============================ Timeouts =========================== */
+// Endurecimiento de tiempos a nivel servidor (DoS ligeras / colgados)
+server.headersTimeout = 65000;   // tiempo total para headers
+server.requestTimeout = 30000;   // 30s por request
+server.keepAliveTimeout = 60000; // keep-alive
+
+// Timeouts granulares por request/response
+app.use((req, res, next) => {
+  req.setTimeout(15000);  // 15s lectura
+  res.setTimeout(20000);  // 20s escritura
+  next();
+});
+
+/* ======================== Archivos estáticos ===================== */
+ensureUploadsFolderExists();
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads/products", express.static(path.join(__dirname, "uploads/products")));
+
+/* ============================== Rutas ============================ */
+// Ajusta estos require a tu estructura real si difiere
 const userRoutes = require("./routes/userRoutes");
+const productEntryHistoryRoutes = require("./routes/productEntryHistoryRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const messageRoutes = require("./routes/messageRoutes");
@@ -15,46 +127,12 @@ const sizeRoutes = require("./routes/sizeRoutes");
 const colorRoutes = require("./routes/colorRoutes");
 const visitRoutes = require("./routes/visitRouter");
 const dashboardRoutes = require("./routes/dashboardRoutes");
-const productEntryHistoryRoutes = require("./routes/productEntryHistoryRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 
-const ensureUploadsFolderExists = require("./utils/products");
+// Healthcheck simple
+app.get("/health", (req, res) => res.json({ ok: true, ts: Date.now() }));
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
-
-io.on("connection", (socket) => {
-  socket.on("sendMessage", (message) => {
-    io.emit("newMessage", message);
-  });
-  socket.on("disconnect", () => {});
-});
-
-const corsOptions = {
-  // origen frontend exacto
-  origin: "http://localhost:5173",
-  // permite envío de cookies
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-app.use(cors(corsOptions));
-app.use(express.json());
-app.use(cookieParser());
-app.set("io", io);
-
-// Servir archivos estáticos correctamente
-ensureUploadsFolderExists();
-app.use("/uploads/products", express.static("uploads/products"));
-
+// API
 app.use("/api/users", userRoutes);
 app.use("/api/productsHistory", productEntryHistoryRoutes);
 app.use("/api/products", productRoutes);
@@ -65,15 +143,43 @@ app.use("/api/sizes", sizeRoutes);
 app.use("/api/colors", colorRoutes);
 app.use("/api/visits", visitRoutes);
 app.use("/api/dashboard", dashboardRoutes);
-app.use('/api/cart', cartRoutes);
+app.use("/api/cart", cartRoutes);
+
+/* ============================== Mongo ============================ */
+const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/pajatoquilla";
 
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(MONGO_URI, {
+    // opciones defensivas
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 20000,
+    dbName: undefined, // si tu URI ya incluye DB, Mongo la toma de allí
+  })
   .then(() => {
-    server.listen(process.env.PORT, () => {
-      console.log(
-        `🚀 Servidor backend en http://localhost:${process.env.PORT}`
-      );
+    server.listen(PORT, () => {
+      console.log(`🚀 Backend escuchando en http://localhost:${PORT}`);
+      console.log(`🌐 FRONTEND_ORIGIN = ${FRONTEND_ORIGIN}`);
+      console.log(`🗄️  MongoDB = ${MONGO_URI}`);
+      console.log(`🔐 NODE_ENV = ${process.env.NODE_ENV || "development"}`);
     });
   })
-  .catch((err) => console.error("❌ Error de conexión a MongoDB:", err));
+  .catch((err) => {
+    console.error("❌ Error de conexión a MongoDB:", err);
+    process.exit(1);
+  });
+
+/* =========================== Manejo básico de errores ============ */
+// 404 genérico para rutas no encontradas
+app.use((req, res) => {
+  res.status(404).json({ error: "Not Found" });
+});
+
+// Error handler explícito (evita filtrar stack en prod)
+app.use((err, req, res, next) => {
+  console.error("🔥 Unhandled error:", err);
+  const status = err.status || 500;
+  const payload = {
+    error: status === 500 ? "Internal Server Error" : err.message || "Error",
+  };
+  res.status(status).json(payload);
+});

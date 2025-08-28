@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 
 import apiUrl from "../../api/apiClient";
 
@@ -10,17 +9,17 @@ const OrderItemEditor = ({ item, onChange, index }) => {
   const [variantError, setVariantError] = useState("");
 
   useEffect(() => {
-    axios
-      .get("http://localhost:5000/api/sizes")
+    apiUrl
+      .get("sizes")
       .then((res) => setSizes(res.data));
-    axios
-      .get("http://localhost:5000/api/colors")
+    apiUrl
+      .get("colors")
       .then((res) => setColors(res.data));
 
     // Obtener variantes del producto actual (por ID)
     if (item.product?._id) {
-      axios
-        .get(`http://localhost:5000/api/products/${item.product._id}`)
+      apiUrl
+        .get(`products/${item.product._id}`)
         .then((res) => {
           setProductVariants(res.data.variants || []);
         })
