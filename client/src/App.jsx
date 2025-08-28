@@ -14,6 +14,10 @@ import EmailVerificationPage from "./pages/EmailVerificationPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import CatalogoPage from "./pages/user/CatalogoPage";
+import OrigenNarinoPage from "./pages/user/cafe/OrigenNariñoPage";
+import { PanelaSandonaPage } from "./pages/user/panela/PanelaSandonaPage";
+import PanelaRecipesPage from "./pages/user/panela/RecetasPanelaPage";
+import TostionCafePage from "./pages/user/cafe/TostionCafePage";
 
 /* Páginas privadas (user) */
 import PrivateRoute from "./routes/PrivateRoutes";
@@ -67,6 +71,18 @@ function AppShell() {
             path="/reset-password/:token"
             element={<ResetPasswordPage />}
           />
+          {/** Complementos de navbar de cafe y panela */}
+                      <Route path="/origen/cafe-narino" element={<OrigenNarinoPage />} />
+            <Route path="/origen/tostion" element={<TostionCafePage />} />
+            <Route
+              path="/origen/panela-sandona"
+              element={<PanelaSandonaPage />}
+            />
+                        <Route
+              path="/origen/recetas"
+              element={<PanelaRecipesPage />}
+            />
+            
           <Route path="/tienda" element={<CatalogoPage />} />
           <Route path="/categoria/:slug" element={<CatalogoPage />} />
           {/* Compatibilidad navbar actual */}
