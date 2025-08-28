@@ -3,20 +3,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import LoaderOverlay from "../blocks/LoaderOverlay";
 import { cancelAllActiveRequests } from "../api/apiClient";
 
-/**
- * GlobalHttpHandler
- * - Overlay por HTTP (eventos http:start/stop/slow) con pequeño delay anti-parpadeo.
- * - Overlay inmediato en CAMBIO DE RUTA (antes del paint) con useLayoutEffect.
- * - Cancela requests al navegar.
- */
+
 export default function GlobalHttpHandler({
-  showOnRouteChange = true, // <- ACTIVADO por defecto para tu caso
-  routeMinMs = 300,         // tiempo mínimo visible en cambio de ruta (evita flash)
-  routeMaxMs = 1200,        // tope para no secuestrar la UX
+  showOnRouteChange = true,
+  routeMinMs = 300,         
+  routeMaxMs = 1200,       
 }) {
   const [pending, setPending] = useState(0);
-  const [visible, setVisible] = useState(false); // overlay por HTTP
-  const [routeSpin, setRouteSpin] = useState(false); // overlay por cambio de ruta
+  const [visible, setVisible] = useState(false); 
+  const [routeSpin, setRouteSpin] = useState(false); 
 
   const showDelayRef = useRef(null);
   const location = useLocation();

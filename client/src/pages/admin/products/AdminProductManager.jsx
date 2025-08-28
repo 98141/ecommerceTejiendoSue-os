@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useContext, useRef } from "react";
-import axios from "axios";
+
+import apiUrl from "../../../api/apiClient"
 
 import { AuthContext } from "../../../contexts/AuthContext";
 import ConfirmModal from "../../../blocks/ConfirmModalBlock";
@@ -116,12 +117,12 @@ const AdminProductPage = () => {
     try {
       if (abortRef.current) abortRef.current.abort();
       abortRef.current = new AbortController();
-      const res = await axios.get(`${SERVER_BASE}/api/products`, {
+      const res = await apiUrl.get(`products`, {
         signal: abortRef.current.signal,
       });
       setProducts(res.data || []);
     } catch (e) {
-      if (axios.isCancel(e)) return;
+      if (apiUrl.isCancel(e)) return;
       showToast("Error al cargar productos", "error");
     }
   };
@@ -206,7 +207,7 @@ const AdminProductPage = () => {
   const handleDelete = async () => {
     if (!productToDelete) return;
     try {
-      await axios.delete(`${SERVER_BASE}/api/products/${productToDelete._id}`, {
+      await apiUrl.delete(`products/${productToDelete._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       showToast("Producto eliminado correctamente", "success");

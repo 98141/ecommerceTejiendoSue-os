@@ -1,5 +1,6 @@
 import { useEffect, useState, useContext, useCallback, useMemo } from "react";
-import axios from "axios";
+
+import apiUrl from "../../api/apiClient";
 
 import { AuthContext } from "../../contexts/AuthContext";
 import DashboardHeaderBlock from "../../blocks/admin/dashboar/DashboardHeaderBlock";
@@ -29,8 +30,8 @@ const AdminDashboardPage = () => {
   const loadDashboard = useCallback(() => {
     setLoading(true);
     setErr(null);
-    axios
-      .get(`${API}/dashboard/summary`, {
+    apiUrl
+      .get(`dashboard/summary`, {
         headers: { Authorization: `Bearer ${token}` },
         params: filters,
       })

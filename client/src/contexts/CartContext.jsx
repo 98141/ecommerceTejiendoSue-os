@@ -128,7 +128,6 @@ async function apiFetch(path, { method = "GET", body, ifMatch } = {}) {
 
     return { data, etag };
   } catch (error) {
-    // axios ya trae más info
     throw error;
   }
 }

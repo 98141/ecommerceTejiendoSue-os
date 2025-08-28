@@ -1,0 +1,101 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Sombrero tejido con brillo cálido</title>
+  <desc id="desc">Sombrero de paja estilizado con bandas concéntricas, copa redondeada y cinta azul, sobre fondo con halo cálido.</desc>
+
+  <!-- Fondo con halo cálido -->
+  <defs>
+    <radialGradient id="bgGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
+      gradientTransform="translate(256 256) rotate(90) scale(256)">
+      <stop offset="0" stop-color="#7a4a10" stop-opacity="0.25"/>
+      <stop offset="0.55" stop-color="#8d5a16" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#2e1a06" stop-opacity="1"/>
+    </radialGradient>
+
+    <linearGradient id="gold1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F1DEAD"/>
+      <stop offset="1" stop-color="#C9A646"/>
+    </linearGradient>
+
+    <linearGradient id="gold2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D7B867"/>
+      <stop offset="1" stop-color="#B6953C"/>
+    </linearGradient>
+
+    <linearGradient id="weaveStroke" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6B4F1D"/>
+      <stop offset="0.5" stop-color="#C9A646"/>
+      <stop offset="1" stop-color="#6B4F1D"/>
+    </linearGradient>
+
+    <linearGradient id="bandBlue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6FA9D6"/>
+      <stop offset="1" stop-color="#4C8BBE"/>
+    </linearGradient>
+
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+
+    <filter id="innerSoft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>
+      <feOffset dx="0" dy="2" result="offset"/>
+      <feComposite in="offset" in2="blur" operator="arithmetic" k2="-1" k3="1" result="inner"/>
+      <feColorMatrix in="inner" type="matrix"
+        values="0 0 0 0 0
+                0 0 0 0 0
+                0 0 0 0 0
+                0 0 0 0.6 0"/>
+      <feComposite in="SourceGraphic" operator="over"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#bgGlow)"/>
+
+  <!-- Sombrero -->
+  <g transform="translate(0,16)">
+    <!-- Ala: base -->
+    <ellipse cx="256" cy="344" rx="170" ry="46" fill="url(#gold2)" filter="url(#softShadow)"/>
+
+    <!-- Tejido del ala (anillos concéntricos) -->
+    <g fill="none" stroke="url(#weaveStroke)" stroke-linecap="round" opacity="0.95">
+      <ellipse cx="256" cy="344" rx="160" ry="41" stroke-width="10"/>
+      <ellipse cx="256" cy="344" rx="140" ry="36" stroke-width="9"/>
+      <ellipse cx="256" cy="344" rx="120" ry="31" stroke-width="8"/>
+      <ellipse cx="256" cy="344" rx="100" ry="26" stroke-width="7"/>
+      <ellipse cx="256" cy="344" rx="80"  ry="21" stroke-width="6"/>
+      <ellipse cx="256" cy="344" rx="60"  ry="16" stroke-width="5"/>
+    </g>
+
+    <!-- Cinta azul -->
+    <ellipse cx="256" cy="330" rx="88" ry="14" fill="url(#bandBlue)" opacity="0.9"/>
+
+    <!-- Copa -->
+    <g filter="url(#softShadow)">
+      <path d="
+        M196,224
+        C196,204 212,188 232,188
+        L280,188
+        C300,188 316,204 316,224
+        L316,300
+        C316,312 306,322 294,322
+        L218,322
+        C206,322 196,312 196,300
+        Z"
+        fill="url(#gold1)" />
+
+      <!-- Borde superior de la copa -->
+      <rect x="206" y="198" width="100" height="14" rx="7" fill="#EBD8A2"/>
+
+      <!-- Sombras internas suaves -->
+      <path d="
+        M200,224 L312,224 L312,300
+        C312,310 304,318 294,318
+        L218,318
+        C208,318 200,310 200,300 Z"
+        fill="rgba(0,0,0,0.12)" filter="url(#innerSoft)"/>
+    </g>
+
+    <!-- Unión copa-ala (resalte) -->
+    <ellipse cx="256" cy="324" rx="96" ry="18" fill="url(#gold2)" opacity="0.7"/>
+  </g>
+</svg>

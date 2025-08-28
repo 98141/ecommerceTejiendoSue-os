@@ -1,6 +1,8 @@
 // pages/admin/products/AdminProductHistoryPage.jsx
 import React, { useEffect, useState, useContext, useMemo } from "react";
-import axios from "axios";
+
+import apiUrl from "../../../api/apiClient"
+
 import { useParams, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../../contexts/AuthContext";
 import { useToast } from "../../../contexts/ToastContext";
@@ -46,12 +48,12 @@ const AdminProductHistoryPage = () => {
       if (opts.variantKey) params.append("variantKey", opts.variantKey);
 
       const [leg, sal] = await Promise.all([
-        axios.get(
-          `${API}/products/${id}/ledger?${params.toString()}`,
+        apiUrl.get(
+          `products/${id}/ledger?${params.toString()}`,
           authHeaders
         ),
-        axios.get(
-          `${API}/products/${id}/sales-history?${params.toString()}`,
+        apiUrl.get(
+          `products/${id}/sales-history?${params.toString()}`,
           authHeaders
         ),
       ]);

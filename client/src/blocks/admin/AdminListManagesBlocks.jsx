@@ -2,14 +2,13 @@ import { useState, useEffect, useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaTimesCircle, FaPlusCircle } from "react-icons/fa";
 
-import axios from "axios";
+import apiUrl from "../../api/apiClient";
 
 import { AuthContext } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 
-
 const AdminListManager = ({ title, apiEndpoint, fieldName }) => {
-  const { token } = useContext(AuthContext);
+  const { token } = useContext(AuthContext); 
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -23,26 +22,34 @@ const AdminListManager = ({ title, apiEndpoint, fieldName }) => {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const singular = useMemo(() => {
-    // fallback rápido: quita la última letra si termina en 's'
     return title?.endsWith("s") ? title.slice(0, -1) : title || "ítem";
   }, [title]);
+
+  // 🔧 Normaliza el endpoint para NO duplicar /api (tu api ya lo agrega en baseURL)
+  const norm = (p = "") => {
+    let u = String(p).trim();
+    // si viene con http(s)://... lo dejamos en ruta pura
+    u = u.replace(/^https?:\/\/[^/]+/i, "");
+    // quita un prefijo /api si lo trae
+    u = u.replace(/^\/?api(\/|$)/i, "/");
+    // asegura 1 sola barra inicial
+    if (!u.startsWith("/")) u = `/${u}`;
+    return u;
+  };
 
   useEffect(() => {
     fetchItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const authHeaders = token
-    ? { headers: { Authorization: `Bearer ${token}` } }
-    : {};
-
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(apiEndpoint, authHeaders);
+      const res = await apiUrl.get(norm(apiEndpoint));
       setItems(res.data || []);
-    } catch {
-      showToast("Error al cargar elementos", "error");
+    } catch (err) {
+      const msg = err?.response?.data?.error || "Error al cargar elementos";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -66,12 +73,13 @@ const AdminListManager = ({ title, apiEndpoint, fieldName }) => {
 
     try {
       setLoading(true);
-      await axios.post(apiEndpoint, { [fieldName]: value }, authHeaders);
+      await apiUrl.post(norm(apiEndpoint), { [fieldName]: value });
       showToast(`${singular} creado con éxito`, "success");
       setNewValue("");
       fetchItems();
-    } catch {
-      showToast("Error al crear", "error");
+    } catch (err) {
+      const msg = err?.response?.data?.error || "Error al crear";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -97,17 +105,14 @@ const AdminListManager = ({ title, apiEndpoint, fieldName }) => {
 
     try {
       setLoading(true);
-      await axios.put(
-        `${apiEndpoint}/${id}`,
-        { [fieldName]: value },
-        authHeaders
-      );
+      await apiUrl.put(`${norm(apiEndpoint)}/${id}`, { [fieldName]: value });
       showToast(`${singular} actualizado`, "success");
       setEditingId(null);
       setEditingValue("");
       fetchItems();
-    } catch {
-      showToast("Error al actualizar", "error");
+    } catch (err) {
+      const msg = err?.response?.data?.error || "Error al actualizar";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -116,12 +121,13 @@ const AdminListManager = ({ title, apiEndpoint, fieldName }) => {
   const handleDelete = async (id) => {
     try {
       setLoading(true);
-      await axios.delete(`${apiEndpoint}/${id}`, authHeaders);
+      await apiUrl.delete(`${norm(apiEndpoint)}/${id}`);
       showToast(`${singular} eliminado`, "success");
       setConfirmDeleteId(null);
       fetchItems();
-    } catch {
-      showToast("Error al eliminar", "error");
+    } catch (err) {
+      const msg = err?.response?.data?.error || "Error al eliminar";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -266,7 +272,6 @@ const AdminListManager = ({ title, apiEndpoint, fieldName }) => {
         </table>
       </div>
 
-      {/* Modal de confirmación de eliminación */}
       {confirmDeleteId && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card">

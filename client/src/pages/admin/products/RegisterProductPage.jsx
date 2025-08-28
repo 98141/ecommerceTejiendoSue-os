@@ -1,5 +1,7 @@
 import { useContext, useEffect, useState } from "react";
-import axios from "axios";
+
+import apiUrl from "../../../api/apiClient"
+
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../../../contexts/AuthContext";
 import { useToast } from "../../../contexts/ToastContext";
@@ -15,7 +17,7 @@ const RegisterProductPage = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/categories");
+        const res = await apiUrl.get("categories");
         setCategories(res.data);
       } catch {
         showToast("Error al cargar categorías", "error");
@@ -26,7 +28,7 @@ const RegisterProductPage = () => {
 
   const handleSubmit = async (formData) => {
     try {
-      await axios.post("http://localhost:5000/api/products", formData, {
+      await apiUrl.post("products", formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",
