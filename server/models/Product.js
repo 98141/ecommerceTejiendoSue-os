@@ -81,3 +81,4 @@ productSchema.index({ "variants.color": 1 });
 const Product =
   mongoose.models.Product || mongoose.model("Product", productSchema);
 module.exports = Product;
+

@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const { clearDashboardCache } = require("./dashboardController");
+const {
+  serializeOrderForAdmin,
+  serializeOrderForUser,
+} = require("./orderSerializers");
 
 // Clave lógica de ítem (para comparar por variante)
 const itemKey = (i) =>
@@ -176,7 +180,8 @@ exports.getMyOrders = async (req, res) => {
       .populate({ path: "items.size", select: "label" })
       .populate({ path: "items.color", select: "name" })
       .sort({ createdAt: -1 });
-    res.json(orders);
+
+    res.json(orders.map(serializeOrderForUser));
   } catch (err) {
     console.error("Error al obtener pedidos:", err);
     res.status(500).json({ error: "Error al obtener pedidos" });
@@ -210,7 +215,13 @@ exports.updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const allowed = ["pendiente", "facturado", "enviado", "entregado", "cancelado"];
+    const allowed = [
+      "pendiente",
+      "facturado",
+      "enviado",
+      "entregado",
+      "cancelado",
+    ];
     if (!allowed.includes(String(status))) {
       return res.status(400).json({ error: "Estado inválido" });
     }
@@ -247,11 +258,13 @@ exports.updateOrderStatus = async (req, res) => {
     });
   } catch (err) {
     console.error("Error al actualizar estado del pedido:", err);
-    return res.status(500).json({ error: "Error al actualizar estado del pedido" });
+    return res
+      .status(500)
+      .json({ error: "Error al actualizar estado del pedido" });
   }
 };
 
-/** ========================== READ BY ID ========================== */
+/** ========================== READ BY admin user ========================== */
 exports.getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
@@ -261,9 +274,31 @@ exports.getOrderById = async (req, res) => {
       .populate({ path: "items.color", select: "name" });
 
     if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
-    res.json(order);
+
+    return res.json(serializeOrderForAdmin(order));
   } catch (err) {
     console.error("Error getOrderById:", err);
+    res.status(500).json({ error: "Error al obtener el pedido" });
+  }
+};
+
+exports.getMyOrderById = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const order = await Order.findById(id)
+      .populate({ path: "items.product", select: "name price" })
+      .populate({ path: "items.size", select: "label" })
+      .populate({ path: "items.color", select: "name" });
+
+    if (!order) return res.status(404).json({ error: "Pedido no encontrado" });
+    // seguridad: solo dueño puede ver
+    if (String(order.user) !== String(req.user.id)) {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+
+    return res.json(serializeOrderForUser(order));
+  } catch (err) {
+    console.error("Error getMyOrderById:", err);
     res.status(500).json({ error: "Error al obtener el pedido" });
   }
 };
@@ -283,7 +318,7 @@ exports.updateOrder = async (req, res) => {
     trackingNumber,
     shippingCompany,
     adminComment,
-    shippingInfo, // ⬅️ soportado también en el guard
+    shippingInfo,
   } = req.body;
 
   try {
@@ -542,11 +577,7 @@ exports.updateOrder = async (req, res) => {
         .status(400)
         .json({ error: txErr.message || "Error al actualizar pedido" });
     } finally {
-      // cierra la sesión si se abrió
-      // (si no se abrió porque caíste en el guard, no habrá session aquí)
-      // en este flujo, sí se abrió:
-      // eslint-disable-next-line no-unsafe-finally
-      (await mongoose.connection?.client?.startSession) ? null : null; // no-ops defensivos
+      (await mongoose.connection?.client?.startSession) ? null : null;
     }
   } catch (error) {
     console.error("Error actualizando pedido:", error);

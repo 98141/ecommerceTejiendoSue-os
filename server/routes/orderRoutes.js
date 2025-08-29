@@ -5,6 +5,7 @@ const { verifyToken, isAdmin } = require("../middleware/auth");
 const {
   createOrder,
   getMyOrders,
+  getMyOrderById,
   getAllOrders,
   updateOrderStatus,
   getOrderById,
@@ -29,6 +30,7 @@ router.get("/ids", verifyToken, isAdmin, getAllOrderIds);
 
 // Usuario autenticado
 router.get("/my", verifyToken, getMyOrders);
+router.get("/my/:id", verifyToken, getMyOrderById);
 
 // CRUD/acciones sobre una orden
 router.get("/:id", verifyToken, isAdmin, getOrderById);

@@ -37,5 +37,3 @@ ProductEntryHistorySchema.index({ createdAt: -1 });
 ProductEntryHistorySchema.index({ name: "text", description: "text" });
 
 module.exports = mongoose.model("ProductEntryHistory", ProductEntryHistorySchema);
-
-
