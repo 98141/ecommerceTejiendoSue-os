@@ -29,7 +29,8 @@ const unitPrice = (product) =>
 
 /**
  * Toma una lista de ids y retorna un mapa { [productId]: product }
- * Intenta usar /api/products/bulk?ids=... y si no existe, cae a GET por id.
+ * Intenta usar /api/products/bulk con ids como ARRAY (?ids=a&ids=b).
+ * Si no existe, cae a GET por id.
  */
 function useProductsMap(ids, token) {
   const [map, setMap] = useState({});
@@ -45,15 +46,13 @@ function useProductsMap(ids, token) {
       }
       setLoading(true);
       try {
-        // 1) Intento bulk
-        const bulkUrl = `products/bulk?ids=${encodeURIComponent(
-          unique.join(",")
-        )}`;
-        const headers = token
-          ? { Authorization: `Bearer ${token}` }
-          : undefined;
+        // 1) Intento bulk con ARRAY en params (NADA de join(","))
+        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
         try {
-          const r = await apiUrl.get(bulkUrl, { headers });
+          const r = await apiUrl.get("products/bulk", {
+            params: { ids: unique }, // 👈 clave del cambio
+            headers,
+          });
           if (!cancel) {
             const obj = {};
             for (const p of r.data || []) obj[String(p._id)] = p;
@@ -64,9 +63,7 @@ function useProductsMap(ids, token) {
           const results = await Promise.all(
             unique.map(async (id) => {
               try {
-                const rr = await apiUrl.get(`products/${id}`, {
-                  headers,
-                });
+                const rr = await apiUrl.get(`products/${id}`, { headers });
                 return rr.data;
               } catch {
                 return null;

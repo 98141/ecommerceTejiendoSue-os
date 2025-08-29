@@ -1,5 +1,5 @@
-// src/api/apiClient.js
 import axios from "axios";
+import qs from "qs"; 
 import { getToken, setToken, logout } from "../utils/authHelpers";
 
 /* ===================== Base ===================== */
@@ -9,8 +9,9 @@ const API_BASE_URL = (
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
-  withCredentials: true, // cookies httpOnly para refresh
-  timeout: 15000, // hard-timeout (además del watchdog)
+  withCredentials: true, 
+  timeout: 15000,
+  paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
 });
 
 /* ===================== Eventos / Control ===================== */

@@ -113,7 +113,7 @@ const createUpdateValidators = [
    para que `/:id` no capture `/bulk`, `/public/:id`, `/search`, `/sections`.
    ================================================================ */
 
-/** Handler robusto para /bulk (GET y POST) */
+/** Handler robusto para /bulk (GET y POST) — FIX: castear explícitamente a ObjectId[] */
 async function bulkHandler(req, res, next) {
   try {
     let raw = [];
@@ -126,37 +126,81 @@ async function bulkHandler(req, res, next) {
       else if (typeof req.body?.ids === "string") raw = req.body.ids.split(",");
     }
 
-    // normaliza, quita vacíos, únicos
+    // normaliza
     const ids = Array.from(
       new Set((raw || []).map((s) => String(s || "").trim()).filter(Boolean))
     );
 
-    const validIds = ids.filter(isObjectId);
-    if (validIds.length === 0) {
-      return res.status(400).json({ error: "No valid ids", received: ids });
+    // valida 24-hex
+    const validHex = ids.filter(
+      (s) => /^[0-9a-fA-F]{24}$/.test(s) && mongoose.Types.ObjectId.isValid(s)
+    );
+    if (validHex.length === 0) {
+      return res.status(400).json({
+        error: "No valid ids",
+        received: ids,
+        reqId: req.id,
+      });
     }
 
-    const prods = await Product.find({ _id: { $in: validIds } })
-      .populate({ path: "variants.size", select: "label" })
-      .populate({ path: "variants.color", select: "name" })
-      .lean();
+    // convierte a ObjectId[]
+    const objIds = validHex.map((s) => new mongoose.Types.ObjectId(s));
 
-    // mantener orden y entregar shape público
+    // ⚠️ Clave: usar aggregate para evitar caster de { $in: ... } en path _id
+    let prods = await Product.aggregate([{ $match: { _id: { $in: objIds } } }]);
+
+    // populate sobre el resultado del aggregate
+    prods = await Product.populate(prods, [
+      { path: "variants.size", select: "label" },
+      { path: "variants.color", select: "name" },
+    ]);
+
+    // mantener orden original
     const map = new Map(prods.map((p) => [String(p._id), p]));
-    const ordered = validIds
-      .map((id) => map.get(id) || null)
+    const ordered = validHex
+      .map((id) => map.get(id))
       .filter(Boolean)
-      .map(shapePublicProduct);
+      .map((p) => ({
+        _id: p._id,
+        name: p.name,
+        price: p.price,
+        effectivePrice: (() => {
+          const price = Number(p?.price) || 0;
+          const d = p?.discount || {};
+          if (!d.enabled) return price;
+          const now = new Date();
+          const start = d.startAt ? new Date(d.startAt) : null;
+          const end = d.endAt ? new Date(d.endAt) : null;
+          if (start && now < start) return price;
+          if (end && now > end) return price;
+          let eff = price;
+          if (d.type === "PERCENT")
+            eff = price - (price * (Number(d.value) || 0)) / 100;
+          else eff = price - (Number(d.value) || 0);
+          return Number(Math.max(0, eff).toFixed(2));
+        })(),
+        images: Array.isArray(p.images) ? p.images : [],
+        variants: Array.isArray(p.variants)
+          ? p.variants.map((v) => ({
+              size: v?.size
+                ? { _id: v.size._id || v.size, label: v.size.label }
+                : null,
+              color: v?.color
+                ? { _id: v.color._id || v.color, name: v.color.name }
+                : null,
+              stock: typeof v?.stock === "number" ? v.stock : 0,
+            }))
+          : [],
+      }));
 
     return res.json(ordered);
   } catch (err) {
-    if (err?.name === "CastError") {
-      return res
-        .status(400)
-        .json({ error: "Invalid ObjectId in ids", details: err.message });
-    }
-    console.error("[/api/products/bulk] ERROR:", err);
-    next(err);
+    // deja reqId para rastreo
+    return res.status(400).json({
+      error: "Invalid ObjectId in ids",
+      details: err?.message || String(err),
+      reqId: req.id,
+    });
   }
 }
 

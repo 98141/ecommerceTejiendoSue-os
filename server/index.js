@@ -18,7 +18,7 @@ const slowDown = require("express-slow-down");
 const { errors: celebrateErrors } = require("celebrate");
 const jwt = require("jsonwebtoken");
 
-/* ======================= Entorno / Config ======================= */
+// ======================= Entorno / Config =======================
 const {
   NODE_ENV = "development",
   PORT = 5000,
@@ -29,23 +29,20 @@ const {
   JWT_SECRET = "changeme",
 } = process.env;
 
-const FRONTEND_ORIGIN = (
-  RAW_ORIGIN ||
-  CLIENT_URL ||
-  "http://localhost:5173"
-).replace(/\/+$/, "");
+const FRONTEND_ORIGIN = (RAW_ORIGIN || CLIENT_URL || "http://localhost:5173").replace(/\/+$/, "");
 const isProd = NODE_ENV === "production";
 
-/* ======================= App + Server base ====================== */
+// ======================= App + Server base ======================
 const app = express();
 const server = http.createServer(app);
 
 // Menos info expuesta
 app.disable("x-powered-by");
+
 // Detrás de proxy (Nginx/Cloudflare) para cookies Secure / req.ip real
 app.set("trust proxy", 1);
 
-/* ======================= Seguridad / Cabeceras ================== */
+// ======================= Seguridad / Cabeceras ==================
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -63,7 +60,7 @@ app.use(
             "img-src": ["'self'", "data:", "blob:", FRONTEND_ORIGIN],
             "connect-src": ["'self'", FRONTEND_ORIGIN, "ws:", "wss:"],
             "script-src": ["'self'"],
-            "style-src": ["'self'", "'unsafe-inline'"], 
+            "style-src": ["'self'", "'unsafe-inline'"],
             "font-src": ["'self'", "data:"],
             "object-src": ["'none'"],
             "frame-ancestors": ["'none'"],
@@ -73,9 +70,10 @@ app.use(
       : false,
   })
 );
+
 app.use(compression());
 
-/* ============================ Request ID ======================== */
+// ============================ Request ID ========================
 app.use((req, res, next) => {
   const incoming = req.get("X-Req-Id");
   const reqId = incoming && incoming.trim() ? incoming : randomUUID();
@@ -84,12 +82,8 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ============================ Logging =========================== */
-// En dev: verbose en consola. En prod: formato combined a archivo y solo ≥400.
-const accessLogStream = fs.createWriteStream(
-  path.join(__dirname, "access.log"),
-  { flags: "a" }
-);
+// ============================ Logging ===========================
+const accessLogStream = fs.createWriteStream(path.join(__dirname, "access.log"), { flags: "a" });
 app.use(
   morgan(isProd ? "combined" : "dev", {
     stream: isProd ? accessLogStream : process.stdout,
@@ -97,35 +91,29 @@ app.use(
   })
 );
 
-/* ============================ CORS ============================== */
-const allowlist = [
-  FRONTEND_ORIGIN,
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-].filter(Boolean);
+// ============================ CORS ==============================
+const allowlist = [FRONTEND_ORIGIN, "http://localhost:5173", "http://127.0.0.1:5173"].filter(Boolean);
+
 const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // curl/healthchecks
-    return cb(null, allowlist.includes(origin));
+    if (!origin) return cb(null, true); // CLI/healthchecks
+    if (allowlist.includes(origin)) return cb(null, true);
+    return cb(new Error("Not allowed by CORS"), false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "X-Req-Id",
-  ],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Req-Id"],
   exposedHeaders: ["X-Req-Id"],
   maxAge: 86400,
 };
+
 app.use(cors(corsOptions));
 
-/* ====================== Body / Cookies ========================== */
+// ====================== Body / Cookies ==========================
 app.use(express.json({ limit: JSON_LIMIT, strict: true }));
 app.use(cookieParser());
 
-/* ==================== HPP (Parameter Pollution) ================= */
+// ==================== HPP (Parameter Pollution) =================
 app.use(
   hpp({
     // Permite arrays en estas keys (no aplastar el query)
@@ -133,7 +121,7 @@ app.use(
   })
 );
 
-/* =============== Sanitización in-place (NoSQL & proto) ========= */
+// =============== Sanitización in-place (NoSQL & proto) ==========
 function sanitizeInPlace(obj) {
   if (!obj || typeof obj !== "object") return;
   for (const key of Object.keys(obj)) {
@@ -149,6 +137,7 @@ function sanitizeInPlace(obj) {
     if (val && typeof val === "object") sanitizeInPlace(val);
   }
 }
+
 app.use((req, _res, next) => {
   try {
     sanitizeInPlace(req.body);
@@ -160,7 +149,67 @@ app.use((req, _res, next) => {
   }
 });
 
-/* ===================== Socket.IO (mismo origin) ================ */
+// =============== Normalizadores anti-400 (CRÍTICOS) =============
+// 1) /api/products/bulk => aceptar ids como string con comas, array o objeto
+app.use((req, _res, next) => {
+  if (req.method === "GET" && req.path === "/api/products/bulk") {
+    const { ids } = req.query;
+    let arr = [];
+
+    if (Array.isArray(ids)) {
+      arr = ids;
+    } else if (typeof ids === "string") {
+      // admite "id1,id2,id3"
+      arr = ids.split(",").map((s) => s.trim());
+    } else if (ids && typeof ids === "object") {
+      // casos raros: ids[0]=..., ids[1]=...
+      arr = Object.values(ids).map((s) => String(s).trim());
+    }
+
+    req.query.ids = (arr || []).filter(Boolean);
+  }
+  next();
+});
+
+// 2) /api/orders => normalizar items y cantidades si vienen como strings
+app.use((req, _res, next) => {
+  if (req.method === "POST" && req.path === "/api/orders") {
+    try {
+      if (typeof req.body.items === "string") {
+        // si por alguna razón viene serializado
+        req.body.items = JSON.parse(req.body.items);
+      }
+      if (Array.isArray(req.body.items)) {
+        req.body.items = req.body.items
+          .map((it) => {
+            if (!it || typeof it !== "object") return null;
+            const normalized = { ...it };
+            if (normalized.quantity != null) {
+              const n = Number(normalized.quantity);
+              normalized.quantity = Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
+            }
+            // asegurar strings simples para IDs
+            if (normalized.product && typeof normalized.product === "object") {
+              normalized.product = normalized.product._id || normalized.product.id || normalized.product;
+            }
+            if (normalized.size && typeof normalized.size === "object") {
+              normalized.size = normalized.size._id || normalized.size.id || normalized.size;
+            }
+            if (normalized.color && typeof normalized.color === "object") {
+              normalized.color = normalized.color._id || normalized.color.id || normalized.color;
+            }
+            return normalized;
+          })
+          .filter(Boolean);
+      }
+    } catch (_e) {
+      // si falla el parse, deja que la validación de la ruta responda 400
+    }
+  }
+  next();
+});
+
+// ===================== Socket.IO (mismo origin) ================
 const io = new Server(server, {
   cors: { origin: allowlist, methods: ["GET", "POST"], credentials: true },
 });
@@ -170,8 +219,7 @@ app.set("io", io);
 io.use((socket, next) => {
   try {
     const hdr = socket.handshake.headers?.authorization || "";
-    const token =
-      socket.handshake.auth?.token || hdr.replace(/^Bearer\s+/i, "");
+    const token = socket.handshake.auth?.token || hdr.replace(/^Bearer\s+/i, "");
     if (!token) return next(new Error("unauthorized"));
     const payload = jwt.verify(token, JWT_SECRET);
     socket.data.user = {
@@ -201,19 +249,14 @@ function allowed(socket, limit = 15, windowMs = 5000) {
 
 io.on("connection", (socket) => {
   socket.on("sendMessage", (message) => {
-    if (!allowed(socket)) return; // silencia exceso
+    if (!allowed(socket)) return;
     const text = String(message?.text || "").slice(0, 2000);
-    const safe = {
-      text,
-      from: socket.data.user?.id,
-      role: socket.data.user?.role,
-      at: Date.now(),
-    };
+    const safe = { text, from: socket.data.user?.id, role: socket.data.user?.role, at: Date.now() };
     io.emit("newMessage", safe);
   });
 });
 
-/* ============================ Timeouts ========================== */
+// ============================ Timeouts ==========================
 server.headersTimeout = 65_000;
 server.requestTimeout = 30_000;
 server.keepAliveTimeout = 60_000;
@@ -223,15 +266,13 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ===================== Archivos estáticos ======================= */
+// ===================== Archivos estáticos =======================
 function ensureUploadsFolderExists() {
   try {
     const uploadsRoot = path.join(__dirname, "uploads");
     const productsDir = path.join(uploadsRoot, "products");
-    if (!fs.existsSync(uploadsRoot))
-      fs.mkdirSync(uploadsRoot, { recursive: true });
-    if (!fs.existsSync(productsDir))
-      fs.mkdirSync(productsDir, { recursive: true });
+    if (!fs.existsSync(uploadsRoot)) fs.mkdirSync(uploadsRoot, { recursive: true });
+    if (!fs.existsSync(productsDir)) fs.mkdirSync(productsDir, { recursive: true });
     const keep = path.join(productsDir, ".gitkeep");
     if (!fs.existsSync(keep)) fs.writeFileSync(keep, "");
     console.log("📁 Directorios de uploads OK:", productsDir);
@@ -251,13 +292,13 @@ app.use(
   })
 );
 
-/* ===================== API cache policy (no-store) ============== */
+// ===================== API cache policy (no-store) ==============
 app.use("/api", (_req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
 });
 
-/* ========================= Rate Limiting ======================== */
+// ========================= Rate Limiting ========================
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
@@ -287,7 +328,7 @@ const writeLimiter = rateLimit({
 });
 app.use(["/api/orders", "/api/messages", "/api/cart"], writeLimiter);
 
-/* ============================== Rutas =========================== */
+// ============================== Rutas ===========================
 const userRoutes = require("./routes/userRoutes");
 const productEntryHistoryRoutes = require("./routes/productEntryHistoryRoutes");
 const productRoutes = require("./routes/productRoutes");
@@ -301,9 +342,7 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 
 // Healthcheck
-app.get("/health", (_req, res) =>
-  res.status(200).json({ ok: true, ts: Date.now() })
-);
+app.get("/health", (_req, res) => res.status(200).json({ ok: true, ts: Date.now() }));
 
 // API
 app.use("/api/users", userRoutes);
@@ -318,28 +357,30 @@ app.use("/api/visits", visitRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/cart", cartRoutes);
 
-/* ========== Errores de celebrate (si usas celebrate en rutas) ==== */
+// ========== Errores de celebrate (si usas celebrate en rutas) ====
 app.use(celebrateErrors());
 
-/* ====================== 404 controlado ========================== */
+// ====================== 404 controlado ==========================
 app.use((req, res) => res.status(404).json({ error: "Not Found" }));
 
-/* ===================== Error handler único ====================== */
+// ===================== Error handler único ======================
 app.use((err, req, res, _next) => {
   const status = err.status || 500;
   const payload =
     status === 500
-      ? { error: "Internal Server Error" }
-      : { error: err.message || "Error" };
-  if (status !== 404) console.error(`🔥 [${req.id}]`, err);
+      ? { error: "Internal Server Error", reqId: req.id }
+      : { error: err.message || "Error", reqId: req.id };
+  if (status !== 404) {
+    console.error(`🔥 [${req.id}] ${req.method} ${req.originalUrl} -> ${status}`, err);
+  }
   res.status(status).json(payload);
 });
 
-/* ======= Endurecer Mongoose antes de conectar (ODM layer) ======= */
+// ======= Endurecer Mongoose antes de conectar (ODM layer) =======
 mongoose.set("sanitizeFilter", true);
 mongoose.set("strictQuery", true);
 
-/* ================== Conexión Mongo y arranque =================== */
+// ================== Conexión Mongo y arranque ===================
 mongoose
   .connect(MONGO_URI, {
     serverSelectionTimeoutMS: 10_000,
@@ -349,7 +390,7 @@ mongoose
     server.listen(PORT, () => {
       console.log(`🚀 Backend en ${NODE_ENV} escuchando en :${PORT}`);
       console.log(`🌐 FRONTEND_ORIGIN = ${FRONTEND_ORIGIN}`);
-      console.log(`🗄️  MongoDB = ${MONGO_URI}`);
+      console.log(`🗄️ MongoDB = ${MONGO_URI}`);
     });
   })
   .catch((err) => {
@@ -357,20 +398,20 @@ mongoose
     process.exit(1);
   });
 
-/* =================== Seguimiento de conexiones vivas ============ */
+// =================== Seguimiento de conexiones vivas ============
 const connections = new Set();
 server.on("connection", (socket) => {
   connections.add(socket);
   socket.on("close", () => connections.delete(socket));
 });
 
-/* ======================== Cierre elegante ======================= */
+// ======================== Cierre elegante =======================
 function closeHttpServer(srv) {
   return new Promise((resolve) => srv.close(resolve));
 }
+
 async function gracefulShutdown(reason = "shutdown") {
   console.log(`\n🛑 Iniciando cierre elegante por: ${reason}`);
-
   const FORCE_EXIT_MS = 10_000;
   const forceTimer = setTimeout(() => {
     console.warn("⚠️ Forzando cierre por timeout de gracia");
@@ -387,22 +428,18 @@ async function gracefulShutdown(reason = "shutdown") {
     // 1) Cerrar Socket.IO
     try {
       const ioInstance = app.get("io");
-      if (ioInstance && typeof ioInstance.close === "function")
-        await ioInstance.close();
+      if (ioInstance && typeof ioInstance.close === "function") await ioInstance.close();
     } catch (e) {
       console.warn("⚠️ Error cerrando Socket.IO:", e?.message || e);
     }
-
-    // 2) Dejar de aceptar nuevas conexiones HTTP y esperar a las actuales
+    // 2) Cerrar HTTP
     await closeHttpServer(server);
-
     // 3) Cerrar Mongoose
     try {
       await mongoose.disconnect();
     } catch (e) {
       console.warn("⚠️ Error cerrando Mongoose:", e?.message || e);
     }
-
     console.log("🧹 Conexiones cerradas limpiamente. Bye!");
     process.exit(0);
   } catch (err) {
@@ -410,6 +447,7 @@ async function gracefulShutdown(reason = "shutdown") {
     process.exit(1);
   }
 }
+
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("unhandledRejection", (reason) => {
@@ -420,3 +458,5 @@ process.on("uncaughtException", (err) => {
   console.error("💥 Uncaught Exception:", err);
   gracefulShutdown("uncaughtException");
 });
+
+
