@@ -1,4 +1,3 @@
-/* ========================== Core & Libs ========================== */
 require("dotenv").config();
 const path = require("path");
 const fs = require("fs");
@@ -11,7 +10,6 @@ const compression = require("compression");
 const mongoose = require("mongoose");
 const { Server } = require("socket.io");
 
-/* ========================== App & Env ============================ */
 const app = express();
 
 const PORT = Number(process.env.PORT || 5000);
@@ -99,14 +97,14 @@ app.set("io", io);
 
 /* ============================ Timeouts =========================== */
 // Endurecimiento de tiempos a nivel servidor (DoS ligeras / colgados)
-server.headersTimeout = 65000;   // tiempo total para headers
-server.requestTimeout = 30000;   // 30s por request
-server.keepAliveTimeout = 60000; // keep-alive
+server.headersTimeout = 65000;   
+server.requestTimeout = 30000;   
+server.keepAliveTimeout = 60000; 
 
 // Timeouts granulares por request/response
 app.use((req, res, next) => {
-  req.setTimeout(15000);  // 15s lectura
-  res.setTimeout(20000);  // 20s escritura
+  req.setTimeout(15000);  
+  res.setTimeout(20000);  
   next();
 });
 
@@ -116,7 +114,6 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/uploads/products", express.static(path.join(__dirname, "uploads/products")));
 
 /* ============================== Rutas ============================ */
-// Ajusta estos require a tu estructura real si difiere
 const userRoutes = require("./routes/userRoutes");
 const productEntryHistoryRoutes = require("./routes/productEntryHistoryRoutes");
 const productRoutes = require("./routes/productRoutes");
@@ -145,7 +142,6 @@ app.use("/api/visits", visitRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/cart", cartRoutes);
 
-/* ============================== Mongo ============================ */
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/pajatoquilla";
 
 mongoose
@@ -153,7 +149,7 @@ mongoose
     // opciones defensivas
     serverSelectionTimeoutMS: 10000,
     socketTimeoutMS: 20000,
-    dbName: undefined, // si tu URI ya incluye DB, Mongo la toma de allí
+    dbName: undefined,
   })
   .then(() => {
     server.listen(PORT, () => {
@@ -169,7 +165,6 @@ mongoose
   });
 
 /* =========================== Manejo básico de errores ============ */
-// 404 genérico para rutas no encontradas
 app.use((req, res) => {
   res.status(404).json({ error: "Not Found" });
 });
