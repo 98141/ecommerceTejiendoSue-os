@@ -25,8 +25,8 @@ function effectivePrice(product) {
 
 /** ========================== CREATE (sin transacciones) ========================== */
 exports.createOrder = async (req, res) => {
-  // NOTA: sin sesiones/transacciones; usamos updates atómicos + compensación
-  const compensations = []; // para revertir en caso de error
+  // NOTA: mantenemos compensación por si algún ítem posterior falla
+  const compensations = [];
   try {
     const { items, shippingInfo } = req.body;
 
@@ -36,41 +36,61 @@ exports.createOrder = async (req, res) => {
         .json({ error: "Debes incluir al menos un producto" });
     }
 
-    // Normaliza/valida payload
+    // Normaliza/valida payload + castea a ObjectId
     const normalizedItems = [];
     for (const item of items) {
-      const productId = item.product;
-      const sizeId = item.size;
-      const colorId = item.color;
-      const qty = Number(item.quantity) || 0;
+      const productId = String(item.product || "").trim();
+      const sizeId = String(item.size || "").trim();
+      const colorId = String(item.color || "").trim();
+      const qty = Math.max(1, Math.floor(Number(item.quantity || 0)));
 
       if (!productId || !sizeId || !colorId || qty <= 0) {
         return res
           .status(400)
           .json({ error: "Datos inválidos en uno de los ítems" });
       }
+      if (
+        !mongoose.Types.ObjectId.isValid(productId) ||
+        !mongoose.Types.ObjectId.isValid(sizeId) ||
+        !mongoose.Types.ObjectId.isValid(colorId)
+      ) {
+        return res
+          .status(400)
+          .json({ error: "IDs inválidos en uno de los ítems" });
+      }
+
       normalizedItems.push({
-        product: productId,
-        size: sizeId,
-        color: colorId,
+        product: new mongoose.Types.ObjectId(productId),
+        size: new mongoose.Types.ObjectId(sizeId),
+        color: new mongoose.Types.ObjectId(colorId),
         quantity: qty,
       });
     }
 
-    // Prepara snapshots y descuentos atómicos por variante
+    // (opcional pero recomendado) Deduplicar líneas iguales sumando cantidades
+    const dedup = new Map();
+    for (const it of normalizedItems) {
+      const key = itemKey(it);
+      const prev = dedup.get(key);
+      if (prev) prev.quantity += it.quantity;
+      else dedup.set(key, { ...it });
+    }
+    const itemsToProcess = Array.from(dedup.values());
+
+    // Proceso ítem por ítem con decremento + verificación + posible rollback
     let total = 0;
     const itemsToSave = [];
 
-    for (const it of normalizedItems) {
-      // Trae SOLO la variante coincidente para conocer stock actual y nombre/precio
+    for (const it of itemsToProcess) {
+      // 1) Traer sólo la variante exacta (para snapshot + precio)
       const prodDoc = await Product.findOne(
         {
           _id: it.product,
           "variants.size": it.size,
           "variants.color": it.color,
         },
-        { name: 1, price: 1, "variants.$": 1 } // proyecta solo variante
-      );
+        { name: 1, price: 1, discount: 1, "variants.$": 1 }
+      ).lean();
 
       if (!prodDoc || !prodDoc.variants || !prodDoc.variants[0]) {
         throw new Error("Variante no disponible para el producto seleccionado");
@@ -78,33 +98,53 @@ exports.createOrder = async (req, res) => {
 
       const variant = prodDoc.variants[0];
       const stockBefore = Number(variant.stock) || 0;
+
       if (stockBefore < it.quantity) {
         throw new Error(
           `Stock insuficiente para ${prodDoc.name}. Disponible: ${stockBefore}`
         );
       }
 
-      // Descuento atómico de stock (protege contra carreras)
+      // 2) Decremento SIN $gte (evita mismatch de tipos en DB)
       const dec = await Product.updateOne(
         {
           _id: it.product,
-          variants: {
-            $elemMatch: {
-              size: it.size,
-              color: it.color,
-              stock: { $gte: it.quantity }, // asegura stock suficiente en el mismo paso
-            },
-          },
+          "variants.size": it.size,
+          "variants.color": it.color,
         },
         { $inc: { "variants.$.stock": -it.quantity } }
       );
 
       if (!dec.modifiedCount) {
-        // Otra operación consumió el stock en medio → abortar
+        // No matcheó el elemento (IDs/campos no coinciden)
         throw new Error(`Stock insuficiente (carrera) para ${prodDoc.name}.`);
       }
 
-      // Registra compensación por si hay que revertir más adelante
+      // 3) Verifica que no quedó negativo (si en DB había string y otra carrera, aquí lo detectamos)
+      const checkDoc = await Product.findOne(
+        {
+          _id: it.product,
+          "variants.size": it.size,
+          "variants.color": it.color,
+        },
+        { name: 1, "variants.$": 1 }
+      ).lean();
+
+      const stockAfter = Number(checkDoc?.variants?.[0]?.stock) || 0;
+      if (stockAfter < 0) {
+        // Revertir inmediato este ítem y abortar
+        await Product.updateOne(
+          {
+            _id: it.product,
+            "variants.size": it.size,
+            "variants.color": it.color,
+          },
+          { $inc: { "variants.$.stock": it.quantity } }
+        );
+        throw new Error(`Stock insuficiente (carrera) para ${prodDoc.name}.`);
+      }
+
+      // 4) Registrar compensación por si falla otro ítem más adelante
       compensations.push({
         product: it.product,
         size: it.size,
@@ -112,10 +152,10 @@ exports.createOrder = async (req, res) => {
         qty: it.quantity,
       });
 
+      // 5) Precio unitario (aplica descuento si tu modelo lo calcula)
       const unitPrice = effectivePrice(prodDoc);
-      const stockAfter = stockBefore - it.quantity;
-
       total += unitPrice * it.quantity;
+
       itemsToSave.push({
         product: it.product,
         size: it.size,
@@ -127,13 +167,12 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Crea la orden (sin sesión)
+    // 6) Crear la orden
     const order = await Order.create({
       user: req.user.id,
       items: itemsToSave,
       total: Number(total.toFixed(2)),
       status: "pendiente",
-      // Campos de envío opcionales:
       shippingInfo: shippingInfo && {
         fullName: String(shippingInfo.fullName || ""),
         phone: String(shippingInfo.phone || ""),
@@ -144,25 +183,20 @@ exports.createOrder = async (req, res) => {
     });
 
     clearDashboardCache();
-
-    // Puedes construir el texto para WhatsApp del lado del cliente con "order" devuelto
     return res.status(201).json({ orderId: order._id, order });
   } catch (err) {
-    // COMPENSACIÓN: si falló algo, regreso el stock ya disminuido
+    // COMPENSACIÓN: restituye todo lo decrementado si falló algo
     for (const c of compensations) {
       try {
         await Product.updateOne(
           {
             _id: c.product,
-            variants: {
-              $elemMatch: { size: c.size, color: c.color },
-            },
+            "variants.size": c.size,
+            "variants.color": c.color,
           },
           { $inc: { "variants.$.stock": c.qty } }
         );
-      } catch (_) {
-        // si esto fallara, lo registras; en práctica es muy raro si _id/variante existen
-      }
+      } catch (_) {}
     }
 
     console.error("Error en createOrder:", err);
