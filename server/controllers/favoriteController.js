@@ -2,61 +2,86 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const Product = require("../models/Product");
 
+const toObjectId = (v) => {
+  const s = String(v || "");
+  return mongoose.Types.ObjectId.isValid(s) ? new mongoose.Types.ObjectId(s) : null;
+};
+
+const toDateOrNull = (v) => {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 exports.listFavorites = async (req, res) => {
   try {
     const populate = String(req.query.populate || "0") === "1";
-    const user = await User.findById(req.user.id).select("favorites").lean();
-    if (!user)
-      return res.status(404).json({ message: "Usuario no encontrado" });
 
-    const favIds = (Array.isArray(user.favorites) ? user.favorites : [])
-      .map(String)
-      .filter((id) => mongoose.Types.ObjectId.isValid(id))
-      .map((id) => new mongoose.Types.ObjectId(id));
+    const u = await User.findById(req.user.id).select("favorites").lean();
+    if (!u) return res.status(404).json({ message: "Usuario no encontrado" });
+
+    const rawFavs = Array.isArray(u.favorites) ? u.favorites : [];
+    const favIds = rawFavs.map(toObjectId).filter(Boolean);
+
+    // DEBUG: qué le llega al servidor
+    console.log("[favorites] user:", req.user.id, "rawFavs:", rawFavs, "favIds(valid):", favIds.length);
 
     if (!favIds.length) {
-      return populate
-        ? res.json({ products: [] })
-        : res.json({ productIds: [] });
+      return populate ? res.json({ products: [] }) : res.json({ productIds: [] });
     }
 
     if (!populate) return res.json({ productIds: favIds.map(String) });
 
+    // Busca productos; si falla por cualquier razón, no rompes la ruta
+    let products = [];
+    try {
+      products = await Product.find({ _id: { $in: favIds } })
+        .select("_id name price images discount")
+        .lean();
+    } catch (e) {
+      console.error("Error consultando productos favoritos:", e);
+      // Devolver vacío evita el 500 y la UI sigue viva
+      return res.json({ products: [] });
+    }
+
     const now = new Date();
-    const products = await Product.find({ _id: { $in: favIds } })
-      .select("_id name price images discount")
-      .lean();
+    const shaped = [];
 
-    const shaped = products.map((p) => {
-      const price = Number(p.price || 0);
-      const d = p.discount || {};
-      let effectivePrice = price;
-      const inWindow =
-        d.enabled &&
-        (!d.startAt || now >= d.startAt) &&
-        (!d.endAt || now <= d.endAt);
+    for (const p of products) {
+      try {
+        const price = Number(p?.price || 0);
+        const d = p?.discount || {};
+        const start = toDateOrNull(d.startAt);
+        const end = toDateOrNull(d.endAt);
 
-      if (inWindow) {
-        effectivePrice =
-          d.type === "PERCENT"
-            ? price - (price * Number(d.value || 0)) / 100
-            : price - Number(d.value || 0);
-        effectivePrice = Math.max(0, Number(effectivePrice.toFixed(2)));
+        const inWindow = !!d.enabled && (!start || now >= start) && (!end || now <= end);
+
+        let effectivePrice = price;
+        if (inWindow) {
+          effectivePrice =
+            d.type === "PERCENT"
+              ? price - (price * Number(d.value || 0)) / 100
+              : price - Number(d.value || 0);
+          effectivePrice = Math.max(0, Number(effectivePrice.toFixed(2)));
+        }
+
+        shaped.push({
+          _id: p._id,
+          name: p.name,
+          price,
+          effectivePrice,
+          images: Array.isArray(p.images) ? p.images : (p.images ? [p.images] : []),
+        });
+      } catch (e) {
+        // Si un producto viene raro, lo ignoramos
+        console.warn("Producto favorito omitido por error de shape:", p?._id, e?.message);
       }
+    }
 
-      return {
-        _id: p._id,
-        name: p.name,
-        price: p.price,
-        effectivePrice,
-        images: Array.isArray(p.images) ? p.images : [],
-      };
-    });
-
-    res.json({ products: shaped });
+    return res.json({ products: shaped });
   } catch (err) {
-    console.error("Error en listFavorites:", err);
-    res.status(500).json({ message: "Error al obtener favoritos" });
+    console.error("Error en listFavorites (capa exterior):", err);
+    return res.status(500).json({ message: "Error al obtener favoritos" });
   }
 };
 

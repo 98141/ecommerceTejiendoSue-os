@@ -9,16 +9,17 @@ export default function FavoriteButton({ productId, className = "" }) {
   const { showToast } = useToast();
 
   const active = isFavorite(productId);
-  const blocked = !user || user.role !== "user";
+  // Invitado permitido (local). Solo bloquea si hay user y NO es 'user' (ej: admin)
+  const blocked = !!user && user.role !== "user";
 
   const onClick = async (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (blocked) {
-      showToast(user ? "Solo usuarios pueden usar favoritos" : "Inicia sesión para usar favoritos", user ? "warning" : "info");
+      showToast("Solo usuarios pueden usar favoritos", "warning");
       return;
     }
-    await toggleFavorite(productId);
+    await toggleFavorite(productId); // invitado -> localStorage, user -> backend
   };
 
   return (
