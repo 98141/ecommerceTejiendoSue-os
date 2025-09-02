@@ -1,6 +1,6 @@
 
    import { useEffect, useState, useContext  } from "react";
-import { AuthContext } from "../contexts/AuthContext";
+import { AuthContext } from "../../contexts/AuthContext";
 import api from "../../api/apiClient";
 import { useToast } from "../../contexts/ToastContext";
 import ProductListBlocks from "../../blocks/users/ProductListBlocks"; 

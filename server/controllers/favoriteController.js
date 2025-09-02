@@ -2,96 +2,116 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const Product = require("../models/Product");
 
-const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
-
 exports.listFavorites = async (req, res) => {
-  const populate = String(req.query.populate || "0") === "1";
-  const user = await User.findById(req.user.id).select("favorites").lean();
-  if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
+  try {
+    const populate = String(req.query.populate || "0") === "1";
+    const user = await User.findById(req.user.id).select("favorites").lean();
+    if (!user)
+      return res.status(404).json({ message: "Usuario no encontrado" });
 
-  if (!populate) return res.json({ productIds: user.favorites });
+    const favIds = (Array.isArray(user.favorites) ? user.favorites : [])
+      .map(String)
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
 
-  const products = await Product.find({ _id: { $in: user.favorites } })
-    .select("_id name price images discount") // devolvemos campos mínimos
-    .lean();
+    if (!favIds.length) {
+      return populate
+        ? res.json({ products: [] })
+        : res.json({ productIds: [] });
+    }
 
-  // calcular precio efectivo de forma consistente (igual que tus helpers)
-  const now = new Date();
-  const shape = (p) => {
-    const price = Number(p?.price) || 0;
-    const d = p?.discount || {};
-    let effectivePrice = price;
-    if (d.enabled) {
-      const start = d.startAt ? new Date(d.startAt) : null;
-      const end = d.endAt ? new Date(d.endAt) : null;
-      if (!(start && now < start) && !(end && now > end)) {
+    if (!populate) return res.json({ productIds: favIds.map(String) });
+
+    const now = new Date();
+    const products = await Product.find({ _id: { $in: favIds } })
+      .select("_id name price images discount")
+      .lean();
+
+    const shaped = products.map((p) => {
+      const price = Number(p.price || 0);
+      const d = p.discount || {};
+      let effectivePrice = price;
+      const inWindow =
+        d.enabled &&
+        (!d.startAt || now >= d.startAt) &&
+        (!d.endAt || now <= d.endAt);
+
+      if (inWindow) {
         effectivePrice =
           d.type === "PERCENT"
-            ? price - (price * (Number(d.value) || 0)) / 100
-            : price - (Number(d.value) || 0);
-        effectivePrice = Number(Math.max(0, effectivePrice).toFixed(2));
+            ? price - (price * Number(d.value || 0)) / 100
+            : price - Number(d.value || 0);
+        effectivePrice = Math.max(0, Number(effectivePrice.toFixed(2)));
       }
-    }
-    return {
-      _id: p._id,
-      name: p.name,
-      price: p.price,
-      effectivePrice,
-      images: Array.isArray(p.images) ? p.images : [],
-    };
-  };
 
-  const shaped = products.map(shape);
-  return res.json({ products: shaped });
+      return {
+        _id: p._id,
+        name: p.name,
+        price: p.price,
+        effectivePrice,
+        images: Array.isArray(p.images) ? p.images : [],
+      };
+    });
+
+    res.json({ products: shaped });
+  } catch (err) {
+    console.error("Error en listFavorites:", err);
+    res.status(500).json({ message: "Error al obtener favoritos" });
+  }
 };
 
+// ➕ Agregar a favoritos
 exports.addFavorite = async (req, res) => {
-  const { productId } = req.params;
-  if (!isValidId(productId))
-    return res.status(400).json({ message: "productId inválido" });
+  try {
+    const { productId } = req.params;
 
-  const exists = await Product.exists({ _id: productId });
-  if (!exists) return res.status(404).json({ message: "Producto no existe" });
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: "ID de producto inválido" });
+    }
 
-  await User.updateOne(
-    { _id: req.user.id },
-    { $addToSet: { favorites: productId } }
-  );
+    const user = await User.findById(req.user.id);
+    if (!user)
+      return res.status(404).json({ message: "Usuario no encontrado" });
 
-  return res.status(201).json({ message: "Agregado a favoritos", productId });
+    if (!user.favorites.includes(productId)) {
+      user.favorites.push(productId);
+      await user.save();
+    }
+
+    res.json({
+      message: "Producto agregado a favoritos",
+      favorites: user.favorites,
+    });
+  } catch (err) {
+    console.error("Error en addFavorite:", err);
+    res.status(500).json({ message: "Error al agregar a favoritos" });
+  }
 };
 
+// ❌ Eliminar de favoritos
 exports.removeFavorite = async (req, res) => {
-  const { productId } = req.params;
-  if (!isValidId(productId))
-    return res.status(400).json({ message: "productId inválido" });
+  try {
+    const { productId } = req.params;
 
-  await User.updateOne(
-    { _id: req.user.id },
-    { $pull: { favorites: productId } }
-  );
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: "ID de producto inválido" });
+    }
 
-  return res.status(204).send();
-};
+    const user = await User.findById(req.user.id);
+    if (!user)
+      return res.status(404).json({ message: "Usuario no encontrado" });
 
-// Fusión de favoritos (opcional): cuando el usuario tenía favoritos en localStorage
-exports.bulkMergeFavorites = async (req, res) => {
-  const { productIds } = req.body;
-  if (!Array.isArray(productIds)) {
-    return res.status(400).json({ message: "productIds debe ser un array" });
-  }
-  const valids = productIds.filter(isValidId);
-  if (!valids.length) return res.json({ merged: [] });
-
-  const existingIds = (
-    await Product.find({ _id: { $in: valids } }).select("_id").lean()
-  ).map((p) => p._id);
-
-  if (existingIds.length) {
-    await User.updateOne(
-      { _id: req.user.id },
-      { $addToSet: { favorites: { $each: existingIds } } }
+    user.favorites = user.favorites.filter(
+      (favId) => favId.toString() !== productId
     );
+    await user.save();
+
+    res.json({
+      message: "Producto eliminado de favoritos",
+      favorites: user.favorites,
+    });
+  } catch (err) {
+    console.error("Error en removeFavorite:", err);
+    res.status(500).json({ message: "Error al eliminar de favoritos" });
   }
-  return res.json({ merged: existingIds });
 };

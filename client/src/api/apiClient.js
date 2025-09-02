@@ -1,32 +1,41 @@
 import axios from "axios";
 import qs from "qs";
 import { getToken, setToken, logout } from "../utils/authHelpers";
+import { getAccessToken, setAccessToken, clearAccessToken } from "./tokenStore";
 
 /* ===================== Base ===================== */
 const API_BASE_URL = (
   import.meta.env.VITE_API_URL || "http://localhost:5000"
 ).replace(/\/+$/, "");
-
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
   withCredentials: true,
   timeout: 15000,
-  paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
+  paramsSerializer: (p) => qs.stringify(p, { arrayFormat: "repeat" }),
 });
 
 /* ===================== Eventos / Control ===================== */
-const activeControllers = new Map(); // reqId -> { controller, startedAt, url, method, slowTimer }
+const activeControllers = new Map();
 const genId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
+// 🔹 NUEVO: serializar solo campos simples
+function toSerializable(detail) {
+  if (!detail || typeof detail !== "object") return detail;
+  const { controller, signal, request, response, ...rest } = detail;
+  const out = { ...rest };
+  if (out.error instanceof Error) out.error = out.error.message;
+  return out;
+}
+
 const emit = (type, detail) => {
   try {
-    window.dispatchEvent(new CustomEvent(`http:${type}`, { detail }));
-  } catch {
-    // no-op (SSR o tests)
-  }
+    window.dispatchEvent(
+      new CustomEvent(`http:${type}`, { detail: toSerializable(detail) })
+    );
+  } catch {}
 };
 
 function onRequestStart(meta, slowMs = 15000) {
@@ -47,7 +56,7 @@ function onRequestStop(meta, ok, status) {
   emit("stop", { ...meta, endedAt: Date.now(), ok: !!ok, status: status ?? 0 });
 }
 
-export function cancelAllActiveRequests() {
+function cancelAllActiveRequests() {
   for (const [, meta] of activeControllers) {
     try {
       meta.controller.abort();
@@ -58,49 +67,55 @@ export function cancelAllActiveRequests() {
 }
 
 /* ===================== Rutas públicas ===================== */
-const isPublicPath = (urlPath = "") => {
-  const u = (urlPath || "").toLowerCase();
+const isPublicPath = (u = "") => {
+  const x = (u || "").toLowerCase();
   return (
-    u.includes("/users/login") ||
-    u.includes("/users/register") ||
-    u.includes("/users/refresh-token") ||
-    u.includes("/users/forgot-password") ||
-    u.includes("/users/reset-password") ||
-    u.includes("/users/verify/") ||
-    u.includes("/users/resend-verification")
+    x.includes("/users/login") ||
+    x.includes("/users/register") ||
+    x.includes("/users/refresh-token") ||
+    x.includes("/users/forgot-password") ||
+    x.includes("/users/reset-password") ||
+    x.includes("/users/verify/") ||
+    x.includes("/users/resend-verification")
   );
 };
 
 /* ===================== REQUEST ===================== */
-api.interceptors.request.use(
-  (config) => {
-    // Bearer sólo si no es ruta pública
-    if (!isPublicPath(config.url || "")) {
-      const token = getToken();
-      if (token) config.headers.Authorization = `Bearer ${token}`;
-    }
+api.interceptors.request.use((config) => {
+  const isInternal = config.__internal === true; // 🔹 NUEVO
 
-    // AbortController por request
-    const controller = new AbortController();
-    config.signal = controller.signal;
+  // Bearer memoria -> localStorage (compat)
+  if (!isPublicPath(config.url || "")) {
+    const mem = getAccessToken();
+    const ls = getToken?.() || null;
+    const t = mem || ls;
+    if (t) config.headers.Authorization = `Bearer ${t}`;
+  }
 
-    // Metadatos para loader/slow
-    const id = genId();
-    const method = (config.method || "get").toUpperCase();
-    const url = `${config.baseURL || ""}${config.url || ""}`;
-    const startedAt = Date.now();
-    const meta = { id, method, url, startedAt, controller };
+  // 🔹 si es interna, NO trackeamos ni emitimos eventos
+  if (isInternal) return config;
 
-    // Marcar la request
-    config.headers["X-Req-Id"] = id;
+  // AbortController por request + tracking
+  const controller = new AbortController();
+  config.signal = controller.signal;
+  const id = genId();
+  const method = (config.method || "get").toUpperCase();
+  const url = `${config.baseURL || ""}${config.url || ""}`;
+  const startedAt = Date.now();
+  const meta = { id, method, url, startedAt, controller, internal: false }; // <- solo datos simples
+  config.headers["X-Req-Id"] = id;
+  onRequestStart(meta, 15000);
 
-    // Iniciar tracking + watchdog
-    onRequestStart(meta, 15000);
+  // DEBUG
+  if (import.meta.env.DEV && String(config.url || "").includes("/favorites")) {
+    console.log("DBG favorites req:", {
+      url: `${config.baseURL || ""}${config.url || ""}`,
+      auth: config.headers?.Authorization ? "Bearer present" : "NO AUTH",
+    });
+  }
 
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+  return config;
+});
 
 /* ===================== RESPONSE (refresh con cola) ===================== */
 let isRefreshing = false;
@@ -114,32 +129,33 @@ const processQueue = (error, token = null) => {
 
 api.interceptors.response.use(
   (res) => {
-    const id = res.config?.headers?.["X-Req-Id"];
-    const meta = id ? activeControllers.get(id) : null;
-    onRequestStop(meta, true, res.status);
+    const isInternal = res.config?.__internal === true; // 🔹 NUEVO
+    if (!isInternal) {
+      const id = res.config?.headers?.["X-Req-Id"];
+      const meta = id ? activeControllers.get(id) : null;
+      onRequestStop(meta, true, res.status);
+    }
     return res;
   },
   async (error) => {
     const original = error.config || {};
+    const isInternal = original.__internal === true; // 🔹 NUEVO
     const id = original.headers?.["X-Req-Id"];
     const meta = id ? activeControllers.get(id) : null;
 
     const status = error.response?.status;
     const msg = (error.response?.data?.error || "").toLowerCase();
+    const isAuthError =
+      (status === 401 || status === 403) && /token|jwt|autoriz/.test(msg);
 
-    const isAuthError = status === 401 || status === 403;
-    const looksLikeJwtIssue = /token|jwt|autoriz/.test(msg);
-
-    // Si no es caso de refresh, cerramos tracking y devolvemos error
-    if (!isAuthError || original._retry || !looksLikeJwtIssue) {
-      onRequestStop(meta, false, status);
+    if (!isAuthError || original._retry) {
+      if (!isInternal) onRequestStop(meta, false, status);
       return Promise.reject(error);
     }
 
     original._retry = true;
 
     if (isRefreshing) {
-      // En cola hasta que termine el refresh
       return new Promise((resolve, reject) => {
         refreshQueue.push({
           resolve: (newToken) => {
@@ -153,49 +169,38 @@ api.interceptors.response.use(
 
     isRefreshing = true;
     try {
-      // NOTA: ruta pública → no requiere Bearer
+      // 🔹 refresh interno y silencioso
       const { data } = await api.get("/users/refresh-token", {
         withCredentials: true,
+        __internal: true,
       });
       const newToken = data?.token;
       if (!newToken) throw new Error("No se recibió nuevo token");
 
-      setToken(newToken);
-      processQueue(null, newToken);
+      setAccessToken(newToken);
+      setToken?.(newToken);
 
+      processQueue(null, newToken);
       original.headers.Authorization = `Bearer ${newToken}`;
-      onRequestStop(meta, false, status); // cerramos tracking de la original fallida
+      if (!isInternal) onRequestStop(meta, false, status);
       return api(original);
     } catch (refreshErr) {
       processQueue(refreshErr, null);
-      logout();
+      clearAccessToken();
+      logout?.();
       if (
         typeof window !== "undefined" &&
         window.location.pathname !== "/login"
       ) {
         window.location.href = "/login";
       }
-      onRequestStop(meta, false, status);
+      if (!isInternal) onRequestStop(meta, false, status);
       return Promise.reject(refreshErr);
     } finally {
       isRefreshing = false;
     }
   }
 );
-
-//prueba
-api.interceptors.request.use((config) => {
-  // ... tu código existente ...
-  if (import.meta.env.DEV) {
-    if ((config.url || "").includes("/")) {
-      console.log("DBG favorites req:", {
-        url: `${config.baseURL || ""}${config.url || ""}`,
-        auth: config.headers?.Authorization ? "Bearer present" : "NO AUTH",
-      });
-    }
-  }
-  return config;
-});
 
 /* ===================== Utils export ===================== */
 export const getBaseUrl = () =>
@@ -204,5 +209,5 @@ export const getBaseUrl = () =>
     ""
   );
 
-export { api, API_BASE_URL };
+export { api, API_BASE_URL, cancelAllActiveRequests };
 export default api;

@@ -3,15 +3,14 @@ import { useLocation, useNavigate } from "react-router-dom";
 import LoaderOverlay from "../blocks/LoaderOverlay";
 import { cancelAllActiveRequests } from "../api/apiClient";
 
-
 export default function GlobalHttpHandler({
   showOnRouteChange = true,
-  routeMinMs = 300,         
-  routeMaxMs = 1200,       
+  routeMinMs = 300,
+  routeMaxMs = 1200,
 }) {
   const [pending, setPending] = useState(0);
-  const [visible, setVisible] = useState(false); 
-  const [routeSpin, setRouteSpin] = useState(false); 
+  const [visible, setVisible] = useState(false);
+  const [routeSpin, setRouteSpin] = useState(false);
 
   const showDelayRef = useRef(null);
   const location = useLocation();
@@ -35,14 +34,35 @@ export default function GlobalHttpHandler({
 
   // Eventos provenientes de apiCliente (http:start/stop/slow/flush)
   useEffect(() => {
-    const onStart = () => { setPending((p) => p + 1); ensureShow(); };
-    const onStop  = () => { setPending((p) => Math.max(0, p - 1)); };
-    const onSlow  = (e) => {
+    const onStart = () => {
+      setPending((p) => p + 1);
+      ensureShow();
+    };
+    const onStop = () => {
+      setPending((p) => Math.max(0, p - 1));
+    };
+    const onSlow = (e) => {
+      const d = e?.detail || {};
+      // 🔹 Ignora internos o sin datos mínimos
+      if (d.internal || !d.url || !d.method) return;
+
       if (location.pathname !== "/status/slow") {
-        navigate("/status/slow", { state: e.detail, replace: false });
+        // 🔹 Pasa solo un subconjunto “clonable”
+        const state = {
+          id: d.id,
+          url: d.url,
+          method: d.method,
+          startedAt: d.startedAt,
+          elapsed: d.elapsed,
+          status: d.status,
+        };
+        navigate("/status/slow", { state, replace: false });
       }
     };
-    const onFlush = () => { setPending(0); ensureHide(); };
+    const onFlush = () => {
+      setPending(0);
+      ensureHide();
+    };
 
     window.addEventListener("http:start", onStart);
     window.addEventListener("http:stop", onStop);
@@ -57,7 +77,9 @@ export default function GlobalHttpHandler({
   }, [location.pathname, navigate]);
 
   // Si no hay pendientes, ocultar overlay HTTP
-  useEffect(() => { if (pending <= 0) ensureHide(); }, [pending]);
+  useEffect(() => {
+    if (pending <= 0) ensureHide();
+  }, [pending]);
 
   // ---- Overlay inmediato en CAMBIO DE RUTA (antes del paint)
   useLayoutEffect(() => {
@@ -76,7 +98,11 @@ export default function GlobalHttpHandler({
     // Y un máximo por seguridad
     const max = setTimeout(() => setRouteSpin(false), routeMaxMs);
 
-    return () => { clearTimeout(min); clearTimeout(max); setRouteSpin(false); };
+    return () => {
+      clearTimeout(min);
+      clearTimeout(max);
+      setRouteSpin(false);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 

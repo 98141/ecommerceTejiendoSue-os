@@ -2,41 +2,38 @@ const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 
 const verifyToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"] || "";
+  const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-
-  if (!token) return res.status(403).json({ error: "Token requerido" });
-
+  if (!token) return res.status(401).json({ error: "Token requerido" });
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { id: decoded.id, role: decoded.role };
-    return next();
-  } catch (err) {
-    return res.status(403).json({ error: "Token inválido o expirado" }); // ← clave para refrescar
+    const dec = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = { id: dec.id, role: dec.role };
+    next();
+  } catch {
+    return res.status(401).json({ error: "Token inválido o expirado" });
   }
 };
 
-const isAdmin = (req, res, next) => {
-  if (req.user && req.user.role === "admin") return next();
-  return res
-    .status(403)
-    .json({ error: "Acceso denegado: solo administradores" });
-};
+const isAdmin = (req, res, next) =>
+  req.user?.role === "admin"
+    ? next()
+    : res.status(403).json({ error: "Acceso denegado: solo administradores" });
 
-const onlyUsers = (req, res, next) => {
-  if (req.user && req.user.role === "user") return next();
-  return res.status(403).json({ error: "Solo usuarios pueden gestionar favoritos" });
-};
+const onlyUsers = (req, res, next) =>
+  req.user?.role === "user"
+    ? next()
+    : res
+        .status(403)
+        .json({ error: "Solo usuarios pueden gestionar favoritos" });
 
-// Limita a 5 intentos cada 5 minutos
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     error: "Demasiados intentos fallidos. Intenta nuevamente en unos minutos.",
   },
-  standardHeaders: true,
-  legacyHeaders: false,
 });
 
 module.exports = { verifyToken, isAdmin, onlyUsers, loginLimiter };

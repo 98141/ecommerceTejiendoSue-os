@@ -1,7 +1,7 @@
-import { createContext, useState } from "react";
-import { getToken, setToken, removeToken } from "../utils/authHelpers";
-
-import apiUrl from "../api/apiClient";
+import { createContext, useEffect, useState } from "react";
+import api from "../api/apiClient";
+import { getToken, setToken as setTokenLS, removeToken } from "../utils/authHelpers";
+import { setAccessToken, clearAccessToken } from "../api/tokenStore";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext();
@@ -12,29 +12,54 @@ export const AuthProvider = ({ children }) => {
     const storedUser = localStorage.getItem("user");
     return storedUser ? JSON.parse(storedUser) : null;
   });
+  const [authReady, setAuthReady] = useState(false);
 
+  // 🔹 Bootstrap de sesión al montar: si hay cookie de refresh, pide un access token nuevo
+useEffect(() => {
+  (async () => {
+    try {
+      const { data } = await api.get("/users/refresh-token", { withCredentials: true, __internal: true });
+      if (data?.token) {
+        setAccessToken(data.token);
+        setTokenLS?.(data.token);
+        setTokenState(data.token);
+      }
+      if (data?.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+        setUser(data.user);
+      }
+    } catch {
+      // 401: invitado; no pasa nada
+    } finally {
+      setAuthReady(true);
+    }
+  })();
+}, []);
   const login = (newToken, userData) => {
-    setToken(newToken); // guarda en localStorage
-    setTokenState(newToken); // guarda en memoria
+    // guarda en memoria + (opcional) localStorage
+    setAccessToken(newToken);
+    setTokenLS?.(newToken);
+    setTokenState(newToken);
+
     localStorage.setItem("user", JSON.stringify(userData));
     setUser(userData);
   };
 
   const logout = async () => {
     try {
-      await apiUrl.post("/users/logout");
+      await api.post("/users/logout");
     } catch (error) {
-      console.error("Error al cerrar sesión en el backend:", error.message);
+      console.error("Error al cerrar sesión en el backend:", error?.message);
     }
-
-    removeToken(); // borra del localStorage
+    clearAccessToken();
+    removeToken?.();
     localStorage.removeItem("user");
-    setTokenState(""); // borra en memoria
+    setTokenState("");
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    <AuthContext.Provider value={{ token, user, authReady, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

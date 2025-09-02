@@ -5,37 +5,31 @@ const validator = require("validator");
 const { sendVerificationEmail, sendResetEmail } = require("../utils/sendEmail");
 
 // ====== Config por ENV (fallbacks sensatos) ======
-const ACCESS_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1d"; // ← antes 60m
+const ACCESS_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "30m";
 const REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
-
-// ====== Funciones para tokens ======
-const createAccessToken = (user) => {
-  return jwt.sign(
-    { id: user._id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: ACCESS_EXPIRES_IN } // ← 1 día por defecto
-  );
-};
-
-const createRefreshToken = (user) => {
-  return jwt.sign(
-    { id: user._id },
-    process.env.JWT_REFRESH_SECRET,
-    { expiresIn: REFRESH_EXPIRES_IN } // ← 7 días por defecto
-  );
-};
 
 // Util de cookie para refresh (dev/prod)
 function refreshCookieOptions() {
   const isProd = process.env.NODE_ENV === "production";
   return {
     httpOnly: true,
-    secure: isProd, // ← false en dev (HTTP), true en prod (HTTPS)
-    sameSite: "lax", // ← evita bloqueos innecesarios; 'Strict' puede romper flujos
+    secure: isProd,
+    sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: "/",
+    path: "/", // usa "/" si en dev te resulta más simple; debe coincidir en clearCookie
   };
 }
+
+// ====== Funciones para tokens ======
+const createAccessToken = (user) =>
+  jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: ACCESS_EXPIRES_IN,
+  });
+
+const createRefreshToken = (user) =>
+  jwt.sign({ id: user._id, use: "refresh" }, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: REFRESH_EXPIRES_IN,
+  });
 
 // ====== Registro ======
 exports.register = async (req, res) => {
@@ -115,15 +109,15 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!validator.isEmail(email))
       return res.status(400).json({ error: "Correo inválido" });
 
     const user = await User.findOne({ email }).select("+password");
-    if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+    if (!user) return res.status(401).json({ error: "Credenciales inválidas" });
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ error: "Contraseña incorrecta" });
+    if (!match)
+      return res.status(401).json({ error: "Credenciales inválidas" });
 
     if (!user.isVerified)
       return res
@@ -144,6 +138,7 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         role: user.role,
+        email: user.email,
       },
     });
   } catch (err) {
@@ -152,29 +147,72 @@ exports.login = async (req, res) => {
   }
 };
 
+/* ====== Logout ====== */
+exports.logout = async (req, res) => {
+  try {
+    const token = req.cookies.refreshToken;
+
+    if (token) {
+      const user = await User.findOne({ refreshToken: token });
+      if (user) {
+        user.refreshToken = null;
+        await user.save();
+      }
+    }
+
+    const opts = refreshCookieOptions();
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      sameSite: opts.sameSite,
+      secure: opts.secure,
+      path: "/", // 👈 igual que en setCookie
+    });
+
+    return res.status(200).json({ message: "Sesión cerrada correctamente" });
+  } catch (err) {
+    return res.status(500).json({ error: "Error al cerrar sesión" });
+  }
+};
+
 // ====== Refrescar token ======
 exports.refreshToken = async (req, res) => {
   try {
     const token = req.cookies.refreshToken;
-    if (!token) return res.status(401).json({ error: "Token requerido" });
+    if (!token) return res.status(401).json({ error: "Falta refresh cookie" });
 
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user || user.refreshToken !== token) {
-      return res.status(403).json({ error: "Token inválido o caducado" });
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    } catch {
+      return res.status(401).json({ error: "Refresh inválido o expirado" });
     }
 
-    const newAccessToken = createAccessToken(user);
-    // (Opcional) Rotar refresh en cada uso:
-    const newRefresh = createRefreshToken(user);
-    user.refreshToken = newRefresh;
-    await user.save();
-    res.cookie("refreshToken", newRefresh, refreshCookieOptions());
+    const user = await User.findById(decoded.id).select(
+      "_id name email role isVerified refreshToken"
+    );
+    if (!user) return res.status(401).json({ error: "Refresh inválido" });
 
-    res.json({ token: newAccessToken });
+    // Importante: compara contra el almacenado (anti-replay)
+    if (!user.refreshToken || user.refreshToken !== token) {
+      return res.status(401).json({ error: "Refresh inválido" });
+    }
+
+    // ⚠️ NO rotamos aquí para evitar condiciones de carrera
+    // res.cookie("refreshToken", token, refreshCookieOptions());  // opcional: reestablecer mismas flags
+
+    const access = createAccessToken(user);
+    res.json({
+      token: access,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
   } catch (err) {
     console.error("Error refrescando token:", err);
-    return res.status(403).json({ error: "Error al refrescar el token" });
+    return res.status(401).json({ error: "Refresh inválido" });
   }
 };
 
@@ -224,32 +262,6 @@ exports.resendVerification = async (req, res) => {
   } catch (err) {
     console.error("Error reenviando verificación:", err);
     res.status(500).json({ error: "No se pudo reenviar el correo" });
-  }
-};
-
-// ====== Logout ======
-exports.logout = async (req, res) => {
-  try {
-    const token = req.cookies.refreshToken;
-    if (token) {
-      const user = await User.findOne({ refreshToken: token });
-      if (user) {
-        user.refreshToken = null;
-        await user.save();
-      }
-    }
-
-    const opts = refreshCookieOptions();
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      sameSite: opts.sameSite,
-      secure: opts.secure,
-      path: "/",
-    });
-
-    return res.status(200).json({ message: "Sesión cerrada correctamente" });
-  } catch (err) {
-    return res.status(500).json({ error: "Error al cerrar sesión" });
   }
 };
 
