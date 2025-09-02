@@ -9,6 +9,7 @@ import { CartProvider } from "./contexts/CartContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { SupportProvider } from "./contexts/SupportContext";
+import { FavoriteProvider } from "./contexts/FavoriteContext";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -16,7 +17,9 @@ createRoot(document.getElementById("root")).render(
       <AuthProvider>
         <CartProvider>
           <SupportProvider>
-            <App />
+            <FavoriteProvider>
+              <App />
+            </FavoriteProvider>
           </SupportProvider>
         </CartProvider>
       </AuthProvider>

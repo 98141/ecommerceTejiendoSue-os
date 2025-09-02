@@ -340,12 +340,15 @@ const colorRoutes = require("./routes/colorRoutes");
 const visitRoutes = require("./routes/visitRouter");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const cartRoutes = require("./routes/cartRoutes");
+const favoriteRoutes = require("./routes/favoriteRoutes");
 
 // Healthcheck
 app.get("/health", (_req, res) => res.status(200).json({ ok: true, ts: Date.now() }));
 
 // API
 app.use("/api/users", userRoutes);
+
+app.use("/api/favorites", favoriteRoutes);
 app.use("/api/productsHistory", productEntryHistoryRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
@@ -458,5 +461,3 @@ process.on("uncaughtException", (err) => {
   console.error("💥 Uncaught Exception:", err);
   gracefulShutdown("uncaughtException");
 });
-
-

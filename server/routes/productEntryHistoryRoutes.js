@@ -12,6 +12,4 @@ router.get("/history", verifyToken, isAdmin, ctrl.listHistory);
 // Detalle
 router.get("/history/:id", verifyToken, isAdmin, ctrl.getHistoryById);
 
-
-
 module.exports = router;

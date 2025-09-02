@@ -7,6 +7,7 @@ import { getBaseUrl } from "../../api/apiClient";
 import { AuthContext } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import ProductPriceBlock from "../ProductPrice";
+import FavoriteButton from "./FavoriteButton";
 
 /* =============== Helpers =============== */
 const idVal = (x) =>
@@ -81,7 +82,7 @@ const MiniCard = ({ item }) => {
       ? item.effectivePrice
       : computeEffectiveFallback(item);
 
-    const baseUrl = getBaseUrl();
+  const baseUrl = getBaseUrl();
 
   return (
     <Link to={`/product/${item?._id}`} className="mini">
@@ -381,7 +382,10 @@ const ProductDetailBlock = ({
             <Link to="/artesanias">Artesanías</Link>
           </div>
 
-          <h1 className="pd__title">{product.name}</h1>
+          <div className="pd__titleRow">
+            <h1 className="pd__title">{product.name}</h1>
+            <FavoriteButton productId={product?._id} className="pd__favBtn" />
+          </div>
 
           <div className="pd__ratingRow">
             <StarRatingDisplay value={avg} />
@@ -659,10 +663,7 @@ const ProductDetailBlock = ({
                 onClick={() => setLbIndex(i)}
                 type="button"
               >
-                <img
-                  src={`${baseUrl}${img}`}
-                  alt={`mini ${i + 1}`}
-                />
+                <img src={`${baseUrl}${img}`} alt={`mini ${i + 1}`} />
               </button>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import axios from "axios";
-import qs from "qs"; 
+import qs from "qs";
 import { getToken, setToken, logout } from "../utils/authHelpers";
 
 /* ===================== Base ===================== */
@@ -9,7 +9,7 @@ const API_BASE_URL = (
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
-  withCredentials: true, 
+  withCredentials: true,
   timeout: 15000,
   paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
 });
@@ -183,9 +183,26 @@ api.interceptors.response.use(
   }
 );
 
+//prueba
+api.interceptors.request.use((config) => {
+  // ... tu código existente ...
+  if (import.meta.env.DEV) {
+    if ((config.url || "").includes("/")) {
+      console.log("DBG favorites req:", {
+        url: `${config.baseURL || ""}${config.url || ""}`,
+        auth: config.headers?.Authorization ? "Bearer present" : "NO AUTH",
+      });
+    }
+  }
+  return config;
+});
+
 /* ===================== Utils export ===================== */
 export const getBaseUrl = () =>
-  (import.meta.env.VITE_API_URL || "http://localhost:5000").replace("/api", "");
+  (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
+    /\/api\/?$/,
+    ""
+  );
 
 export { api, API_BASE_URL };
 export default api;

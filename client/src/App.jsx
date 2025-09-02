@@ -24,6 +24,7 @@ import PrivateRoute from "./routes/PrivateRoutes";
 import CartPage from "./pages/CartPage";
 import MyOrders from "./pages/Myorders";
 import ProductDetailPage from "./pages/ProductDetailPage";
+import FavoritesPage from "./pages/user/FavoritesPage";
 
 /* Páginas privadas (admin) */
 import AdminDashboard from "./pages/AdminDashboard";
@@ -54,7 +55,11 @@ function AppShell() {
 
       {/* Overlay + watchdog + cancelación de requests */}
       {/* Activa overlay también en cambios de ruta con showOnRouteChange={true} si lo deseas */}
-      <GlobalHttpHandler showOnRouteChange={true} routeMinMs={300} routeMaxMs={1200} />
+      <GlobalHttpHandler
+        showOnRouteChange={true}
+        routeMinMs={300}
+        routeMaxMs={1200}
+      />
 
       <main className="site-main" role="main">
         <Routes>
@@ -72,17 +77,14 @@ function AppShell() {
             element={<ResetPasswordPage />}
           />
           {/** Complementos de navbar de cafe y panela */}
-                      <Route path="/origen/cafe-narino" element={<OrigenNarinoPage />} />
-            <Route path="/origen/tostion" element={<TostionCafePage />} />
-            <Route
-              path="/origen/panela-sandona"
-              element={<PanelaSandonaPage />}
-            />
-                        <Route
-              path="/origen/recetas"
-              element={<PanelaRecipesPage />}
-            />
-            
+          <Route path="/origen/cafe-narino" element={<OrigenNarinoPage />} />
+          <Route path="/origen/tostion" element={<TostionCafePage />} />
+          <Route
+            path="/origen/panela-sandona"
+            element={<PanelaSandonaPage />}
+          />
+          <Route path="/origen/recetas" element={<PanelaRecipesPage />} />
+
           <Route path="/tienda" element={<CatalogoPage />} />
           <Route path="/categoria/:slug" element={<CatalogoPage />} />
           {/* Compatibilidad navbar actual */}
@@ -98,6 +100,7 @@ function AppShell() {
             <Route path="/cart" element={<CartPage />} />
             <Route path="/my-orders" element={<MyOrders />} />
             <Route path="/product/:id" element={<ProductDetailPage />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
           </Route>
 
           {/* Privadas admin */}

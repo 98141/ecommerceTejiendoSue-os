@@ -23,6 +23,11 @@ const isAdmin = (req, res, next) => {
     .json({ error: "Acceso denegado: solo administradores" });
 };
 
+const onlyUsers = (req, res, next) => {
+  if (req.user && req.user.role === "user") return next();
+  return res.status(403).json({ error: "Solo usuarios pueden gestionar favoritos" });
+};
+
 // Limita a 5 intentos cada 5 minutos
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -34,4 +39,4 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-module.exports = { verifyToken, isAdmin, loginLimiter };
+module.exports = { verifyToken, isAdmin, onlyUsers, loginLimiter };

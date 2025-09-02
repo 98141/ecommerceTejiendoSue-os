@@ -6,6 +6,7 @@ import { CartContext } from "../contexts/CartContext";
 import { SupportContext } from "../contexts/SupportContext";
 import { useToast } from "../contexts/ToastContext";
 import ConfirmModal from "../blocks/ConfirmModalBlock";
+import { useFavorites } from "../contexts/FavoriteContext";
 
 /* ==================== Helpers de "ruta activa" ==================== */
 const isMatch = (pathname, matcher) => {
@@ -281,6 +282,8 @@ const Navbar = () => {
   const hidePublic = isAdminRoute || user?.role === "user";
   const isCustomer = user?.role === "user";
 
+  const { favorites } = useFavorites();
+
   const capitalizeInitials = (name) =>
     (name || "")
       .split(" ")
@@ -328,8 +331,7 @@ const Navbar = () => {
   };
 
   const handleSearchToggle = () => setShowSearch((s) => !s);
-  const handleWishlist = () =>
-    showToast("Favoritos estará disponible pronto.", "info");
+  const handleWishlist = () => navigate("/favorites");
   const accountPath = !user
     ? "/login"
     : user.role === "admin"
@@ -469,8 +471,8 @@ const Navbar = () => {
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M20.8 4.6c-1.9-1.7-4.9-1.7-6.8 0l-1 1-1-1c-1.9-1.7-4.9-1.7-6.8 0s-1.9 4.5 0 6.2l7.8 7.2 7.8-7.2c1.9-1.7 1.9-4.5 0-6.2z" />
                   </svg>
-                  {totalItems > 0 && (
-                    <span className="cart-badge">{totalItems}</span>
+                  {favorites?.length > 0 && (
+                    <span className="cart-badge">{favorites.length}</span>
                   )}
                 </Link>
 

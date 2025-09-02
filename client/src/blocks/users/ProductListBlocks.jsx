@@ -2,6 +2,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 
 import ProductPrice from "../ProductPrice";
+import FavoriteButton from "./FavoriteButton";
+
 import { getBaseUrl } from "../../api/apiClient";
 
 /** === Fallback defensivo de precio efectivo (si backend no lo trae) === */
