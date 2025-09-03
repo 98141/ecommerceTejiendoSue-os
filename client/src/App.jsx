@@ -18,6 +18,7 @@ import OrigenNarinoPage from "./pages/user/cafe/OrigenNariñoPage";
 import { PanelaSandonaPage } from "./pages/user/panela/PanelaSandonaPage";
 import PanelaRecipesPage from "./pages/user/panela/RecetasPanelaPage";
 import TostionCafePage from "./pages/user/cafe/TostionCafePage";
+import ProfilePage from "./pages/ProfilePage";
 
 /* Páginas privadas (user) */
 import PrivateRoute from "./routes/PrivateRoutes";
@@ -76,6 +77,7 @@ function AppShell() {
             path="/reset-password/:token"
             element={<ResetPasswordPage />}
           />
+          <Route path="/profile" element={<ProfilePage />} />
           {/** Complementos de navbar de cafe y panela */}
           <Route path="/origen/cafe-narino" element={<OrigenNarinoPage />} />
           <Route path="/origen/tostion" element={<TostionCafePage />} />

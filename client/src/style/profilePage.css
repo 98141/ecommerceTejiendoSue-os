@@ -1,0 +1,39 @@
+.profile-page h1 {
+  margin-bottom: 1rem;
+}
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 800px) {
+  .profile-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.badge--ok {
+  background: #eafaf1;
+  color: #18794e;
+}
+.badge--warn {
+  background: #fff5e5;
+  color: #915b00;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}

@@ -109,20 +109,18 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+
     if (!validator.isEmail(email))
       return res.status(400).json({ error: "Correo inválido" });
 
     const user = await User.findOne({ email }).select("+password");
-    if (!user) return res.status(401).json({ error: "Credenciales inválidas" });
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match)
-      return res.status(401).json({ error: "Credenciales inválidas" });
+    if (!match) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-    if (!user.isVerified)
-      return res
-        .status(403)
-        .json({ error: "Verifica tu cuenta antes de iniciar sesión." });
+    // 🔔 IMPORTANTE: NO bloquear el login por no verificado.
+    // Muestra limitaciones en frontend o protege rutas con requireVerified en backend.
 
     const accessToken = createAccessToken(user);
     const refreshToken = createRefreshToken(user);
@@ -137,8 +135,9 @@ exports.login = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
+        email: user.email, 
         role: user.role,
-        email: user.email,
+        isVerified: user.isVerified,
       },
     });
   } catch (err) {
@@ -303,4 +302,13 @@ exports.resetPassword = async (req, res) => {
   } catch (err) {
     return res.status(400).json({ error: "Token inválido o expirado" });
   }
+};
+
+/*Informacion de perfil */
+exports.getMe = async (req, res) => {
+  const me = await User.findById(req.user.id)
+    .select("name email role isVerified createdAt")
+    .lean();
+  if (!me) return res.status(404).json({ error: "Usuario no encontrado" });
+  res.json({ user: me });
 };

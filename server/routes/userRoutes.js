@@ -28,4 +28,6 @@ router.get("/admin-dashboard", verifyToken, isAdmin, (req, res) => {
   res.json({ message: "Bienvenido al panel de administrador" });
 });
 
+router.get("/me", verifyToken, userController.getMe);
+
 module.exports = router;

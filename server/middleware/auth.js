@@ -36,4 +36,9 @@ const loginLimiter = rateLimit({
   },
 });
 
-module.exports = { verifyToken, isAdmin, onlyUsers, loginLimiter };
+const requireVerified = (req, res, next) => {
+  if (req.user?.isVerified === true) return next();
+  return res.status(403).json({ error: "Verifica tu cuenta para realizar esta acción" });
+};
+
+module.exports = { verifyToken, isAdmin, onlyUsers, loginLimiter, requireVerified };

@@ -333,9 +333,9 @@ const Navbar = () => {
   const handleSearchToggle = () => setShowSearch((s) => !s);
   const handleWishlist = () => navigate("/favorites");
   const accountPath = !user
-    ? "/login"
+    ? "/profile"
     : user.role === "admin"
-    ? "/admin/dashboard"
+    ? "/profile"
     : "/";
 
   return (
@@ -498,7 +498,7 @@ const Navbar = () => {
             {user && (
               <>
                 <Link
-                  to={accountPath}
+                  to="/profile"
                   className={`icon-btn support-link ${
                     isSupportActive ? "active" : ""
                   }`}
