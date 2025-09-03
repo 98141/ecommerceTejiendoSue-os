@@ -51,6 +51,14 @@ const productSchema = new mongoose.Schema(
     // NUEVOS
     salesCount: { type: Number, default: 0, index: true },
     trendingScore: { type: Number, default: 0, index: true }, // opcional
+
+    // Datos de reviews
+    ratingAvg: { type: Number, default: 0 },
+    reviewsCount: { type: Number, default: 0 },
+    ratingDist: {
+      type: Object,
+      default: () => ({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }),
+    },
   },
   { timestamps: true }
 );
@@ -81,4 +89,3 @@ productSchema.index({ "variants.color": 1 });
 const Product =
   mongoose.models.Product || mongoose.model("Product", productSchema);
 module.exports = Product;
-

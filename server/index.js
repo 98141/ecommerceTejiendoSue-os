@@ -342,6 +342,7 @@ const visitRoutes = require("./routes/visitRouter");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 const favoriteRoutes = require("./routes/favoriteRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 
 // Healthcheck
 app.get("/health", (_req, res) => res.status(200).json({ ok: true, ts: Date.now() }));
@@ -361,6 +362,7 @@ app.use("/api/colors", colorRoutes);
 app.use("/api/visits", visitRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // ========== Errores de celebrate (si usas celebrate en rutas) ====
 app.use(celebrateErrors());

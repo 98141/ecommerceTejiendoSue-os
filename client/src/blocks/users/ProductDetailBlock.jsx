@@ -1,8 +1,7 @@
 import { useState, useContext, useEffect, useMemo, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 
-import apiUrl from "../../api/apiClient";
-import { getBaseUrl } from "../../api/apiClient";
+import apiUrl, { getBaseUrl } from "../../api/apiClient";
 
 import { AuthContext } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
@@ -57,6 +56,8 @@ const StarRatingInput = ({ value, onChange }) => (
         key={v}
         className="rating-input__opt"
         aria-label={`${v} estrellas`}
+        title={`${v} estrellas`}
+        style={{ cursor: "pointer" }}
       >
         <input
           type="radio"
@@ -64,6 +65,7 @@ const StarRatingInput = ({ value, onChange }) => (
           value={v}
           checked={Number(value) === v}
           onChange={() => onChange(v)}
+          style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
         />
         <div className="stars">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -140,7 +142,6 @@ const ProductDetailBlock = ({
     setLbIndex((i) => (i - 1 + images.length) % images.length);
   const goNext = () => setLbIndex((i) => (i + 1) % images.length);
 
-  // teclado + bloquear scroll del body cuando está abierto
   useEffect(() => {
     if (!lbOpen) return;
     const onKey = (e) => {
@@ -157,7 +158,6 @@ const ProductDetailBlock = ({
     };
   }, [lbOpen, images.length]);
 
-  // pre-carga de siguiente y anterior
   useEffect(() => {
     if (!lbOpen) return;
     const preload = (src) => {
@@ -166,15 +166,14 @@ const ProductDetailBlock = ({
     };
     preload(images[(lbIndex + 1) % images.length]);
     preload(images[(lbIndex - 1 + images.length) % images.length]);
-  }, [lbOpen, lbIndex, images]);
+  }, [lbOpen, lbIndex, images, baseUrl]);
 
-  // swipe táctil
   const onTouchStart = (e) => (touchStartX.current = e.touches[0].clientX);
   const onTouchEnd = (e) => {
     if (touchStartX.current == null) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     touchStartX.current = null;
-    const TH = 40; // umbral
+    const TH = 40;
     if (dx > TH) goPrev();
     else if (dx < -TH) goNext();
   };
@@ -264,22 +263,21 @@ const ProductDetailBlock = ({
   };
 
   /* ----- Carrito ----- */
-  const { showToast: toast } = useToast();
-  const { user: currentUser } = useContext(AuthContext);
   const handleAdd = () => {
-    if (!currentUser || currentUser.role === "admin") {
-      toast("Debes iniciar sesión como usuario para comprar", "warning");
+    if (!user || user.role === "admin") {
+      showToast("Debes iniciar sesión como usuario para comprar", "warning");
       return navigate("/login");
     }
     if (!selectedSize || !selectedColor) {
-      toast("Debes seleccionar talla y color", "warning");
+      showToast("Debes seleccionar talla y color", "warning");
       return;
     }
     const variant = product.variants.find(
       (v) => idVal(v.size) === selectedSize && idVal(v.color) === selectedColor
     );
-    if (!variant) return toast("Variante no disponible", "error");
-    if (variant.stock < quantity) return toast("Stock insuficiente", "error");
+    if (!variant) return showToast("Variante no disponible", "error");
+    if (variant.stock < quantity)
+      return showToast("Stock insuficiente", "error");
 
     const sizeObj = sizes.find((s) => String(s._id) === selectedSize) || {
       _id: selectedSize,
@@ -289,7 +287,7 @@ const ProductDetailBlock = ({
     };
     const cartItem = { ...product, size: sizeObj, color: colorObj };
     onAddToCart(cartItem, quantity);
-    toast("Producto agregado al carrito", "success");
+    showToast("Producto agregado al carrito", "success");
   };
 
   /* ----- Precio ----- */
@@ -298,38 +296,126 @@ const ProductDetailBlock = ({
       ? product.effectivePrice
       : computeEffectiveFallback(product);
 
-  /* ----- Opiniones (solo frontend) ----- */
-  const [reviews, setReviews] = useState(() => product.reviews || []);
-  const avg = useMemo(() => {
-    if (!reviews.length) return 0;
-    return (
-      reviews.reduce((s, r) => s + Number(r.rating || 0), 0) / reviews.length
-    );
-  }, [reviews]);
-  const dist = useMemo(() => {
-    const d = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    reviews.forEach((r) => (d[r.rating] = (d[r.rating] || 0) + 1));
-    return d;
-  }, [reviews]);
+  /* ======= Reseñas (backend) ======= */
+  const [reviews, setReviews] = useState([]);
+  const [stats, setStats] = useState({
+    avg: 0,
+    total: 0,
+    dist: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  });
+  const [loadingReviews, setLoadingReviews] = useState(true);
 
-  const [newRating, setNewRating] = useState(5);
-  const [newText, setNewText] = useState("");
-  const handleSubmitReview = (e) => {
-    e.preventDefault();
-    if (!newText.trim()) return showToast("Escribe tu opinión", "warning");
-    const author = user?.name || "Invitado";
-    const newReview = {
-      id: `temp-${Date.now()}`,
-      author,
-      rating: newRating,
-      text: newText.trim(),
-      date: new Date().toISOString(),
-    };
-    setReviews((r) => [newReview, ...r]);
-    setNewText("");
-    setNewRating(5);
-    showToast("Gracias por tu reseña (guardado local por ahora)", "success");
+  const [myRating, setMyRating] = useState(5);
+  const [myText, setMyText] = useState("");
+  const [myReviewId, setMyReviewId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const isUser = !!user && user.role === "user";
+
+  const fetchReviews = async () => {
+    setLoadingReviews(true);
+    try {
+      const { data } = await apiUrl.get(`/reviews/product/${product._id}`, {
+        params: { page: 1, limit: 10 },
+      });
+      setReviews(Array.isArray(data?.items) ? data.items : []);
+      setStats(
+        data?.stats || {
+          avg: 0,
+          total: 0,
+          dist: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        }
+      );
+      if (data?.myReview) {
+        setMyReviewId(data.myReview.id || data.myReview._id || null);
+        setMyRating(Number(data.myReview.rating || 5));
+        setMyText(String(data.myReview.text || ""));
+      } else {
+        setMyReviewId(null);
+        setMyRating(5);
+        setMyText("");
+      }
+    } catch {
+      setReviews([]);
+      setStats({ avg: 0, total: 0, dist: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } });
+      setMyReviewId(null);
+    } finally {
+      setLoadingReviews(false);
+    }
   };
+
+  // Cargar reseñas al montar / cambiar de producto
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      await fetchReviews();
+      if (cancel) return;
+    })();
+    return () => {
+      cancel = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product._id]);
+
+  // Guardar/editar (upsert) reseña
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!isUser) {
+      showToast(
+        user ? "Solo usuarios pueden reseñar" : "Inicia sesión para reseñar",
+        user ? "warning" : "info"
+      );
+      return;
+    }
+    const txt = myText.trim();
+    if (!txt) {
+      showToast("Escribe tu opinión", "warning");
+      return;
+    }
+    if (txt.length > 1200) {
+      showToast("La reseña es muy larga (máx. 1200 caracteres)", "warning");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiUrl.post(`/reviews/product/${product._id}`, {
+        rating: myRating,
+        text: txt,
+      });
+      showToast("¡Gracias! Tu reseña ha sido guardada.", "success");
+      // 🧹 limpiar caja y reset estrellas a 5
+      setMyText("");
+      setMyRating(5);
+      await fetchReviews();
+    } catch {
+      showToast("No se pudo guardar tu reseña", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Eliminar reseña propia
+  const handleDeleteReview = async () => {
+    if (!isUser || !myReviewId) return;
+    const ok = window.confirm(
+      "¿Eliminar tu reseña? Esta acción no se puede deshacer."
+    );
+    if (!ok) return;
+    setSubmitting(true);
+    try {
+      await apiUrl.delete(`/reviews/product/${product._id}`);
+      showToast("Reseña eliminada", "success");
+      setMyText("");
+      setMyRating(5);
+      setMyReviewId(null);
+      await fetchReviews();
+    } catch {
+      showToast("No se pudo eliminar tu reseña", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const avg = Number(stats.avg || 0);
 
   /* ----- UI ----- */
   return (
@@ -390,7 +476,7 @@ const ProductDetailBlock = ({
           <div className="pd__ratingRow">
             <StarRatingDisplay value={avg} />
             <span className="pd__votes">
-              {reviews.length} {reviews.length === 1 ? "opinión" : "opiniones"}
+              {stats.total} {stats.total === 1 ? "opinión" : "opiniones"}
             </span>
           </div>
 
@@ -506,14 +592,14 @@ const ProductDetailBlock = ({
             <div className="pd__avg">
               <StarRatingDisplay value={avg} size="lg" />
               <div className="pd__avgnum">{avg.toFixed(1)}</div>
-              <div className="pd__avglbl">{reviews.length} calificaciones</div>
+              <div className="pd__avglbl">{stats.total} calificaciones</div>
             </div>
 
             <div className="pd__bars">
               {[5, 4, 3, 2, 1].map((s) => {
-                const count = dist[s] || 0;
-                const pct = reviews.length
-                  ? Math.round((count / reviews.length) * 100)
+                const count = stats?.dist?.[s] || 0;
+                const pct = stats.total
+                  ? Math.round((count / stats.total) * 100)
                   : 0;
                 return (
                   <div key={s} className="bar">
@@ -530,53 +616,72 @@ const ProductDetailBlock = ({
 
           <div className="pd__opinions">
             <form className="pd__form" onSubmit={handleSubmitReview}>
-              <h4>Escribe tu reseña</h4>
-              <StarRatingInput value={newRating} onChange={setNewRating} />
+              <h4>
+                {isUser
+                  ? myReviewId
+                    ? "Edita tu reseña"
+                    : "Escribe tu reseña"
+                  : "Inicia sesión para reseñar"}
+              </h4>
+              <StarRatingInput value={myRating} onChange={setMyRating} />
               <textarea
                 placeholder="Cuéntanos tu experiencia con el producto…"
-                value={newText}
-                onChange={(e) => setNewText(e.target.value)}
+                value={myText}
+                onChange={(e) => setMyText(e.target.value)}
                 rows={4}
+                disabled={!isUser || submitting}
+                maxLength={1200}
               />
               <div className="pd__formActions">
-                <button type="submit" className="btn btn--primary">
-                  Enviar reseña
+                <button
+                  type="submit"
+                  className="btn btn--primary"
+                  disabled={!isUser || submitting}
+                >
+                  {myReviewId ? "Guardar cambios" : "Guardar reseña"}
                 </button>
+                {myReviewId && (
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    onClick={handleDeleteReview}
+                    disabled={submitting}
+                  >
+                    Eliminar mi reseña
+                  </button>
+                )}
                 <span className="pd__hint">
-                  Se mostrará al instante (almacenamiento local por ahora).
+                  Solo puedes tener <b>una reseña</b> por producto. Guardar
+                  vuelve a escribir la tuya.
                 </span>
               </div>
             </form>
 
             <ul className="pd__list">
-              {reviews.length === 0 && (
+              {loadingReviews ? (
+                <li className="pd__empty">Cargando reseñas…</li>
+              ) : reviews.length === 0 ? (
                 <li className="pd__empty">
                   Aún no hay opiniones. ¡Sé el primero en opinar!
                 </li>
+              ) : (
+                reviews.map((r) => (
+                  <li key={r.id || r._id} className="op">
+                    <div className="op__header">
+                      <StarRatingDisplay value={r.rating} />
+                      <span className="op__author">
+                        {r.author || "Usuario"}
+                      </span>
+                      <span className="op__date">
+                        {r.createdAt
+                          ? new Date(r.createdAt).toLocaleDateString()
+                          : ""}
+                      </span>
+                    </div>
+                    <p className="op__text">{r.text}</p>
+                  </li>
+                ))
               )}
-              {reviews.map((r) => (
-                <li key={r.id || r._id} className="op">
-                  <div className="op__header">
-                    <StarRatingDisplay value={r.rating} />
-                    <span className="op__author">{r.author || "Usuario"}</span>
-                    <span className="op__date">
-                      {new Date(r.date || Date.now()).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p className="op__text">{r.text}</p>
-                  <div className="op__actions">
-                    <button
-                      type="button"
-                      className="linklike"
-                      onClick={() =>
-                        showToast("Gracias por tu voto 👍", "success")
-                      }
-                    >
-                      ¿Te fue útil?
-                    </button>
-                  </div>
-                </li>
-              ))}
             </ul>
           </div>
         </div>
@@ -613,7 +718,6 @@ const ProductDetailBlock = ({
           ✕
         </button>
 
-        {/* Botones navegación */}
         {images.length > 1 && (
           <>
             <button
@@ -653,7 +757,6 @@ const ProductDetailBlock = ({
           </figcaption>
         </figure>
 
-        {/* Tira de miniaturas */}
         {images.length > 1 && (
           <div className="lb__thumbs" onClick={(e) => e.stopPropagation()}>
             {images.map((img, i) => (
