@@ -330,6 +330,7 @@ app.use(["/api/orders", "/api/messages", "/api/cart"], writeLimiter);
 
 // ============================== Rutas ===========================
 const userRoutes = require("./routes/userRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const productEntryHistoryRoutes = require("./routes/productEntryHistoryRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
@@ -347,6 +348,7 @@ app.get("/health", (_req, res) => res.status(200).json({ ok: true, ts: Date.now(
 
 // API
 app.use("/api/users", userRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use("/api/favorites", favoriteRoutes);
 app.use("/api/productsHistory", productEntryHistoryRoutes);

@@ -41,6 +41,8 @@ import AdminDashboarPage from "./pages/admin/AdminDashboardPage";
 import ProductHistoryPage from "./pages/admin/products/AdminProductHistoryPage";
 import AdminProductEntryHistoryPage from "./pages/admin/products/AdminProductEntryHistoyPage";
 import AdminInboxPage from "./pages/AdminInboxPage";
+import RequireAdmin from "./components/RequireAdmin";
+import UsersAdminPage from "./pages/admin/UsersAdminPage";
 
 /* Soporte y varias */
 import SupportChatPage from "./pages/SupportChatPage";
@@ -132,6 +134,14 @@ function AppShell() {
             <Route
               path="/admin/historial"
               element={<AdminProductEntryHistoryPage />}
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <RequireAdmin>
+                  <UsersAdminPage />
+                </RequireAdmin>
+              }
             />
           </Route>
 

@@ -135,7 +135,7 @@ exports.login = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email, 
+        email: user.email,
         role: user.role,
         isVerified: user.isVerified,
       },
@@ -311,4 +311,39 @@ exports.getMe = async (req, res) => {
     .lean();
   if (!me) return res.status(404).json({ error: "Usuario no encontrado" });
   res.json({ user: me });
+};
+
+// PATCH (editar nombre/telefono, etc.)
+exports.updateMe = async (req, res) => {
+  const allowed = {};
+  if (typeof req.body.name === "string") allowed.name = req.body.name.trim();
+  if (typeof req.body.phone === "string") allowed.phone = req.body.phone.trim(); // si añades phone al schema
+
+  const me = await User.findByIdAndUpdate(
+    req.user.id,
+    { $set: allowed },
+    { new: true, runValidators: true, select: "name email role isVerified" }
+  );
+  if (!me) return res.status(404).json({ error: "Usuario no encontrado" });
+  res.json({ user: me });
+};
+
+// PATCH /api/users/me/password
+exports.changeMyPassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res
+      .status(400)
+      .json({ error: "Contraseña actual y nueva son requeridas" });
+  }
+  const me = await User.findById(req.user.id).select("+password");
+  if (!me) return res.status(404).json({ error: "Usuario no encontrado" });
+
+  const ok = await bcrypt.compare(currentPassword, me.password);
+  if (!ok)
+    return res.status(401).json({ error: "Contraseña actual incorrecta" });
+
+  me.password = newPassword;
+  await me.save();
+  res.json({ message: "Contraseña actualizada" });
 };

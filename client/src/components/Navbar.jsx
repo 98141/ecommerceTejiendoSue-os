@@ -254,6 +254,11 @@ const menuConfig = ({ role, hidePublic }) => {
               },
             ],
           },
+                    {
+            label: "Usuarios",
+            to: "/admin/users",
+            activeMatch: /^\/admin\/orders(\/|$)/,
+          },
         ]
       : [];
 

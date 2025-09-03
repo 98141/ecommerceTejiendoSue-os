@@ -29,5 +29,7 @@ router.get("/admin-dashboard", verifyToken, isAdmin, (req, res) => {
 });
 
 router.get("/me", verifyToken, userController.getMe);
+router.patch("/me", verifyToken, userController.updateMe);
+router.patch("/me/password", verifyToken, userController.changeMyPassword);
 
 module.exports = router;
