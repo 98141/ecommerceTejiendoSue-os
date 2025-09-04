@@ -37,6 +37,19 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
     lastLoginAt: { type: Date, default: null },
+    phone: { type: String, trim: true, maxlength: 30 },
+    avatar: {
+      full: { type: String, default: "" },
+      thumb: { type: String, default: "" },
+    },
+    address: {
+      line1: { type: String, trim: true, maxlength: 140 },
+      line2: { type: String, trim: true, maxlength: 140 },
+      city: { type: String, trim: true, maxlength: 60 },
+      state: { type: String, trim: true, maxlength: 60 },
+      zip: { type: String, trim: true, maxlength: 20 },
+      country: { type: String, trim: true, maxlength: 60 },
+    },
     favorites: [
       {
         type: mongoose.Schema.Types.ObjectId,

@@ -29,7 +29,11 @@ const {
   JWT_SECRET = "changeme",
 } = process.env;
 
-const FRONTEND_ORIGIN = (RAW_ORIGIN || CLIENT_URL || "http://localhost:5173").replace(/\/+$/, "");
+const FRONTEND_ORIGIN = (
+  RAW_ORIGIN ||
+  CLIENT_URL ||
+  "http://localhost:5173"
+).replace(/\/+$/, "");
 const isProd = NODE_ENV === "production";
 
 // ======================= App + Server base ======================
@@ -83,7 +87,10 @@ app.use((req, res, next) => {
 });
 
 // ============================ Logging ===========================
-const accessLogStream = fs.createWriteStream(path.join(__dirname, "access.log"), { flags: "a" });
+const accessLogStream = fs.createWriteStream(
+  path.join(__dirname, "access.log"),
+  { flags: "a" }
+);
 app.use(
   morgan(isProd ? "combined" : "dev", {
     stream: isProd ? accessLogStream : process.stdout,
@@ -92,7 +99,11 @@ app.use(
 );
 
 // ============================ CORS ==============================
-const allowlist = [FRONTEND_ORIGIN, "http://localhost:5173", "http://127.0.0.1:5173"].filter(Boolean);
+const allowlist = [
+  FRONTEND_ORIGIN,
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+].filter(Boolean);
 
 const corsOptions = {
   origin: (origin, cb) => {
@@ -102,7 +113,12 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Req-Id"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "X-Req-Id",
+  ],
   exposedHeaders: ["X-Req-Id"],
   maxAge: 86400,
 };
@@ -186,17 +202,23 @@ app.use((req, _res, next) => {
             const normalized = { ...it };
             if (normalized.quantity != null) {
               const n = Number(normalized.quantity);
-              normalized.quantity = Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
+              normalized.quantity =
+                Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
             }
             // asegurar strings simples para IDs
             if (normalized.product && typeof normalized.product === "object") {
-              normalized.product = normalized.product._id || normalized.product.id || normalized.product;
+              normalized.product =
+                normalized.product._id ||
+                normalized.product.id ||
+                normalized.product;
             }
             if (normalized.size && typeof normalized.size === "object") {
-              normalized.size = normalized.size._id || normalized.size.id || normalized.size;
+              normalized.size =
+                normalized.size._id || normalized.size.id || normalized.size;
             }
             if (normalized.color && typeof normalized.color === "object") {
-              normalized.color = normalized.color._id || normalized.color.id || normalized.color;
+              normalized.color =
+                normalized.color._id || normalized.color.id || normalized.color;
             }
             return normalized;
           })
@@ -219,7 +241,8 @@ app.set("io", io);
 io.use((socket, next) => {
   try {
     const hdr = socket.handshake.headers?.authorization || "";
-    const token = socket.handshake.auth?.token || hdr.replace(/^Bearer\s+/i, "");
+    const token =
+      socket.handshake.auth?.token || hdr.replace(/^Bearer\s+/i, "");
     if (!token) return next(new Error("unauthorized"));
     const payload = jwt.verify(token, JWT_SECRET);
     socket.data.user = {
@@ -251,7 +274,12 @@ io.on("connection", (socket) => {
   socket.on("sendMessage", (message) => {
     if (!allowed(socket)) return;
     const text = String(message?.text || "").slice(0, 2000);
-    const safe = { text, from: socket.data.user?.id, role: socket.data.user?.role, at: Date.now() };
+    const safe = {
+      text,
+      from: socket.data.user?.id,
+      role: socket.data.user?.role,
+      at: Date.now(),
+    };
     io.emit("newMessage", safe);
   });
 });
@@ -271,10 +299,13 @@ function ensureUploadsFolderExists() {
   try {
     const uploadsRoot = path.join(__dirname, "uploads");
     const productsDir = path.join(uploadsRoot, "products");
-    const reviewsDir  = path.join(uploadsRoot, "reviews"); 
-    if (!fs.existsSync(uploadsRoot)) fs.mkdirSync(uploadsRoot, { recursive: true });
-    if (!fs.existsSync(productsDir)) fs.mkdirSync(productsDir, { recursive: true });
-    if (!fs.existsSync(reviewsDir))  fs.mkdirSync(reviewsDir,  { recursive: true });
+    const reviewsDir = path.join(uploadsRoot, "reviews");
+    if (!fs.existsSync(uploadsRoot))
+      fs.mkdirSync(uploadsRoot, { recursive: true });
+    if (!fs.existsSync(productsDir))
+      fs.mkdirSync(productsDir, { recursive: true });
+    if (!fs.existsSync(reviewsDir))
+      fs.mkdirSync(reviewsDir, { recursive: true });
     const keep = path.join(productsDir, ".gitkeep");
     if (!fs.existsSync(keep)) fs.writeFileSync(keep, "");
     console.log("📁 Directorios de uploads OK:", productsDir);
@@ -338,6 +369,17 @@ const writeLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+app.use(
+  "/uploads/avatars",
+  express.static(path.join(__dirname, "uploads/avatars"), {
+    etag: true,
+    lastModified: true,
+    maxAge: isProd ? "7d" : 0,
+    immutable: isProd,
+  })
+);
+
 app.use(["/api/orders", "/api/messages", "/api/cart"], writeLimiter);
 
 // ============================== Rutas ===========================
@@ -357,7 +399,9 @@ const favoriteRoutes = require("./routes/favoriteRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 
 // Healthcheck
-app.get("/health", (_req, res) => res.status(200).json({ ok: true, ts: Date.now() }));
+app.get("/health", (_req, res) =>
+  res.status(200).json({ ok: true, ts: Date.now() })
+);
 
 // API
 app.use("/api/users", userRoutes);
@@ -390,7 +434,10 @@ app.use((err, req, res, _next) => {
       ? { error: "Internal Server Error", reqId: req.id }
       : { error: err.message || "Error", reqId: req.id };
   if (status !== 404) {
-    console.error(`🔥 [${req.id}] ${req.method} ${req.originalUrl} -> ${status}`, err);
+    console.error(
+      `🔥 [${req.id}] ${req.method} ${req.originalUrl} -> ${status}`,
+      err
+    );
   }
   res.status(status).json(payload);
 });
@@ -447,7 +494,8 @@ async function gracefulShutdown(reason = "shutdown") {
     // 1) Cerrar Socket.IO
     try {
       const ioInstance = app.get("io");
-      if (ioInstance && typeof ioInstance.close === "function") await ioInstance.close();
+      if (ioInstance && typeof ioInstance.close === "function")
+        await ioInstance.close();
     } catch (e) {
       console.warn("⚠️ Error cerrando Socket.IO:", e?.message || e);
     }

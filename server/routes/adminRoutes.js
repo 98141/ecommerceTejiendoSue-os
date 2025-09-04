@@ -1,8 +1,36 @@
-const router = require("express").Router();
+const express = require("express");
+const rateLimit = require("express-rate-limit");
 const { verifyToken, isAdmin } = require("../middleware/auth");
-const adminController = require("../controllers/adminController");
+const {
+  listUsers,
+  resendVerificationForUser,
+} = require("../controllers/adminController");
 
+const router = express.Router();
 router.use(verifyToken, isAdmin);
-router.get("/users", adminController.listUsers);
+
+const readLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const writeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Listado con filtros/paginación
+router.get("/users", readLimiter, listUsers);
+
+// Reenviar verificación a un usuario
+router.post(
+  "/users/:id/resend-verification",
+  writeLimiter,
+  resendVerificationForUser
+);
 
 module.exports = router;

@@ -126,6 +126,7 @@ exports.login = async (req, res) => {
     const refreshToken = createRefreshToken(user);
 
     user.refreshToken = refreshToken;
+    user.lastLoginAt = new Date();
     await user.save();
 
     res.cookie("refreshToken", refreshToken, refreshCookieOptions());
@@ -306,6 +307,19 @@ exports.resetPassword = async (req, res) => {
 
 /*Informacion de perfil */
 exports.getMe = async (req, res) => {
+  const u = await User.findById(req.user.id).lean();
+  if (!u) return res.status(404).json({ error: "No encontrado" });
+  res.json({
+    id: u._id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    isVerified: u.isVerified,
+    phone: u.phone || "",
+    avatar: u.avatar || { full: "", thumb: "" },
+    address: u.address || {},
+  });
+
   const me = await User.findById(req.user.id)
     .select("name email role isVerified createdAt")
     .lean();
@@ -315,17 +329,56 @@ exports.getMe = async (req, res) => {
 
 // PATCH (editar nombre/telefono, etc.)
 exports.updateMe = async (req, res) => {
-  const allowed = {};
-  if (typeof req.body.name === "string") allowed.name = req.body.name.trim();
-  if (typeof req.body.phone === "string") allowed.phone = req.body.phone.trim(); // si añades phone al schema
+  const { name, phone, address } = req.body || {};
+  const patch = {};
 
-  const me = await User.findByIdAndUpdate(
-    req.user.id,
-    { $set: allowed },
-    { new: true, runValidators: true, select: "name email role isVerified" }
-  );
-  if (!me) return res.status(404).json({ error: "Usuario no encontrado" });
-  res.json({ user: me });
+  if (typeof name === "string" && name.trim()) patch.name = name.trim().slice(0, 100);
+  if (typeof phone === "string") patch.phone = phone.trim().slice(0, 30);
+
+  if (address && typeof address === "object") {
+    patch.address = {
+      line1: address.line1?.slice(0, 140) || "",
+      line2: address.line2?.slice(0, 140) || "",
+      city: address.city?.slice(0, 60) || "",
+      state: address.state?.slice(0, 60) || "",
+      zip: address.zip?.slice(0, 20) || "",
+      country: address.country?.slice(0, 60) || "",
+    };
+  }
+
+  const u = await User.findByIdAndUpdate(req.user.id, { $set: patch }, { new: true }).lean();
+  res.json({
+    id: u._id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    isVerified: u.isVerified,
+    phone: u.phone || "",
+    avatar: u.avatar || { full: "", thumb: "" },
+    address: u.address || {},
+  });
+};
+
+// PATCH /api/users/me/password (currentPassword, newPassword)
+exports.changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: "Datos incompletos" });
+
+  const u = await User.findById(req.user.id).select("+password");
+  if (!u) return res.status(404).json({ error: "No encontrado" });
+
+  const ok = await bcrypt.compare(currentPassword, u.password);
+  if (!ok) return res.status(400).json({ error: "Contraseña actual incorrecta" });
+
+  if (
+    !validator.isStrongPassword(newPassword, { minLength: 8, minNumbers: 1, minSymbols: 1 })
+  ) {
+    return res.status(400).json({ error: "Contraseña débil (8+car, 1 número, 1 símbolo)" });
+  }
+
+  u.password = newPassword;
+  await u.save();
+  res.json({ ok: true, message: "Contraseña actualizada" });
 };
 
 // PATCH /api/users/me/password
@@ -346,4 +399,15 @@ exports.changeMyPassword = async (req, res) => {
   me.password = newPassword;
   await me.save();
   res.json({ message: "Contraseña actualizada" });
+};
+
+//  (multipart: avatar)
+exports.updateAvatar = async (req, res) => {
+  if (!req.avatarProcessed) return res.status(400).json({ error: "Archivo requerido" });
+  const u = await User.findByIdAndUpdate(
+    req.user.id,
+    { $set: { avatar: req.avatarProcessed } },
+    { new: true }
+  ).lean();
+  res.json({ avatar: u.avatar });
 };

@@ -1,111 +1,294 @@
-import { useContext, useEffect, useState } from "react";
-import { AuthContext } from "../contexts/AuthContext";
+import { useEffect, useState, useContext } from "react";
 import api from "../api/apiClient";
+import { AuthContext } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
-import { Link } from "react-router-dom";
+import { getBaseUrl } from "../api/apiClient";
 
 export default function ProfilePage() {
-  const { user } = useContext(AuthContext); // viene de localStorage/login
+  const { user } = useContext(AuthContext);
   const { showToast } = useToast();
-  const [me, setMe] = useState(user || null);
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  const [profile, setProfile] = useState({
+    name: "",
+    email: "",
+    role: "",
+    isVerified: false,
+    phone: "",
+    avatar: { full: "", thumb: "" },
+    address: {
+      line1: "",
+      line2: "",
+      city: "",
+      state: "",
+      zip: "",
+      country: "",
+    },
+  });
+
+  const [pw, setPw] = useState({
+    currentPassword: "",
+    newPassword: "",
+    repeat: "",
+  });
+  const [avatarFile, setAvatarFile] = useState(null);
+  const base = getBaseUrl();
 
   useEffect(() => {
-    let cancel = false;
-    const run = async () => {
-      if (!user) {
-        setMe(null);
-        setLoading(false);
-        return;
-      }
+    (async () => {
       try {
-        const { data } = await api.get("/users/me");
-        if (!cancel) setMe(data?.user || user);
+        const { data } = await api.get("users/me");
+        setProfile((p) => ({
+          ...p,
+          ...data,
+          address: { ...p.address, ...(data.address || {}) },
+        }));
       } catch {
-        if (!cancel) setMe(user);
+        showToast("No se pudo cargar tu perfil", "error");
       } finally {
-        if (!cancel) setLoading(false);
+        setLoading(false);
       }
-    };
-    run();
-    return () => {
-      cancel = true;
-    };
-  }, [user]);
+    })();
+  }, [showToast]);
 
-  if (!user)
-    return (
-      <section className="profile-page">
-        <h1>Mi Perfil</h1>
-        <p>Debes iniciar sesión para ver tu perfil.</p>
-      </section>
-    );
-
-  const resend = async () => {
+  const onSaveInfo = async (e) => {
+    e.preventDefault();
     try {
-      setSending(true);
-      await api.post("/users/resend-verification", {
-        email: me?.email || user.email,
-      });
-      showToast("Te enviamos un nuevo correo de verificación.", "success");
+      const { name, phone, address } = profile;
+      const { data } = await api.patch("users/me", { name, phone, address });
+      setProfile((p) => ({ ...p, ...data }));
+      showToast("Perfil actualizado", "success");
     } catch {
-      showToast("No se pudo reenviar el correo", "error");
-    } finally {
-      setSending(false);
+      showToast("No se pudo actualizar el perfil", "error");
     }
   };
 
+  const onChangePw = async (e) => {
+    e.preventDefault();
+    if (!pw.currentPassword || !pw.newPassword || !pw.repeat) {
+      return showToast("Completa todos los campos de contraseña", "warning");
+    }
+    if (pw.newPassword !== pw.repeat) {
+      return showToast("Las nuevas contraseñas no coinciden", "warning");
+    }
+    try {
+      await api.patch("users/me/password", {
+        currentPassword: pw.currentPassword,
+        newPassword: pw.newPassword,
+      });
+      setPw({ currentPassword: "", newPassword: "", repeat: "" });
+      showToast("Contraseña actualizada", "success");
+    } catch (err) {
+      showToast(
+        err?.response?.data?.error || "No se pudo cambiar la contraseña",
+        "error"
+      );
+    }
+  };
+
+  const onUploadAvatar = async () => {
+    if (!avatarFile) return;
+    try {
+      const fd = new FormData();
+      fd.append("avatar", avatarFile);
+      const { data } = await api.patch("users/me/avatar", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setProfile((p) => ({ ...p, avatar: data.avatar || p.avatar }));
+      setAvatarFile(null);
+      showToast("Foto actualizada", "success");
+    } catch {
+      showToast("No se pudo subir el avatar", "error");
+    }
+  };
+
+  if (!user)
+    return (
+      <section className="profile">
+        <h1>Perfil</h1>
+        <p>Inicia sesión para ver tu perfil.</p>
+      </section>
+    );
+  if (loading)
+    return (
+      <section className="profile">
+        <h1>Perfil</h1>
+        <p>Cargando…</p>
+      </section>
+    );
+
   return (
-    <section className="profile-page">
+    <section className="profile">
       <h1>Mi Perfil</h1>
 
-      {loading ? (
-        <p>Cargando…</p>
-      ) : (
-        <div className="profile-grid">
-          <div className="card">
-            <h2>Datos</h2>
-            <p>
-              <b>Nombre:</b> {me?.name}
-            </p>
-            <p>
-              <b>Email:</b> {me?.email}
-            </p>
-            <p>
-              <b>Estado:</b>{" "}
-              {me?.isVerified ? (
-                <span className="badge badge--ok">Verificado</span>
-              ) : (
-                <span className="badge badge--warn">No verificado</span>
-              )}
-            </p>
+      <div className="profile__grid">
+        <form onSubmit={onSaveInfo} className="card">
+          <h2>Información</h2>
+          <label>
+            Nombre
+            <input
+              value={profile.name}
+              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+            />
+          </label>
+          <label>
+            Email
+            <input value={profile.email} disabled />
+          </label>
+          <label>
+            Teléfono
+            <input
+              value={profile.phone || ""}
+              onChange={(e) =>
+                setProfile({ ...profile, phone: e.target.value })
+              }
+            />
+          </label>
 
-            {!me?.isVerified && (
-              <button
-                className="btn btn--primary"
-                onClick={resend}
-                disabled={sending}
-              >
-                {sending ? "Enviando…" : "Reenviar verificación"}
-              </button>
-            )}
-          </div>
-
-          {me?.role === "admin" && (
-            <div className="card">
-              <h2>Panel de administrador</h2>
-              <p>Tienes privilegios de administrador.</p>
-              <div className="actions">
-                <Link to="/admin/users" className="btn btn--ghost">
-                  Usuarios
-                </Link>
-                {/* Puedes añadir más accesos rápidos aquí */}
-              </div>
+          <fieldset>
+            <legend>Dirección</legend>
+            <label>
+              Dirección 1
+              <input
+                value={profile.address.line1 || ""}
+                onChange={(e) =>
+                  setProfile({
+                    ...profile,
+                    address: { ...profile.address, line1: e.target.value },
+                  })
+                }
+              />
+            </label>
+            <label>
+              Dirección 2
+              <input
+                value={profile.address.line2 || ""}
+                onChange={(e) =>
+                  setProfile({
+                    ...profile,
+                    address: { ...profile.address, line2: e.target.value },
+                  })
+                }
+              />
+            </label>
+            <div className="row">
+              <label>
+                Ciudad
+                <input
+                  value={profile.address.city || ""}
+                  onChange={(e) =>
+                    setProfile({
+                      ...profile,
+                      address: { ...profile.address, city: e.target.value },
+                    })
+                  }
+                />
+              </label>
+              <label>
+                Provincia/Estado
+                <input
+                  value={profile.address.state || ""}
+                  onChange={(e) =>
+                    setProfile({
+                      ...profile,
+                      address: { ...profile.address, state: e.target.value },
+                    })
+                  }
+                />
+              </label>
             </div>
-          )}
+            <div className="row">
+              <label>
+                CP
+                <input
+                  value={profile.address.zip || ""}
+                  onChange={(e) =>
+                    setProfile({
+                      ...profile,
+                      address: { ...profile.address, zip: e.target.value },
+                    })
+                  }
+                />
+              </label>
+              <label>
+                País
+                <input
+                  value={profile.address.country || ""}
+                  onChange={(e) =>
+                    setProfile({
+                      ...profile,
+                      address: { ...profile.address, country: e.target.value },
+                    })
+                  }
+                />
+              </label>
+            </div>
+          </fieldset>
+
+          <button className="btn btn--primary" type="submit">
+            Guardar cambios
+          </button>
+        </form>
+
+        <div className="card">
+          <h2>Avatar</h2>
+          <div className="avatarRow">
+            <img
+              src={
+                profile.avatar.thumb
+                  ? `${base}${profile.avatar.thumb}`
+                  : "/placeholder.jpg"
+              }
+              alt="avatar"
+            />
+            <div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+              />
+              <button
+                className="btn"
+                type="button"
+                onClick={onUploadAvatar}
+                disabled={!avatarFile}
+              >
+                Subir
+              </button>
+            </div>
+          </div>
         </div>
-      )}
+
+        <form onSubmit={onChangePw} className="card">
+          <h2>Contraseña</h2>
+          <label>
+            Actual
+            <input
+              type="password"
+              value={pw.currentPassword}
+              onChange={(e) =>
+                setPw({ ...pw, currentPassword: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Nueva
+            <input
+              type="password"
+              value={pw.newPassword}
+              onChange={(e) => setPw({ ...pw, newPassword: e.target.value })}
+            />
+          </label>
+          <label>
+            Repetir nueva
+            <input
+              type="password"
+              value={pw.repeat}
+              onChange={(e) => setPw({ ...pw, repeat: e.target.value })}
+            />
+          </label>
+          <button className="btn btn--primary">Cambiar contraseña</button>
+        </form>
+      </div>
     </section>
   );
 }

@@ -1,44 +1,61 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../api/apiClient";
+import { AuthContext } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 
-const useDebounced = (value, ms = 400) => {
-  const [v, setV] = useState(value);
+// Hook para debounce
+const useDebounced = (value, delay = 400) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
-    const t = setTimeout(() => setV(value), ms);
-    return () => clearTimeout(t);
-  }, [value, ms]);
-  return v;
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
 };
 
-export default function UsersAdminPage() {
+export default function AdminUsersPage() {
+  const { user } = useContext(AuthContext);
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
+  // Seguridad: solo admins
+  useEffect(() => {
+    if (!user || user.role !== "admin") {
+      showToast("Acceso restringido a administradores", "warning");
+      navigate("/");
+    }
+  }, [user, navigate, showToast]);
+
+  // Filtros y estado
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
   const [verified, setVerified] = useState("all");
   const [sort, setSort] = useState("createdAt:desc");
-  const [limit, setLimit] = useState(20);
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
 
-  const debQ = useDebounced(q, 400);
+  const debouncedQ = useDebounced(q, 400);
 
+  // Construcción de parámetros
   const params = useMemo(() => {
     const p = { page, limit, sort };
-    if (debQ.trim()) p.q = debQ.trim();
+    if (debouncedQ.trim()) p.q = debouncedQ.trim();
     if (role !== "all") p.role = role;
     if (verified !== "all") p.verified = verified;
     return p;
-  }, [page, limit, sort, debQ, role, verified]);
+  }, [page, limit, sort, debouncedQ, role, verified]);
 
+  // Fetch de usuarios
   useEffect(() => {
     let cancel = false;
     setLoading(true);
-    api.get("/admin/users", { params })
+    api
+      .get("/admin/users", { params })
       .then(({ data }) => {
         if (cancel) return;
         setItems(Array.isArray(data?.items) ? data.items : []);
@@ -48,14 +65,20 @@ export default function UsersAdminPage() {
         if (cancel) return;
         setItems([]);
         setTotal(0);
-        showToast("No se pudo cargar usuarios", "error");
+        showToast("Error al cargar usuarios", "error");
       })
-      .finally(() => !cancel && setLoading(false));
-    return () => { cancel = true; };
+      .finally(() => {
+        if (!cancel) setLoading(false);
+      });
+    return () => {
+      cancel = true;
+    };
   }, [params, showToast]);
 
-  // Reiniciar a página 1 cuando cambian filtros "fuertes"
-  useEffect(() => { setPage(1); }, [debQ, role, verified, limit, sort]);
+  // Reiniciar página al cambiar filtros
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQ, role, verified, limit, sort]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -63,7 +86,7 @@ export default function UsersAdminPage() {
     <section className="admin-users">
       <h1>Usuarios</h1>
 
-      <div className="admin-users__filters">
+      <div className="filters">
         <input
           type="search"
           value={q}
@@ -88,18 +111,22 @@ export default function UsersAdminPage() {
           <option value="email:asc">Email A→Z</option>
           <option value="email:desc">Email Z→A</option>
         </select>
-        <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
+        <select
+          value={limit}
+          onChange={(e) => setLimit(Number(e.target.value))}
+        >
           <option value={10}>10 / pág</option>
           <option value={20}>20 / pág</option>
           <option value={50}>50 / pág</option>
+          <option value={100}>100 / pág</option>
         </select>
       </div>
 
-      <div className="admin-users__summary">
+      <div className="summary">
         {loading ? "Cargando…" : `Total: ${total} usuarios`}
       </div>
 
-      <div className="admin-users__tableWrap">
+      <div className="tableWrap">
         <table className="admin-table">
           <thead>
             <tr>
@@ -112,16 +139,24 @@ export default function UsersAdminPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5}>Cargando…</td></tr>
+              <tr>
+                <td colSpan={5}>Cargando…</td>
+              </tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={5}>Sin resultados</td></tr>
+              <tr>
+                <td colSpan={5}>Sin resultados</td>
+              </tr>
             ) : (
-              items.map(u => (
+              items.map((u) => (
                 <tr key={u.id}>
                   <td>{u.name}</td>
                   <td>{u.email}</td>
                   <td>
-                    <span className={`badge ${u.role === "admin" ? "badge--admin" : "badge--user"}`}>
+                    <span
+                      className={`badge ${
+                        u.role === "admin" ? "badge--admin" : "badge--user"
+                      }`}
+                    >
                       {u.role}
                     </span>
                   </td>
@@ -132,7 +167,9 @@ export default function UsersAdminPage() {
                       <span className="badge badge--warn">No</span>
                     )}
                   </td>
-                  <td>{u.createdAt ? new Date(u.createdAt).toLocaleString() : "-"}</td>
+                  <td>
+                    {u.createdAt ? new Date(u.createdAt).toLocaleString() : "-"}
+                  </td>
                 </tr>
               ))
             )}
@@ -140,19 +177,21 @@ export default function UsersAdminPage() {
         </table>
       </div>
 
-      <div className="admin-users__pager">
+      <div className="pager">
         <button
           className="btn btn--ghost"
           disabled={page <= 1 || loading}
-          onClick={() => setPage(p => Math.max(1, p - 1))}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
         >
           ← Anterior
         </button>
-        <span>Pág. {page} / {totalPages}</span>
+        <span>
+          Pág. {page} / {totalPages}
+        </span>
         <button
           className="btn btn--ghost"
           disabled={page >= totalPages || loading}
-          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
         >
           Siguiente →
         </button>

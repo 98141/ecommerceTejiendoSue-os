@@ -66,3 +66,31 @@ exports.listUsers = async (req, res) => {
     hasMore: pageNum * limitNum < total,
   });
 };
+
+exports.resendVerificationForUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id).select("_id email isVerified");
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+    if (user.isVerified) {
+      return res.status(400).json({ error: "El usuario ya está verificado" });
+    }
+    if (!process.env.JWT_EMAIL_SECRET) {
+      return res.status(500).json({ error: "Falta JWT_EMAIL_SECRET" });
+    }
+
+    const verifyToken = jwt.sign(
+      { id: user._id },
+      process.env.JWT_EMAIL_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    await sendVerificationEmail(user.email, verifyToken);
+
+    return res.json({ message: "Correo de verificación reenviado" });
+  } catch (err) {
+    console.error("admin.resendVerificationForUser error:", err);
+    res.status(500).json({ error: "No se pudo reenviar la verificación" });
+  }
+};

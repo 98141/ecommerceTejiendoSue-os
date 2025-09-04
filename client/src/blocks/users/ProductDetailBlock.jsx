@@ -49,33 +49,31 @@ const StarRatingDisplay = ({ value = 0, size = "md" }) => {
   );
 };
 
-const StarRatingInput = ({ value, onChange }) => (
-  <div className="rating-input" role="radiogroup" aria-label="Calificación">
-    {[5, 4, 3, 2, 1].map((v) => (
-      <label
-        key={v}
-        className="rating-input__opt"
-        aria-label={`${v} estrellas`}
-        title={`${v} estrellas`}
-        style={{ cursor: "pointer" }}
-      >
-        <input
-          type="radio"
-          name="stars"
-          value={v}
-          checked={Number(value) === v}
-          onChange={() => onChange(v)}
-          style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
-        />
-        <div className="stars">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Star key={i} filled={i <= v} />
-          ))}
-        </div>
-      </label>
-    ))}
-  </div>
-);
+const StarRatingInput = ({ value, onChange }) => {
+  return (
+    <div className="rating-input" role="radiogroup" aria-label="Calificación">
+      {[1, 2, 3, 4, 5].map((v) => (
+        <label
+          key={v}
+          className="rating-input__opt"
+          aria-label={`${v} estrellas`}
+          title={`${v} estrellas`}
+          style={{ cursor: "pointer" }}
+        >
+          <input
+            type="radio"
+            name="stars"
+            value={v}
+            checked={Number(value) === v}
+            onChange={() => onChange(v)}
+            style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+          />
+          <Star filled={v <= value} /> 
+        </label>
+      ))}
+    </div>
+  );
+};
 
 const MiniCard = ({ item }) => {
   const mainImage = item?.images?.[0] || "/placeholder.jpg";
