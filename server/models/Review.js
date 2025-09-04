@@ -14,18 +14,15 @@ const reviewSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    rating: {
-      type: Number,
-      min: 1,
-      max: 5,
-      required: true,
-    },
-    text: {
-      type: String,
-      maxlength: 1000,
-      default: "",
-      trim: true,
-    },
+    rating: { type: Number, min: 1, max: 5, required: true },
+    text: { type: String, trim: true, maxlength: 2000 },
+    images: [
+      {
+        full: { type: String, required: true },
+        thumb: { type: String, required: true },
+      },
+    ],
+    isEdited: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -33,12 +30,12 @@ const reviewSchema = new mongoose.Schema(
 // Un usuario solo puede dejar 1 reseña por producto
 reviewSchema.index({ product: 1, user: 1 }, { unique: true });
 
-// === Helper para recalcular promedio y conteo en Product ===
+// Recalcular y cachear en Product
 reviewSchema.statics.recalcForProduct = async function (productId) {
   const Review = this;
   const Product = mongoose.model("Product");
 
-  const agg = await Review.aggregate([
+  const [row] = await Review.aggregate([
     { $match: { product: new mongoose.Types.ObjectId(productId) } },
     {
       $group: {
@@ -54,22 +51,26 @@ reviewSchema.statics.recalcForProduct = async function (productId) {
     },
   ]);
 
-  const stats = agg[0] || null;
-  const patch = stats
+  const patch = row
     ? {
-        ratingAvg: Number(stats.avg.toFixed(2)),
-        reviewsCount: stats.count,
-        ratingDist: {
-          1: stats.d1, 2: stats.d2, 3: stats.d3, 4: stats.d4, 5: stats.d5,
-        },
+        rating: Number(row.avg.toFixed(2)), // compat: muchos front leen Product.rating
+        reviewsCount: row.count,
+        ratingAvg: Number(row.avg.toFixed(2)), // opcional
+        ratingDist: { 1: row.d1, 2: row.d2, 3: row.d3, 4: row.d4, 5: row.d5 }, // opcional
       }
-    : { ratingAvg: 0, reviewsCount: 0, ratingDist: {1:0,2:0,3:0,4:0,5:0} };
+    : {
+        rating: 0,
+        reviewsCount: 0,
+        ratingAvg: 0,
+        ratingDist: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      };
 
-  await Product.updateOne(
-    { _id: productId },
-    { $set: patch }
-  );
-  return patch;
+  await Product.updateOne({ _id: productId }, { $set: patch });
+  return {
+    avg: patch.rating,
+    total: patch.reviewsCount,
+    dist: patch.ratingDist,
+  };
 };
 
 module.exports = mongoose.model("Review", reviewSchema);

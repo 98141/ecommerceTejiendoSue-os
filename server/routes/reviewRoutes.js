@@ -5,18 +5,42 @@ const slowDown = require("express-slow-down");
 const { verifyToken, onlyUsers } = require("../middleware/auth");
 const maybeAuth = require("../middleware/maybeAuth");
 const ctrl = require("../controllers/reviewController");
+const {
+  uploadReviewImages,
+  processReviewImages,
+} = require("../middleware/uploadReviewImages");
 
-// Ver reseñas (público, pero si hay token lo leemos)
+// Público (lee token si existe)
 router.get("/product/:productId", maybeAuth, ctrl.listByProduct);
 
-// Crear/editar mi reseña (solo usuarios)
-const writeLimiter = rateLimit({ windowMs: 60_000, max: 20, standardHeaders: true });
+// Crear/editar mi reseña (texto + rating + imágenes opcionales)
+const writeLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 20,
+  standardHeaders: true,
+});
 const writeSlow = slowDown({ windowMs: 60_000, delayAfter: 5, delayMs: 200 });
 
-router.post("/product/:productId", verifyToken, onlyUsers, writeLimiter, writeSlow, ctrl.upsertMyReview);
+router.post(
+  "/product/:productId",
+  verifyToken,
+  onlyUsers,
+  writeLimiter,
+  writeSlow,
+  uploadReviewImages,
+  processReviewImages,
+  ctrl.upsertMyReview
+);
 
-// Borrar reseña (dueño o admin)
+// Borrar mi reseña
+router.delete(
+  "/product/:productId",
+  verifyToken,
+  onlyUsers,
+  ctrl.deleteMyReview
+);
+
+// Borrar reseña por id (admin o dueño)
 router.delete("/:id", verifyToken, writeLimiter, writeSlow, ctrl.deleteReview);
-router.delete("/product/:productId", verifyToken, onlyUsers, ctrl.deleteMyReview);
 
 module.exports = router;

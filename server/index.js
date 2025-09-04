@@ -271,8 +271,10 @@ function ensureUploadsFolderExists() {
   try {
     const uploadsRoot = path.join(__dirname, "uploads");
     const productsDir = path.join(uploadsRoot, "products");
+    const reviewsDir  = path.join(uploadsRoot, "reviews"); 
     if (!fs.existsSync(uploadsRoot)) fs.mkdirSync(uploadsRoot, { recursive: true });
     if (!fs.existsSync(productsDir)) fs.mkdirSync(productsDir, { recursive: true });
+    if (!fs.existsSync(reviewsDir))  fs.mkdirSync(reviewsDir,  { recursive: true });
     const keep = path.join(productsDir, ".gitkeep");
     if (!fs.existsSync(keep)) fs.writeFileSync(keep, "");
     console.log("📁 Directorios de uploads OK:", productsDir);
@@ -285,6 +287,16 @@ ensureUploadsFolderExists();
 app.use(
   "/uploads/products",
   express.static(path.join(__dirname, "uploads/products"), {
+    etag: true,
+    lastModified: true,
+    maxAge: isProd ? "7d" : 0,
+    immutable: isProd,
+  })
+);
+
+app.use(
+  "/uploads/reviews",
+  express.static(path.join(__dirname, "uploads/reviews"), {
     etag: true,
     lastModified: true,
     maxAge: isProd ? "7d" : 0,

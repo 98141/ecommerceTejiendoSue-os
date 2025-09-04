@@ -36,6 +36,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    lastLoginAt: { type: Date, default: null },
     favorites: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -44,6 +45,7 @@ const userSchema = new mongoose.Schema(
       },
     ],
   },
+  { timestamps: true }
 );
 
 userSchema.pre("save", async function () {

@@ -297,6 +297,8 @@ const ProductDetailBlock = ({
       : computeEffectiveFallback(product);
 
   /* ======= Reseñas (backend) ======= */
+  const isUser = !!user && user.role === "user";
+
   const [reviews, setReviews] = useState([]);
   const [stats, setStats] = useState({
     avg: 0,
@@ -305,11 +307,13 @@ const ProductDetailBlock = ({
   });
   const [loadingReviews, setLoadingReviews] = useState(true);
 
+  const [myReviewId, setMyReviewId] = useState(null);
   const [myRating, setMyRating] = useState(5);
   const [myText, setMyText] = useState("");
-  const [myReviewId, setMyReviewId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const isUser = !!user && user.role === "user";
+
+  const [files, setFiles] = useState([]);
+  const [previews, setPreviews] = useState([]);
 
   const fetchReviews = async () => {
     setLoadingReviews(true);
@@ -343,7 +347,6 @@ const ProductDetailBlock = ({
     }
   };
 
-  // Cargar reseñas al montar / cambiar de producto
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -356,7 +359,24 @@ const ProductDetailBlock = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product._id]);
 
-  // Guardar/editar (upsert) reseña
+  // Previews cuando cambian files
+  useEffect(() => {
+    previews.forEach((u) => URL.revokeObjectURL(u));
+    const next = files.map((f) => URL.createObjectURL(f));
+    setPreviews(next);
+    return () => next.forEach((u) => URL.revokeObjectURL(u));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files]);
+
+  const onPickFiles = (e) => {
+    const list = Array.from(e.target.files || []);
+    const safe = list.slice(0, 4).filter((f) => f.size <= 3 * 1024 * 1024);
+    setFiles(safe);
+  };
+  const removePicked = (i) =>
+    setFiles((arr) => arr.filter((_, idx) => idx !== i));
+
+  // Guardar/editar (upsert) reseña (JSON o multipart)
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!isUser) {
@@ -367,27 +387,38 @@ const ProductDetailBlock = ({
       return;
     }
     const txt = myText.trim();
-    if (!txt) {
-      showToast("Escribe tu opinión", "warning");
-      return;
-    }
-    if (txt.length > 1200) {
-      showToast("La reseña es muy larga (máx. 1200 caracteres)", "warning");
-      return;
-    }
+    if (!txt) return showToast("Escribe tu opinión", "warning");
+    if (txt.length > 2000)
+      return showToast("Máximo 2000 caracteres", "warning");
+
     setSubmitting(true);
     try {
-      await apiUrl.post(`/reviews/product/${product._id}`, {
-        rating: myRating,
-        text: txt,
-      });
-      showToast("¡Gracias! Tu reseña ha sido guardada.", "success");
-      // 🧹 limpiar caja y reset estrellas a 5
+      let resp;
+      if (files.length) {
+        const fd = new FormData();
+        fd.append("rating", String(myRating));
+        fd.append("text", txt);
+        files.forEach((f) => fd.append("images", f));
+        resp = await apiUrl.post(`/reviews/product/${product._id}`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        resp = await apiUrl.post(`/reviews/product/${product._id}`, {
+          rating: myRating,
+          text: txt,
+        });
+      }
+
+      if (resp?.data?.stats) setStats(resp.data.stats);
+      // Limpiar y refrescar
       setMyText("");
-      setMyRating(5);
+      setMyRating(5); // <-- Aquí se resetea la calificación seleccionada
+      setFiles([]);
       await fetchReviews();
-    } catch {
-      showToast("No se pudo guardar tu reseña", "error");
+      showToast("¡Gracias! Tu reseña ha sido guardada.", "success");
+    } catch (err) {
+      const msg = err?.response?.data?.error || "No se pudo guardar tu reseña";
+      showToast(msg, "error");
     } finally {
       setSubmitting(false);
     }
@@ -402,12 +433,14 @@ const ProductDetailBlock = ({
     if (!ok) return;
     setSubmitting(true);
     try {
-      await apiUrl.delete(`/reviews/product/${product._id}`);
-      showToast("Reseña eliminada", "success");
+      const { data } = await apiUrl.delete(`/reviews/product/${product._id}`);
+      if (data?.stats) setStats(data.stats);
       setMyText("");
       setMyRating(5);
       setMyReviewId(null);
+      setFiles([]);
       await fetchReviews();
+      showToast("Reseña eliminada", "success");
     } catch {
       showToast("No se pudo eliminar tu reseña", "error");
     } finally {
@@ -465,7 +498,7 @@ const ProductDetailBlock = ({
         <aside className="pd__panel">
           <div className="pd__breadcrumbs">
             <Link to="/">Inicio</Link> <span>›</span>{" "}
-            <Link to="/artesanias">Artesanías</Link>
+            <Link to="/artesanías">Artesanías</Link>
           </div>
 
           <div className="pd__titleRow">
@@ -623,15 +656,53 @@ const ProductDetailBlock = ({
                     : "Escribe tu reseña"
                   : "Inicia sesión para reseñar"}
               </h4>
+
+              {/* >>> AQUÍ SE CALIFICA con las estrellas <<< */}
+              <p className="pd__rateHint">
+                Aquí se califica: selecciona cuántas ⭐ das al producto.
+              </p>
               <StarRatingInput value={myRating} onChange={setMyRating} />
+
               <textarea
                 placeholder="Cuéntanos tu experiencia con el producto…"
                 value={myText}
                 onChange={(e) => setMyText(e.target.value)}
                 rows={4}
                 disabled={!isUser || submitting}
-                maxLength={1200}
+                maxLength={2000}
               />
+
+              {/* Uploader de imágenes */}
+              <div className="pd__uploader">
+                <label className="btn btn--ghost">
+                  Adjuntar imágenes (máx. 4)
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={onPickFiles}
+                    style={{ display: "none" }}
+                    disabled={!isUser || submitting}
+                  />
+                </label>
+                <div className="pd__previews">
+                  {previews.map((src, i) => (
+                    <div key={src} className="pd__thumbUp">
+                      <img src={src} alt={`preview-${i}`} />
+                      <button
+                        type="button"
+                        className="x"
+                        onClick={() => removePicked(i)}
+                        aria-label="Quitar"
+                        disabled={submitting}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="pd__formActions">
                 <button
                   type="submit"
@@ -678,7 +749,26 @@ const ProductDetailBlock = ({
                           : ""}
                       </span>
                     </div>
-                    <p className="op__text">{r.text}</p>
+                    {r.text ? <p className="op__text">{r.text}</p> : null}
+
+                    {Array.isArray(r.images) && r.images.length > 0 && (
+                      <div className="op__imgs">
+                        {r.images.map((im, idx) => (
+                          <a
+                            key={idx}
+                            href={`${getBaseUrl()}${im.full}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <img
+                              src={`${getBaseUrl()}${im.thumb}`}
+                              alt={`foto ${idx + 1}`}
+                              loading="lazy"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </li>
                 ))
               )}

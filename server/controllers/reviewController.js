@@ -2,23 +2,7 @@ const mongoose = require("mongoose");
 const Review = require("../models/Review");
 const Product = require("../models/Product");
 
-function normalizeStats(doc) {
-  const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  if (doc?.dist && Array.isArray(doc.dist)) {
-    for (const d of doc.dist) dist[d._id] = d.count;
-  }
-  return {
-    avg: doc?.avg ? Number(doc.avg.toFixed(2)) : 0,
-    total: doc?.total || 0,
-    dist,
-  };
-}
-
-
-/**
- * GET /api/reviews/product/:productId
- * Público (maybeAuth). Devuelve items + stats (avg, dist, total) + tu reseña si estás logeado.
- */
+// GET /api/reviews/product/:productId
 exports.listByProduct = async (req, res) => {
   const { productId } = req.params;
   if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -38,8 +22,7 @@ exports.listByProduct = async (req, res) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
 
-  // Items
-  const [items, total, statsAgg] = await Promise.all([
+  const [items, total, agg] = await Promise.all([
     Review.find({ product: productId })
       .populate({ path: "user", select: "name" })
       .sort({ [field]: dir, _id: dir })
@@ -64,29 +47,43 @@ exports.listByProduct = async (req, res) => {
     ]),
   ]);
 
-  const stats = statsAgg[0]
+  const stats = agg[0]
     ? {
-        avg: Number(statsAgg[0].avg.toFixed(2)),
+        avg: Number(agg[0].avg.toFixed(2)),
         total,
-        dist: { 1:statsAgg[0].d1,2:statsAgg[0].d2,3:statsAgg[0].d3,4:statsAgg[0].d4,5:statsAgg[0].d5 },
+        dist: {
+          1: agg[0].d1,
+          2: agg[0].d2,
+          3: agg[0].d3,
+          4: agg[0].d4,
+          5: agg[0].d5,
+        },
       }
-    : { avg: 0, total: 0, dist: { 1:0,2:0,3:0,4:0,5:0 } };
+    : { avg: 0, total: 0, dist: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
 
   let myReview = null;
   if (req.user?.id) {
-    const mine = await Review.findOne({ product: productId, user: req.user.id }).lean();
+    const mine = await Review.findOne({
+      product: productId,
+      user: req.user.id,
+    }).lean();
     if (mine) {
       myReview = {
-        id: String(mine._id), rating: mine.rating, text: mine.text,
-        createdAt: mine.createdAt, updatedAt: mine.updatedAt,
+        id: String(mine._id),
+        rating: mine.rating,
+        text: mine.text,
+        images: mine.images || [],
+        createdAt: mine.createdAt,
+        updatedAt: mine.updatedAt,
       };
     }
   }
 
-  const shaped = items.map(r => ({
+  const shaped = items.map((r) => ({
     id: String(r._id),
     rating: r.rating,
     text: r.text,
+    images: r.images || [],
     author: r.user?.name || "Usuario",
     createdAt: r.createdAt,
   }));
@@ -101,15 +98,11 @@ exports.listByProduct = async (req, res) => {
   });
 };
 
-/**
- * POST /api/reviews/product/:productId
- * Solo usuarios (no admin). Upsert: crea/edita la reseña del usuario.
- * body: { rating: 1..5, text?: string }
- */
+// POST /api/reviews/product/:productId  (JSON o multipart)
+// Si vienen nuevas imágenes -> REEMPLAZAN las anteriores; si no, se mantienen.
 exports.upsertMyReview = async (req, res) => {
   const { productId } = req.params;
   const userId = req.user?.id;
-  const { rating, text = "" } = req.body || {};
 
   if (!mongoose.Types.ObjectId.isValid(productId)) {
     return res.status(400).json({ error: "productId inválido" });
@@ -119,93 +112,71 @@ exports.upsertMyReview = async (req, res) => {
     return res.status(403).json({ error: "Solo usuarios pueden reseñar" });
   }
 
-  const n = Number(rating);
-  if (!Number.isFinite(n) || n < 1 || n > 5) {
+  const rating = Number(req.body?.rating);
+  const text = String(req.body?.text || "")
+    .trim()
+    .slice(0, 2000);
+
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
     return res.status(400).json({ error: "rating inválido (1..5)" });
-  }
-  if (typeof text !== "string" || text.length > 1000) {
-    return res.status(400).json({ error: "text inválido (<=1000 chars)" });
   }
 
   const prodExists = await Product.exists({ _id: productId });
   if (!prodExists) return res.status(404).json({ error: "Producto no existe" });
 
+  const update = { rating, text, isEdited: true };
+  if (Array.isArray(req.processedImages) && req.processedImages.length) {
+    update.images = req.processedImages; // reemplaza
+  }
+
   const doc = await Review.findOneAndUpdate(
     { product: productId, user: userId },
-    { $set: { rating: n, text: text.trim() } },
+    { $set: update },
     { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+  ).populate("user", "name");
 
-  // Recalcular métricas del producto (cache)
-  const patch = await Review.recalcForProduct(productId);
+  const stats = await Review.recalcForProduct(productId);
 
   res.status(201).json({
     id: String(doc._id),
     rating: doc.rating,
     text: doc.text,
+    images: doc.images || [],
+    author: doc.user?.name || "Usuario",
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
-    stats: { avg: patch.ratingAvg, total: patch.reviewsCount, dist: patch.ratingDist },
+    stats,
   });
 };
 
-/**
- * DELETE /api/reviews/:id
- * El autor puede borrar su reseña; el admin puede borrar cualquiera.
- */
+// DELETE /api/reviews/product/:productId (mi reseña)
+exports.deleteMyReview = async (req, res) => {
+  const { productId } = req.params;
+  const userId = req.user?.id;
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    return res.status(400).json({ error: "productId inválido" });
+  }
+  await Review.deleteOne({ product: productId, user: userId });
+  const stats = await Review.recalcForProduct(productId);
+  res.json({ ok: true, stats });
+};
+
+// DELETE /api/reviews/:id (admin o dueño)
 exports.deleteReview = async (req, res) => {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ error: "id inválido" });
   }
-
   const doc = await Review.findById(id);
   if (!doc) return res.status(404).json({ error: "No existe" });
 
   const isOwner = req.user?.id && String(doc.user) === String(req.user.id);
   const isAdmin = req.user?.role === "admin";
-  if (!isOwner && !isAdmin) {
+  if (!isOwner && !isAdmin)
     return res.status(403).json({ error: "No autorizado" });
-  }
 
+  const productId = doc.product;
   await doc.deleteOne();
-  const patch = await Review.recalcForProduct(doc.product);
-
-  res.json({ ok: true, stats: { avg: patch.ratingAvg, total: patch.reviewsCount, dist: patch.ratingDist } });
-};
-
-exports.deleteMyReview = async (req, res) => {
-  try {
-    const { productId } = req.params;
-    const userId = req.user.id;
-
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ error: "productId inválido" });
-    }
-
-    await Review.deleteOne({ product: productId, user: userId });
-
-    // Recalcular estadísticas
-    const [agg] = await Review.aggregate([
-      { $match: { product: new mongoose.Types.ObjectId(productId) } },
-      {
-        $facet: {
-          avg: [{ $group: { _id: null, avg: { $avg: "$rating" }, total: { $sum: 1 } } }],
-          dist: [{ $group: { _id: "$rating", count: { $sum: 1 } } }],
-        },
-      },
-      {
-        $project: {
-          avg: { $ifNull: [{ $arrayElemAt: ["$avg.avg", 0] }, 0] },
-          total: { $ifNull: [{ $arrayElemAt: ["$avg.total", 0] }, 0] },
-          dist: 1,
-        },
-      },
-    ]);
-
-    return res.json({ message: "Reseña eliminada", stats: normalizeStats(agg) });
-  } catch (err) {
-    console.error("Error deleteMyReview:", err);
-    res.status(500).json({ error: "No se pudo eliminar la reseña" });
-  }
+  const stats = await Review.recalcForProduct(productId);
+  res.json({ ok: true, stats });
 };
