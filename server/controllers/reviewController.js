@@ -1,6 +1,32 @@
 const mongoose = require("mongoose");
 const Review = require("../models/Review");
 const Product = require("../models/Product");
+const Order = require("../models/Order");
+
+const DEFAULT_ELIGIBLE_STATES = ["facturado", "enviado", "entregado"];
+const rawEligible = process.env.REVIEW_ELIGIBLE_STATUSES;
+
+const ELIGIBLE_STATES = Array.isArray(rawEligible)
+  ? rawEligible
+  : typeof rawEligible === "string" && rawEligible.trim()
+  ? rawEligible
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  : DEFAULT_ELIGIBLE_STATES;
+
+// ✅ Helper: ¿el usuario compró este producto?
+async function userHasPurchasedProduct(userId, productId) {
+  const filter = {
+    user: userId,
+    "items.product": productId,
+    $or: ELIGIBLE_STATES.map((s) => ({ status: s })),
+  };
+
+  const doc = await Order.findOne(filter).select("_id").lean();
+
+  return !!doc;
+}
 
 // GET /api/reviews/product/:productId
 exports.listByProduct = async (req, res) => {
@@ -88,6 +114,11 @@ exports.listByProduct = async (req, res) => {
     createdAt: r.createdAt,
   }));
 
+  let eligible = true;
+  if (req.user?.id) {
+    eligible = await userHasPurchasedProduct(req.user.id, productId);
+  }
+
   res.json({
     items: shaped,
     page: pageNum,
@@ -95,6 +126,7 @@ exports.listByProduct = async (req, res) => {
     total,
     stats,
     myReview,
+    eligible,
   });
 };
 
@@ -123,6 +155,19 @@ exports.upsertMyReview = async (req, res) => {
 
   const prodExists = await Product.exists({ _id: productId });
   if (!prodExists) return res.status(404).json({ error: "Producto no existe" });
+
+  const requirePurchase =
+    (process.env.REQUIRE_PURCHASE_FOR_REVIEW || "true").toLowerCase() !==
+    "false";
+
+  if (requirePurchase) {
+    const ok = await userHasPurchasedProduct(userId, productId);
+    if (!ok) {
+      return res.status(403).json({
+        error: "Solo compradores verificados pueden reseñar este producto",
+      });
+    }
+  }
 
   const update = { rating, text, isEdited: true };
   if (Array.isArray(req.processedImages) && req.processedImages.length) {

@@ -68,7 +68,7 @@ const StarRatingInput = ({ value, onChange }) => {
             onChange={() => onChange(v)}
             style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
           />
-          <Star filled={v <= value} /> 
+          <Star filled={v <= value} />
         </label>
       ))}
     </div>
@@ -118,6 +118,7 @@ const ProductDetailBlock = ({
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [availableStock, setAvailableStock] = useState(0);
+  const [eligible, setEligible] = useState(0);
   const [quantity, setQuantity] = useState(1);
 
   const baseUrl = getBaseUrl();
@@ -314,6 +315,18 @@ const ProductDetailBlock = ({
   const [previews, setPreviews] = useState([]);
 
   const fetchReviews = async () => {
+    const { data } = await apiUrl.get(`/reviews/product/${product._id}`, {
+      params: { page: 1, limit: 10 },
+    });
+    setReviews(Array.isArray(data?.items) ? data.items : []);
+    setStats(
+      data?.stats || {
+        avg: 0,
+        total: 0,
+        dist: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      }
+    );
+    setEligible(Boolean(data?.eligible ?? true));
     setLoadingReviews(true);
     try {
       const { data } = await apiUrl.get(`/reviews/product/${product._id}`, {
@@ -655,7 +668,13 @@ const ProductDetailBlock = ({
                   : "Inicia sesión para reseñar"}
               </h4>
 
-              {/* >>> AQUÍ SE CALIFICA con las estrellas <<< */}
+              {isUser && !eligible && (
+                <p className="pd__hint" style={{ color: "#b45309" }}>
+                  Solo <b>compradores verificados</b> pueden reseñar este
+                  producto.
+                </p>
+              )}
+
               <p className="pd__rateHint">
                 Aquí se califica: selecciona cuántas ⭐ das al producto.
               </p>
@@ -666,7 +685,7 @@ const ProductDetailBlock = ({
                 value={myText}
                 onChange={(e) => setMyText(e.target.value)}
                 rows={4}
-                disabled={!isUser || submitting}
+                disabled={!isUser || submitting || !eligible}
                 maxLength={2000}
               />
 
@@ -680,9 +699,10 @@ const ProductDetailBlock = ({
                     accept="image/*"
                     onChange={onPickFiles}
                     style={{ display: "none" }}
-                    disabled={!isUser || submitting}
+                    disabled={!isUser || submitting || !eligible}
                   />
                 </label>
+
                 <div className="pd__previews">
                   {previews.map((src, i) => (
                     <div key={src} className="pd__thumbUp">
@@ -705,7 +725,7 @@ const ProductDetailBlock = ({
                 <button
                   type="submit"
                   className="btn btn--primary"
-                  disabled={!isUser || submitting}
+                  disabled={!isUser || submitting || !eligible}
                 >
                   {myReviewId ? "Guardar cambios" : "Guardar reseña"}
                 </button>
